@@ -1,0 +1,67 @@
+---
+titulo: "Log de la LLM Wiki"
+tipo: sintesis
+estado: Vigente
+actualizado: 2026-09-16
+tags: [log]
+---
+
+# Log — LLM Wiki de FCV Citas
+
+Registro cronológico **append-only**. Nunca se editan ni se borran entradas pasadas.
+
+Formato fijo del encabezado, para que sea parseable:
+
+```
+## [YYYY-MM-DD] <ingest|query|learn|lint> | <asunto>
+```
+
+Últimas entradas: `grep "^## \[" log.md | tail -5`
+
+---
+
+## [2026-09-16] learn | Sistema de agentes y LLM Wiki inicializados
+
+- Creada la gobernanza raíz (`AGENTS.md`, `CLAUDE.md`) y diez agentes especializados en `.claude/agents/`.
+- Creado el esquema de la wiki en `schema/SCHEMA.md` con las tres capas y los workflows INGEST / QUERY / LEARN / LINT.
+- `index.md` y este log nacen vacíos: se llenan con fuentes reales, no con páginas especulativas.
+- Abierto: falta el primer INGEST del PRD y de las restricciones técnicas.
+
+## [2026-09-16] ingest | RES-001 — JWT access+refresh en Spring Boot 3.5.x
+
+- Fuente: `raw/RES-001-spring-security-jwt.md`, investigación delegada a un subagente con 18 fuentes citadas.
+- Páginas creadas: [[dec-001-libreria-jwt]], [[dec-002-rotacion-refresh-tokens]], [[riesgo-spring-security-65-trampas]], [[arq-hexagonal-seguridad]].
+- Hallazgo con impacto inmediato: `NimbusJwtEncoder.withSecretKey(...)` es `@since 7.0` y no compila contra Spring Security 6.5.x, que es lo que trae Boot 3.5.x.
+- Abierto: ¿se acepta que el access token no sea revocable durante sus 15 minutos? Decisión pendiente del usuario, registrada en [[dec-002-rotacion-refresh-tokens]].
+
+## [2026-09-16] ingest | MODELO-DATOS-3FN — esquema propio aplicado con Flyway
+
+- Fuente: `raw/MODELO-DATOS-3FN.md`, verificada contra las migraciones V1–V4 aplicadas en MySQL 8.4 (24 tablas).
+- Páginas creadas: [[datos-modelo-3fn]], [[dec-003-libro-unico-slot-reservations]].
+- Única desviación del análisis 3FN previo: fusión en `slot_reservations` para que el motor impida la doble reserva.
+- Abierto: unicidad global del documento, dónde vive el régimen, seed de Medicina General (RF-11).
+
+## [2026-09-16] learn | Repos remotos, aprobación delegada y reanudación tras límite de API
+
+- DECISIÓN: repos remotos definitivos en `jhonnunez-svg` (citas-api, citas-web, FCV_Proyecto_Citas_v1); el repo del trainer queda como `upstream` en la raíz.
+- DECISIÓN: HU-001 a HU-004 pasan a `Aprobada` por aprobación delegada (el usuario eligió S2 autónomo). Regla añadida en `AGENTS.md` §6.
+- PREFERENCIA: el usuario quiere S2 ejecutado de forma autónoma, con la wiki actualizada en cada interacción.
+- HECHO: `citas-web` compila (`npm run build`) y pasa typecheck; su contrato en `src/api/contracts.ts` es provisional y difiere en nombres de campo del backend.
+
+## [2026-09-16] learn | Especificación Scrum completa: 9 épicas, 33 HU
+
+- HECHO: 33 HU y 9 épicas en `scrum/`, sin wikilinks rotos (verificado). 4 `Aprobada` (HU-001..004), 1 `Pendiente de aprobación`, 28 `Borrador`.
+- PREGUNTA ABIERTA: 8 incógnitas de dominio agrupadas en [[sintesis-preguntas-abiertas]].
+- HECHO: dos defectos de esquema verificados en `V3__schedule_and_appointments.sql` — historial de auditoría con `ON DELETE CASCADE` (contradice RN-12) y `source` sin valor para el profesional. Registrados en [[datos-modelo-3fn]]; se corrigen en S3 con una V5.
+
+## [2026-09-16] learn | Aviso de aprobación delegada aclarado y dudas de autenticación
+
+- HECHO: el primer agente de especificación marcó como "proceso ajeno" el paso de HU-001..004 a `Aprobada`; el cambio fue del orquestador bajo aprobación delegada. README de `scrum/` corregido para decirlo explícitamente.
+- PREGUNTA ABIERTA: 4 dudas de autenticación que afectan a S2 (política de contraseña, login único por rol, primer ADMIN, vigencias) añadidas a [[sintesis-preguntas-abiertas]]. Las épicas registran 40 incógnitas `INC-NNN` en total.
+
+## [2026-09-16] learn | GOAL_01 verificado de forma independiente y commit S2 subido
+
+- HECHO: verificador independiente → `mvn test` 33/33 en verde; hash SHA-256 del refresh, revocación de familia por reuso, mismo 401 para email o clave incorrectos, dominio sin imports de framework: confirmados.
+- HECHO: ninguna de HU-001..004 puede pasar a `Completada`: HU-003 falla en el frontend (sin refresh automático ante 401), falta el contrato REST documentado (HU-033) y la trazabilidad, y no se probó la migración sobre una BD vacía.
+- DECISIÓN: commit `feat(s2)` en `develop` de citas-api, citas-web y la raíz, subido a `jhonnunez-svg`. `main` de los subrepos es un commit inicial vacío.
+- Pendientes ordenados en `PLAN_RETOMA_S2.md` (raíz).
