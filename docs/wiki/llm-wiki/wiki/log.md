@@ -58,3 +58,10 @@ Formato fijo del encabezado, para que sea parseable:
 
 - HECHO: el primer agente de especificación marcó como "proceso ajeno" el paso de HU-001..004 a `Aprobada`; el cambio fue del orquestador bajo aprobación delegada. README de `scrum/` corregido para decirlo explícitamente.
 - PREGUNTA ABIERTA: 4 dudas de autenticación que afectan a S2 (política de contraseña, login único por rol, primer ADMIN, vigencias) añadidas a [[sintesis-preguntas-abiertas]]. Las épicas registran 40 incógnitas `INC-NNN` en total.
+
+## [2026-09-16] learn | GOAL_01 verificado de forma independiente y commit S2 subido
+
+- HECHO: verificador independiente → `mvn test` 33/33 en verde; hash SHA-256 del refresh, revocación de familia por reuso, mismo 401 para email o clave incorrectos, dominio sin imports de framework: confirmados.
+- HECHO: ninguna de HU-001..004 puede pasar a `Completada`: HU-003 falla en el frontend (sin refresh automático ante 401), falta el contrato REST documentado (HU-033) y la trazabilidad, y no se probó la migración sobre una BD vacía.
+- DECISIÓN: commit `feat(s2)` en `develop` de citas-api, citas-web y la raíz, subido a `jhonnunez-svg`. `main` de los subrepos es un commit inicial vacío.
+- Pendientes ordenados en `PLAN_RETOMA_S2.md` (raíz).
