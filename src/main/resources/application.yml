@@ -1,0 +1,74 @@
+# Configuracion de citas-api.
+# Regla: NINGUN valor real de credencial vive aqui. Todo secreto o dato de entorno se lee de
+# variables de entorno con los mismos nombres declarados en .env.example.
+spring:
+  application:
+    name: citas-api
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionTimeZone=America/Bogota&forceConnectionTimeZoneToSession=true
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: citas-api-pool
+      maximum-pool-size: 10
+
+  # Flyway es la unica fuente de verdad del esquema.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    clean-disabled: true
+
+  jpa:
+    hibernate:
+      # validate (nunca update/create): Hibernate solo comprueba que las entidades JPA
+      # coincidan con el esquema que produjo Flyway.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Bogota
+        format_sql: false
+
+  jackson:
+    time-zone: America/Bogota
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+# Actuator expone unicamente health.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
+app:
+  cors:
+    # CORS explicito (PRD seccion 8): origenes exactos, nunca comodin.
+    allowed-origins: ${FRONTEND_ORIGIN:http://localhost:5173}
+  security:
+    jwt:
+      access-secret: ${JWT_ACCESS_SECRET}
+      # Sin uso: el refresh token es opaco (DEC-002), no un JWT firmado. Se mantiene opcional.
+      refresh-secret: ${JWT_REFRESH_SECRET:}
+      access-ttl: ${JWT_ACCESS_MINUTES:15}m
+      refresh-ttl: ${JWT_REFRESH_DAYS:7}d
+
+logging:
+  level:
+    root: INFO
+    com.fcv.citas: INFO
+    org.flywaydb: INFO

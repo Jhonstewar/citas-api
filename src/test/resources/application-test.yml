@@ -1,0 +1,11 @@
+# Perfil de pruebas. La base de datos llega por las mismas variables de entorno (DB_*) que usa
+# docker compose (servicio citas-api-dev -> mysql:3306). Las pruebas limpian sus propios datos.
+app:
+  security:
+    jwt:
+      # Secreto FICTICIO solo para pruebas (>= 32 bytes). Nunca usar fuera de los tests.
+      access-secret: test-only-hs256-secret-not-for-real-use-000000000001
+      access-ttl: 15m
+      refresh-ttl: 7d
+  cors:
+    allowed-origins: http://localhost:5173
