@@ -13,6 +13,10 @@ import com.fcv.citas.application.auth.RefreshSessionUseCase;
 import com.fcv.citas.application.auth.RegisterUserUseCase;
 import com.fcv.citas.application.auth.SessionIssuer;
 import com.fcv.citas.application.appointment.AppointmentQueries;
+import com.fcv.citas.application.appointment.AvailabilityQueries;
+import com.fcv.citas.application.appointment.BookAppointmentUseCase;
+import com.fcv.citas.application.appointment.SearchAvailabilityUseCase;
+import com.fcv.citas.domain.appointment.AppointmentRepository;
 import com.fcv.citas.application.appointment.PatientAppointmentsUseCase;
 import com.fcv.citas.application.catalog.ManageSpecialtiesUseCase;
 import com.fcv.citas.application.professional.ManageProfessionalsUseCase;
@@ -96,6 +100,18 @@ public class UseCaseConfig {
     ManageScheduleUseCase manageScheduleUseCase(ProfessionalRepository professionals, BlockRepository blocks,
             ScheduleQueries queries, TransactionRunner tx, Clock clock) {
         return new ManageScheduleUseCase(professionals, blocks, queries, tx, clock);
+    }
+
+    @Bean
+    BookAppointmentUseCase bookAppointmentUseCase(SpecialtyRepository specialties,
+            ProfessionalRepository professionals, BlockRepository blocks, AppointmentRepository appointments,
+            AppointmentQueries queries, TransactionRunner tx, Clock clock) {
+        return new BookAppointmentUseCase(specialties, professionals, blocks, appointments, queries, tx, clock);
+    }
+
+    @Bean
+    SearchAvailabilityUseCase searchAvailabilityUseCase(AvailabilityQueries queries, Clock clock) {
+        return new SearchAvailabilityUseCase(queries, clock);
     }
 
     @Bean

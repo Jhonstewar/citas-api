@@ -115,3 +115,11 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: las escrituras de agenda de un profesional se serializan con `SELECT … FOR UPDATE` sobre su fila, porque la base solo impide dos bloques con el mismo inicio, no solapes.
 - HECHO: Hibernate 6 con `hibernate.jdbc.time_zone=America/Bogota` NO desplaza las columnas `TIME` al guardar `LocalTime` (comprobado con lectura SQL cruda en `ScheduleIntegrationTest`). Esa prueba queda como vigilancia.
 - HECHO: 170 pruebas en verde (10 de integración de agenda).
+
+## [2026-09-18] learn | F5 de S3: reserva general y especializada (HU-022 a HU-025, HU-032), GOAL_02 backend
+
+- HECHO: dos flujos separados, `POST /api/patient/appointments/general` (APPROVED, historial SYSTEM sin actor) y `/specialized` (REQUESTED, historial USER con el paciente como actor). El equivocado → 422 `WRONG_FLOW`.
+- HECHO: la doble reserva la impide solo la PK de `slot_reservations`; el caso de uso no comprueba antes. 8 reservas concurrentes del mismo slot → 1 × 201 y 7 × 409 (repetido 4 veces). Evidencia en `EVIDENCIAS_S3.md` §7.
+- HECHO (trampa): `SlotReservationJpaEntity` implementa `Persistable.isNew() = true`. Con id asignado, Spring Data haría `merge`, que ante un slot ya reservado ACTUALIZARÍA la reserva ajena en vez de fallar: se perdería la garantía de RN-01 sin que ninguna prueba de un solo hilo lo notara.
+- HECHO: el historial se escribe con un `Repository` de solo `save` (sin métodos de borrado ni actualización, RN-12). La disponibilidad empareja en SQL el slot siguiente del mismo bloque para 60 min (RN-05, D9).
+- HECHO: 199 pruebas en verde. GOAL_02: falta la parte de navegador (E2E) contra el backend real.

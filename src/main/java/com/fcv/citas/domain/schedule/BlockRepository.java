@@ -28,4 +28,7 @@ public interface BlockRepository {
 
     /** Cierto si algun slot del bloque esta reservado o retenido (HU-018 CA-02). */
     boolean hasReservations(long blockId);
+
+    /** Ids de los slots del bloque que empiezan en {@code starts}, en ese orden. */
+    List<Long> slotIds(long blockId, List<java.time.LocalTime> starts);
 }

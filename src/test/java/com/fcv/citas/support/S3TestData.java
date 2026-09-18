@@ -118,6 +118,30 @@ public final class S3TestData {
         return key.getKey().longValue();
     }
 
+    /** Bloque con sus slots de 30 min sembrado por SQL (permite bloques en el pasado para RN-06). */
+    public long block(long professionalId, int siteId, java.time.LocalDate date, String start, String end) {
+        GeneratedKeyHolder key = new GeneratedKeyHolder();
+        jdbc.update(con -> {
+            var ps = con.prepareStatement("INSERT INTO availability_blocks (professional_id, site_id, block_date,"
+                    + " start_time, end_time) VALUES (?, ?, ?, ?, ?)", new String[] { "id" });
+            ps.setLong(1, professionalId);
+            ps.setInt(2, siteId);
+            ps.setObject(3, date);
+            ps.setObject(4, java.time.LocalTime.parse(start));
+            ps.setObject(5, java.time.LocalTime.parse(end));
+            return ps;
+        }, key);
+        long blockId = key.getKey().longValue();
+        for (var t = java.time.LocalTime.parse(start); t.isBefore(java.time.LocalTime.parse(end)); t = t.plusMinutes(30)) {
+            jdbc.update("INSERT INTO availability_slots (availability_block_id, start_time) VALUES (?, ?)", blockId, t);
+        }
+        return blockId;
+    }
+
+    public int count(String sql, Object... args) {
+        return jdbc.queryForObject(sql, Integer.class, args);
+    }
+
     /** Reserva un slot para una cita (fila del libro unico, dec-003). */
     public void reserve(long slotId, long appointmentId, int order) {
         jdbc.update("INSERT INTO slot_reservations (slot_id, reservation_type, appointment_id, slot_order)"

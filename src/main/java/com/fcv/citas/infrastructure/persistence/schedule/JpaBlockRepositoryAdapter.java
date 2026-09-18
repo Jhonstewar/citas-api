@@ -79,6 +79,21 @@ class JpaBlockRepositoryAdapter implements BlockRepository {
         return count.longValue() > 0;
     }
 
+    @Override
+    public List<Long> slotIds(long blockId, List<java.time.LocalTime> starts) {
+        List<Long> ids = new java.util.ArrayList<>();
+        for (java.time.LocalTime start : starts) {
+            List<?> found = em.createNativeQuery(
+                    "SELECT id FROM availability_slots WHERE availability_block_id = ? AND start_time = ?")
+                    .setParameter(1, blockId).setParameter(2, start).getResultList();
+            if (found.isEmpty()) {
+                return List.of();
+            }
+            ids.add(((Number) found.get(0)).longValue());
+        }
+        return ids;
+    }
+
     private void insertSlots(long blockId, AvailabilityBlock b) {
         slots.saveAllAndFlush(b.slotStarts().stream().map(t -> new AvailabilitySlotJpaEntity(blockId, t)).toList());
     }
