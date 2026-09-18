@@ -17,7 +17,10 @@ import com.fcv.citas.application.appointment.PatientAppointmentsUseCase;
 import com.fcv.citas.application.catalog.ManageSpecialtiesUseCase;
 import com.fcv.citas.application.professional.ManageProfessionalsUseCase;
 import com.fcv.citas.application.professional.ProfessionalQueries;
+import com.fcv.citas.application.schedule.ManageScheduleUseCase;
+import com.fcv.citas.application.schedule.ScheduleQueries;
 import com.fcv.citas.domain.catalog.SiteCatalog;
+import com.fcv.citas.domain.schedule.BlockRepository;
 import com.fcv.citas.domain.professional.ProfessionalRepository;
 import com.fcv.citas.application.user.BootstrapAdminUseCase;
 import com.fcv.citas.domain.catalog.SpecialtyRepository;
@@ -87,6 +90,12 @@ public class UseCaseConfig {
             TransactionRunner tx) {
         return new ManageProfessionalsUseCase(users, professionals, queries, specialties, sites, documentTypes,
                 passwordHasher, tx);
+    }
+
+    @Bean
+    ManageScheduleUseCase manageScheduleUseCase(ProfessionalRepository professionals, BlockRepository blocks,
+            ScheduleQueries queries, TransactionRunner tx, Clock clock) {
+        return new ManageScheduleUseCase(professionals, blocks, queries, tx, clock);
     }
 
     @Bean

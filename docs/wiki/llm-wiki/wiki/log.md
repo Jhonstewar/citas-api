@@ -108,3 +108,10 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: el código profesional y la matrícula no se editan tras el alta (HU-013 los deja fuera de alcance, INC-015). El contrato se corrigió antes de implementar y se avisó al frontend.
 - HECHO (trampa): `Set.copyOf(...).contains(null)` lanza `NullPointerException` en vez de devolver `false`; validar nulos con `stream().anyMatch(Objects::isNull)`. Salió como un 500 en el alta y tiene prueba de regresión (`ProfessionalTest`).
 - HECHO: Spring Data no detecta repositorios anidados en otra clase (`considerNestedRepositories=false` por defecto); cada repositorio va en su propio archivo.
+
+## [2026-09-18] learn | F4 de S3: agenda del profesional (HU-017 a HU-019)
+
+- HECHO: `AvailabilityBlock` (dominio) discretiza en slots de 30 min, valida la rejilla :00/:30, el rango, el solape (contiguos no solapan), el pasado (RN-06) y si una cita de N slots cabe en el mismo bloque (RN-05, D9). 12 pruebas de dominio.
+- HECHO: las escrituras de agenda de un profesional se serializan con `SELECT … FOR UPDATE` sobre su fila, porque la base solo impide dos bloques con el mismo inicio, no solapes.
+- HECHO: Hibernate 6 con `hibernate.jdbc.time_zone=America/Bogota` NO desplaza las columnas `TIME` al guardar `LocalTime` (comprobado con lectura SQL cruda en `ScheduleIntegrationTest`). Esa prueba queda como vigilancia.
+- HECHO: 170 pruebas en verde (10 de integración de agenda).

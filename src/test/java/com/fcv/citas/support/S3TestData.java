@@ -95,6 +95,40 @@ public final class S3TestData {
     public record Professional(long id, long userId) {
     }
 
+    /** Cita sembrada directamente (para probar reglas que dependen de reservas existentes). */
+    public long appointment(long patientUserId, long professionalId, int siteId, int specialtyId,
+            java.time.LocalDate date, java.time.LocalTime start, java.time.LocalTime end, String status) {
+        GeneratedKeyHolder key = new GeneratedKeyHolder();
+        jdbc.update(con -> {
+            var ps = con.prepareStatement("""
+                    INSERT INTO appointments (patient_user_id, professional_id, site_id, specialty_id, status_id,
+                                              scheduled_date, start_time, end_time)
+                    VALUES (?, ?, ?, ?, (SELECT id FROM appointment_statuses WHERE code = ?), ?, ?, ?)
+                    """, new String[] { "id" });
+            ps.setLong(1, patientUserId);
+            ps.setLong(2, professionalId);
+            ps.setInt(3, siteId);
+            ps.setInt(4, specialtyId);
+            ps.setString(5, status);
+            ps.setObject(6, date);
+            ps.setObject(7, start);
+            ps.setObject(8, end);
+            return ps;
+        }, key);
+        return key.getKey().longValue();
+    }
+
+    /** Reserva un slot para una cita (fila del libro unico, dec-003). */
+    public void reserve(long slotId, long appointmentId, int order) {
+        jdbc.update("INSERT INTO slot_reservations (slot_id, reservation_type, appointment_id, slot_order)"
+                + " VALUES (?, 'APPOINTMENT', ?, ?)", slotId, appointmentId, order);
+    }
+
+    public long slotId(long blockId, String start) {
+        return jdbc.queryForObject("SELECT id FROM availability_slots WHERE availability_block_id = ?"
+                + " AND start_time = ?", Long.class, blockId, start);
+    }
+
     /** Borra todo lo creado por las pruebas de S3, respetando las FK (sin cascada en el historial). */
     public void cleanUp() {
         String users = "SELECT id FROM users WHERE email LIKE '%" + DOMAIN + "'";

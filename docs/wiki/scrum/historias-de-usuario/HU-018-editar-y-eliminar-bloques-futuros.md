@@ -2,7 +2,7 @@
 id: HU-018
 tipo: historia-de-usuario
 titulo: "Editar y eliminar bloques futuros"
-estado: Aprobada
+estado: En desarrollo
 epica: "[[EP-005-agenda-del-profesional]]"
 requisitos: [RF-08]
 esfuerzo: "Medio"
@@ -159,6 +159,7 @@ La edición de un bloque no es una simple actualización de campos: cambiar la f
 
 ## Historial de validación
 
+- 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F4 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
