@@ -3,6 +3,8 @@ package com.fcv.citas.infrastructure.persistence.appointment;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -96,7 +98,7 @@ class JdbcAppointmentQueries implements AppointmentQueries {
                 """, new MapSqlParameterSource("id", appointmentId),
                 (rs, i) -> new HistoryView(rs.getString("status"), rs.getString("status_name"),
                         rs.getString("source"), rs.getString("actor_name"), rs.getString("reason"),
-                        rs.getTimestamp("changed_at").toLocalDateTime()));
+                        rs.getObject("changed_at", LocalDateTime.class)));
     }
 
     @Override
@@ -145,9 +147,9 @@ class JdbcAppointmentQueries implements AppointmentQueries {
                 rs.getLong("id"),
                 rs.getString("status"),
                 rs.getString("status_name"),
-                rs.getDate("scheduled_date").toLocalDate(),
-                rs.getTime("start_time").toLocalTime(),
-                rs.getTime("end_time").toLocalTime(),
+                rs.getObject("scheduled_date", LocalDate.class),
+                rs.getObject("start_time", LocalTime.class),
+                rs.getObject("end_time", LocalTime.class),
                 rs.getInt("duration_minutes"),
                 new SiteRef(rs.getInt("site_id"), rs.getString("site_code"), rs.getString("site_name")),
                 new PersonRef(rs.getLong("professional_id"), rs.getString("professional_name")),
@@ -155,7 +157,7 @@ class JdbcAppointmentQueries implements AppointmentQueries {
                         rs.getString("specialty_name"), rs.getString("specialty_type"),
                         rs.getInt("specialty_duration")),
                 rs.getString("rejection_reason"),
-                rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getObject("created_at", LocalDateTime.class),
                 new PatientRef(rs.getLong("patient_id"), rs.getString("patient_name"),
                         rs.getString("patient_document_type"), rs.getString("patient_document"),
                         rs.getString("patient_email"), rs.getString("patient_phone")));

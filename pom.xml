@@ -94,6 +94,16 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <!-- La zona horaria del JVM de pruebas se fija ANTES de crear cualquier contexto:
+                     las conexiones JDBC y la conversion de LocalTime de Hibernate dependen de ella,
+                     y fijarla tarde desplazaba 5 h las columnas TIME segun el orden de las pruebas. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Duser.timezone=America/Bogota</argLine>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

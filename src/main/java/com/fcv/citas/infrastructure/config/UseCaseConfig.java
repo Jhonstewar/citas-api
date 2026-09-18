@@ -12,6 +12,7 @@ import com.fcv.citas.application.auth.LogoutUseCase;
 import com.fcv.citas.application.auth.RefreshSessionUseCase;
 import com.fcv.citas.application.auth.RegisterUserUseCase;
 import com.fcv.citas.application.auth.SessionIssuer;
+import com.fcv.citas.application.appointment.AdminAppointmentsUseCase;
 import com.fcv.citas.application.appointment.AppointmentQueries;
 import com.fcv.citas.application.appointment.AvailabilityQueries;
 import com.fcv.citas.application.appointment.BookAppointmentUseCase;
@@ -107,6 +108,12 @@ public class UseCaseConfig {
             ProfessionalRepository professionals, BlockRepository blocks, AppointmentRepository appointments,
             AppointmentQueries queries, TransactionRunner tx, Clock clock) {
         return new BookAppointmentUseCase(specialties, professionals, blocks, appointments, queries, tx, clock);
+    }
+
+    @Bean
+    AdminAppointmentsUseCase adminAppointmentsUseCase(AppointmentRepository appointments,
+            AppointmentQueries queries, TransactionRunner tx, Clock clock) {
+        return new AdminAppointmentsUseCase(appointments, queries, tx, clock);
     }
 
     @Bean

@@ -124,3 +124,10 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: el historial se escribe con un `Repository` de solo `save` (sin métodos de borrado ni actualización, RN-12). La disponibilidad empareja en SQL el slot siguiente del mismo bloque para 60 min (RN-05, D9).
 - HECHO: 199 pruebas en verde. GOAL_02: falta la parte de navegador (E2E) contra el backend real.
 - HECHO (verificado por mutación): con `isNew() = false`, la segunda reserva del mismo slot devuelve 201 y sobrescribe la reserva ajena; `doubleBookingIsRejectedWith409` lo detecta, la prueba concurrente no. Registrado en [[dec-003-libro-unico-slot-reservations]].
+
+## [2026-09-18] learn | F6 de S3: bandeja y decisión del ADMIN (HU-029, HU-030) y defecto de zona horaria
+
+- HECHO: `GET /api/admin/inbox` con filtros combinables; `POST /approve` conserva las reservas; `POST /reject` exige motivo (400 si falta), libera los slots en la misma transacción y el paciente ve el motivo. La decisión bloquea la fila (`PESSIMISTIC_WRITE`): aprobar y rechazar a la vez → un 200 y un 409, con un solo registro de decisión. Solicitud vencida → 409 `APPOINTMENT_EXPIRED` (D12).
+- HECHO (defecto de S2 destapado en S3): la zona horaria del JVM se fijaba en un `@PostConstruct`, después de abrir conexiones; las horas `TIME` se desplazaban 5 h según el orden de las pruebas. Mitigado y documentado en [[riesgo-zona-horaria-columnas-time]].
+- HECHO: 210 pruebas en verde, dos ejecuciones seguidas. [[contrato-rest-citas]] pasa a `Vigente`: todas sus rutas existen y tienen pruebas de integración.
+- PREGUNTA ABIERTA: la bandeja devuelve `history: []` en cada entrada, porque el historial completo se pide en el detalle. Si el frontend lo necesita en la lista, habría que ampliarla.

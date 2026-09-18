@@ -2,8 +2,6 @@ package com.fcv.citas;
 
 import java.util.TimeZone;
 
-import jakarta.annotation.PostConstruct;
-
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -21,15 +19,21 @@ public class CitasApiApplication {
     public static final String APP_TIME_ZONE = "America/Bogota";
 
     public static void main(String[] args) {
+        applyDefaultTimeZone();
         SpringApplication.run(CitasApiApplication.class, args);
     }
 
     /**
      * Fija la zona horaria de la JVM para que fechas/horas de agenda y auditoria sean
      * consistentes con la operacion, independientemente del host o del contenedor.
+     *
+     * <p>Se llama en {@code main}, ANTES de arrancar Spring. Hasta S3 se hacia en un
+     * {@code @PostConstruct}, cuando Hikari y Flyway ya habian abierto conexiones con la zona
+     * anterior (UTC en el contenedor): Hibernate convertia {@code LocalTime} con una zona y lo leia
+     * con otra, y las horas de agenda se desplazaban 5 h segun que contexto arrancara primero. Las
+     * pruebas la fijan con {@code -Duser.timezone} (surefire, {@code pom.xml}).</p>
      */
-    @PostConstruct
-    void applyDefaultTimeZone() {
+    static void applyDefaultTimeZone() {
         TimeZone.setDefault(TimeZone.getTimeZone(APP_TIME_ZONE));
     }
 }

@@ -1,7 +1,7 @@
 ---
 titulo: "Contrato REST — Catálogos, profesionales, agenda y citas (S3)"
 tipo: contrato
-estado: Provisional
+estado: Vigente
 actualizado: 2026-09-18
 fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032", "[[dec-004-decisiones-s3-reserva]]"]
 tags: [contrato, rest, s3, citas]
@@ -10,8 +10,10 @@ tags: [contrato, rest, s3, citas]
 # Contrato REST — Catálogos, profesionales, agenda y citas (S3)
 
 Continúa [[contrato-rest-identidad]]: mismas convenciones (JSON, `Authorization: Bearer`,
-errores `ProblemDetail` en español, locale fijo `es_CO`). `Provisional` hasta que el código de
-S3 esté verificado; se reescribe contra el código al cerrar cada fase.
+errores `ProblemDetail` en español, locale fijo `es_CO`). Contrastado con el código al cerrar F6
+(2026-09-18): cada ruta tiene prueba de integración en `citas-api/src/test/.../infrastructure/rest/`.
+Los campos nulos se omiten del JSON (`default-property-inclusion: non_null`): `rejectionReason`,
+`actorName` y `reason` pueden no venir.
 
 ## Convenciones
 
