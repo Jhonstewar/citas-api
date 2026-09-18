@@ -65,3 +65,10 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: ninguna de HU-001..004 puede pasar a `Completada`: HU-003 falla en el frontend (sin refresh automático ante 401), falta el contrato REST documentado (HU-033) y la trazabilidad, y no se probó la migración sobre una BD vacía.
 - DECISIÓN: commit `feat(s2)` en `develop` de citas-api, citas-web y la raíz, subido a `jhonnunez-svg`. `main` de los subrepos es un commit inicial vacío.
 - Pendientes ordenados en `PLAN_RETOMA_S2.md` (raíz).
+
+## [2026-09-17] learn | HU-001..004 Completadas tras tres rondas de verificación independiente
+
+- HECHO: backend 104 pruebas y frontend 42, en verde. Verificación independiente con prueba de mutación: mueren los 11 mutantes del backend y 28 de 29 del frontend; el que sobrevive es cosmético (`maxLength`). HU-001..004 → `Completada`.
+- HECHO: defectos reales encontrados y corregidos: el login aceptaba una contraseña distinta con los mismos 72 primeros bytes (truncado de `BCrypt.checkpw`), y un Bearer caducado bloqueaba refresh y logout. En el cliente había cuatro carreras de sesión y un reintento con la identidad de otra sesión. Registrados en [[riesgo-spring-security-65-trampas]] (trampas 4 y 5) y [[dec-002-rotacion-refresh-tokens]].
+- DECISIÓN (aprobación delegada, pendiente de confirmar): locale fijo `es_CO`; las rutas públicas de auth ignoran `Authorization`; límite de contraseña en bytes UTF-8 en infraestructura. [[contrato-rest-identidad]] alineado con el código; tabla D1–D4 en [[sintesis-preguntas-abiertas]].
+- PREGUNTA ABIERTA: política de contraseña (INC-001, el cliente aplica una que el servidor no), refresh token en cookie `HttpOnly` (S4), `error_description` en inglés en `WWW-Authenticate`. Queda la prueba manual en navegador.

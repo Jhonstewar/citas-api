@@ -34,10 +34,17 @@ class NimbusAccessTokenIssuer implements AccessTokenIssuer {
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(JwtConfig.ISSUER)
                 .subject(String.valueOf(user.id()))
+                // `iat` y `exp` se serializan en segundos enteros: dos emisiones para el mismo
+                // usuario dentro del mismo segundo tendrian la misma carga util y, con la misma
+                // clave, la misma firma. El `jti` aleatorio es lo que garantiza que un token
+                // renovado sea siempre distinto del que sustituye (HU-003 CA-01).
                 .id(UUID.randomUUID().toString())
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
-                .claim("email", user.email())
+                // Sin claim `email`: un JWT va firmado, no cifrado, y su carga util la lee
+                // cualquiera que vea el token. Nadie lo consumia —el servidor identifica por
+                // `sub` y el frontend solo mira `roles`—, asi que era dato personal expuesto
+                // a cambio de nada (PRD seccion 8).
                 .claim(JwtConfig.ROLES_CLAIM, roles)
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

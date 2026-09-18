@@ -1,41 +1,58 @@
 package com.fcv.citas;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.library.GeneralCodingRules;
 
-import org.junit.jupiter.api.Test;
-
-/** domain/ y application/ no importan Spring, JPA, Jackson ni Servlet. */
+/**
+ * Reglas de la arquitectura hexagonal, comprobadas sobre el BYTECODE compilado.
+ *
+ * <p>La version anterior buscaba lineas {@code import} con una expresion regular. Eso dejaba
+ * pasar, entre otras cosas, las referencias con nombre completamente cualificado
+ * ({@code org.springframework.x.Y} escrito en linea), los tipos que llegan por herencia o por la
+ * firma de un metodo, y las anotaciones. ArchUnit mira las dependencias reales de cada clase.</p>
+ */
+@AnalyzeClasses(packages = "com.fcv.citas", importOptions = ImportOption.DoNotIncludeTests.class)
 class HexagonalArchitectureTest {
 
-    private static final Pattern FORBIDDEN = Pattern.compile(
-            "^import\\s+(static\\s+)?(org\\.springframework|jakarta\\.|javax\\.persistence|com\\.fasterxml"
-                    + "|org\\.hibernate|com\\.fcv\\.citas\\.infrastructure)",
-            Pattern.MULTILINE);
+    private static final String[] FRAMEWORK_PACKAGES = {
+            "org.springframework..",
+            "jakarta..",
+            "javax.persistence..",
+            "com.fasterxml..",
+            "org.hibernate..",
+            "org.flywaydb..",
+            "com.nimbusds..",
+    };
 
-    @Test
-    void coreLayersAreFrameworkFree() throws IOException {
-        Path base = Path.of("src/main/java/com/fcv/citas");
-        List<String> offenders;
-        try (Stream<Path> files = Stream.concat(Files.walk(base.resolve("domain")),
-                Files.walk(base.resolve("application")))) {
-            offenders = files.filter(p -> p.toString().endsWith(".java"))
-                    .filter(p -> {
-                        try {
-                            return FORBIDDEN.matcher(Files.readString(p)).find();
-                        } catch (IOException e) {
-                            throw new IllegalStateException(e);
-                        }
-                    })
-                    .map(Path::toString)
-                    .toList();
-        }
-        assertThat(offenders).isEmpty();
-    }
+    /** El nucleo se escribe en Java puro: ningun framework puede filtrarse a domain ni application. */
+    @ArchTest
+    static final ArchRule elNucleoNoDependeDeFrameworks = noClasses()
+            .that().resideInAnyPackage("com.fcv.citas.domain..", "com.fcv.citas.application..")
+            .should().dependOnClassesThat().resideInAnyPackage(FRAMEWORK_PACKAGES)
+            .because("domain y application deben poder compilarse y probarse sin contenedor");
+
+    /** La dependencia apunta hacia dentro: la infraestructura conoce el nucleo, nunca al reves. */
+    @ArchTest
+    static final ArchRule elNucleoNoDependeDeLaInfraestructura = noClasses()
+            .that().resideInAnyPackage("com.fcv.citas.domain..", "com.fcv.citas.application..")
+            .should().dependOnClassesThat().resideInAPackage("com.fcv.citas.infrastructure..")
+            .because("los adaptadores se enchufan a los puertos, no al contrario");
+
+    /** El dominio es la capa mas interna: tampoco depende de la capa de aplicacion. */
+    @ArchTest
+    static final ArchRule elDominioNoDependeDeLaAplicacion = noClasses()
+            .that().resideInAPackage("com.fcv.citas.domain..")
+            .should().dependOnClassesThat().resideInAPackage("com.fcv.citas.application..")
+            .because("el dominio no conoce los casos de uso que lo orquestan");
+
+    /** Nadie escribe a consola: las trazas pasan por el log, que si se configura (PRD seccion 8). */
+    @ArchTest
+    static final ArchRule nadieEscribeEnLaSalidaEstandar =
+            GeneralCodingRules.NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS
+                    .because("un System.out puede filtrar tokens y no respeta el nivel de log");
 }

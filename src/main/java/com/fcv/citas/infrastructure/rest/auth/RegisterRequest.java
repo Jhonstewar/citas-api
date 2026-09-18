@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fcv.citas.infrastructure.rest.validation.BcryptPasswordLength;
 
 /**
  * Cuerpo de {@code POST /api/auth/register}. Nombres canonicos alineados con
@@ -18,8 +19,9 @@ public record RegisterRequest(
         @NotBlank @Size(max = 20) String documentNumber,
         @NotBlank @Email @Size(max = 160) String email,
         @NotBlank @Size(max = 30) String phone,
-        // 72 bytes es el limite de BCrypt. INC-001: no hay politica de complejidad definida.
-        @NotBlank @Size(max = 72) String password) {
+        // Maximo 72 BYTES UTF-8 (limite de BCrypt), no 72 caracteres: @Size contaba caracteres y
+        // 40 x ñ (80 bytes) llegaba al hasher y acababa en 500. INC-001: sin politica de complejidad.
+        @NotBlank @BcryptPasswordLength String password) {
 
     @Override
     public String toString() {

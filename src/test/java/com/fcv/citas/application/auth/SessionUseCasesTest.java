@@ -120,18 +120,49 @@ class SessionUseCasesTest {
         assertThat(refresh.refresh(b.refreshToken())).isNotNull();
     }
 
-    @Test
-    void unknownExpiredOrRevokedRefreshIsRejected() {
-        assertThatThrownBy(() -> refresh.refresh("no-existe")).isInstanceOf(InvalidRefreshTokenException.class);
+    // Los tres motivos de rechazo iban en una sola prueba, que ademas solo tocaba el instante
+    // exacto de expiracion. Separados, un fallo dice cual de los tres se rompio; y el par
+    // "justo antes / justo en / justo despues" fija el borde por los dos lados: sin la primera,
+    // un isExpired() que devolviera siempre true seguiria pasando las otras dos.
 
+    @Test
+    void unknownRefreshIsRejected() {
+        assertThatThrownBy(() -> refresh.refresh("no-existe")).isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void refreshStillWorksOneSecondBeforeExpiry() {
+        AuthSession session = login.login("ana@example.com", "Clave#1");
+        clock.advance(Duration.ofDays(7).minusSeconds(1));
+
+        assertThat(refresh.refresh(session.refreshToken())).isNotNull();
+    }
+
+    @Test
+    void refreshIsRejectedExactlyAtExpiry() {
         AuthSession session = login.login("ana@example.com", "Clave#1");
         clock.advance(Duration.ofDays(7));
+
+        // El instante de expiracion ya NO es valido: la vigencia es un intervalo abierto al final.
         assertThatThrownBy(() -> refresh.refresh(session.refreshToken()))
                 .isInstanceOf(InvalidRefreshTokenException.class);
+    }
 
-        AuthSession other = login.login("ana@example.com", "Clave#1");
-        logout.logout(other.refreshToken());
-        assertThatThrownBy(() -> refresh.refresh(other.refreshToken()))
+    @Test
+    void refreshIsRejectedAfterExpiry() {
+        AuthSession session = login.login("ana@example.com", "Clave#1");
+        clock.advance(Duration.ofDays(7).plusSeconds(1));
+
+        assertThatThrownBy(() -> refresh.refresh(session.refreshToken()))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void revokedRefreshIsRejected() {
+        AuthSession session = login.login("ana@example.com", "Clave#1");
+        logout.logout(session.refreshToken());
+
+        assertThatThrownBy(() -> refresh.refresh(session.refreshToken()))
                 .isInstanceOf(InvalidRefreshTokenException.class);
     }
 
