@@ -101,3 +101,10 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: prefijos por rol en `SecurityConfig` (`/api/admin`, `/api/professional`, `/api/patient`) y `denyAll` por defecto; `/api/catalogs/**` para cualquier rol autenticado, sin escritura (405).
 - DECISIÓN (provisional, desviación): D14 en [[dec-004-decisiones-s3-reserva]]: lecturas con varias tablas por SQL (`JdbcTemplate`); escrituras por JPA. Choca con la letra de `RESTRICCIONES_TECNICAS.md` y queda pendiente de que el usuario la acepte.
 - PREFERENCIA: el usuario pidió seguir la skill `scrum-spec-orchestrator` también en la ejecución: las HU pasan a `En desarrollo` al empezar su fase y se cierran con matriz de evidencia.
+
+## [2026-09-18] learn | F3 de S3: gestión de profesionales (HU-013 a HU-016)
+
+- HECHO: alta atómica usuario PROFESSIONAL + perfil + especialidades + sedes; duplicados → 409 con `field`; primaria validada en el dominio (`SpecialtyAssignment`); sedes obligatorias; activar/desactivar sin borrado. 12 pruebas de integración + 7 de dominio.
+- HECHO: el código profesional y la matrícula no se editan tras el alta (HU-013 los deja fuera de alcance, INC-015). El contrato se corrigió antes de implementar y se avisó al frontend.
+- HECHO (trampa): `Set.copyOf(...).contains(null)` lanza `NullPointerException` en vez de devolver `false`; validar nulos con `stream().anyMatch(Objects::isNull)`. Salió como un 500 en el alta y tiene prueba de regresión (`ProfessionalTest`).
+- HECHO: Spring Data no detecta repositorios anidados en otra clase (`considerNestedRepositories=false` por defecto); cada repositorio va en su propio archivo.

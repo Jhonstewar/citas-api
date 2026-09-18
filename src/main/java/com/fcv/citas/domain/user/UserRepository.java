@@ -22,4 +22,7 @@ public interface UserRepository {
     Optional<User> findById(long id);
 
     boolean existsByRole(Role role);
+
+    /** Actualiza los datos de contacto editables; email, documento y roles no cambian. */
+    void updateContact(long userId, String firstNames, String lastNames, String phone);
 }

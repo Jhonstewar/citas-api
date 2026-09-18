@@ -74,6 +74,12 @@ public class UserJpaEntity {
         this.roles = new HashSet<>(roles);
     }
 
+    public void updateContact(String newFirstNames, String newLastNames, String newPhone) {
+        this.firstNames = newFirstNames;
+        this.lastNames = newLastNames;
+        this.phone = newPhone;
+    }
+
     public Long getId() {
         return id;
     }

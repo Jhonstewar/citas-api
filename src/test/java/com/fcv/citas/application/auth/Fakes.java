@@ -88,6 +88,12 @@ final class Fakes {
             return users.stream().anyMatch(u -> u.roles().contains(role));
         }
 
+        @Override
+        public void updateContact(long userId, String firstNames, String lastNames, String phone) {
+            users.replaceAll(u -> u.id() == userId ? new User(u.id(), u.documentTypeCode(), u.documentNumber(),
+                    firstNames, lastNames, u.email(), phone, u.passwordHash(), u.active(), u.roles()) : u);
+        }
+
         void replace(User user) {
             users.replaceAll(u -> u.id().equals(user.id()) ? user : u);
         }

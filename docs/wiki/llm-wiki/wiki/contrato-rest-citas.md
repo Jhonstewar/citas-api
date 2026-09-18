@@ -98,7 +98,7 @@ No hay escritura sobre catálogos fijos: `POST/PUT/DELETE` → 405.
 | GET | `/api/admin/professionals` | query opcional `active`, `specialtyId`, `siteId` | `Professional[]` |
 | GET | `/api/admin/professionals/{id}` | — | `Professional` |
 | POST | `/api/admin/professionals` | `{ firstNames, lastNames, documentType, documentNumber, email, phone, password, professionalCode, licenseNumber, specialtyIds, primarySpecialtyId, siteIds }` | 201 · 400 · 409 `DUPLICATE` con `field` ∈ `email`, `documentNumber`, `professionalCode`, `licenseNumber` · 422 `SPECIALTY_INACTIVE` |
-| PUT | `/api/admin/professionals/{id}` | `{ firstNames, lastNames, phone, professionalCode, licenseNumber }` | 200 · 409 `DUPLICATE` |
+| PUT | `/api/admin/professionals/{id}` | `{ firstNames, lastNames, phone }` | 200 (código y matrícula no se editan: HU-013, INC-015) |
 | PUT | `/api/admin/professionals/{id}/specialties` | `{ specialtyIds, primarySpecialtyId }` | 200 · 400 (vacío o primaria fuera del conjunto) · 422 `SPECIALTY_INACTIVE` |
 | PUT | `/api/admin/professionals/{id}/sites` | `{ siteIds }` | 200 · 400 (vacío o sede inexistente) |
 | PATCH | `/api/admin/professionals/{id}/status` | `{ active }` | 200 |
