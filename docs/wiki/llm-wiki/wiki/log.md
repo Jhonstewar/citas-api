@@ -78,3 +78,11 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: `citas-api/AGENTS.md` y `citas-web/AGENTS.md` generados con `PROMPT_AGENT_CITAS_API.md` y `PROMPT_AGENT_CITAS_WEB.md` a partir del código real (stack, capas hexagonales, reglas ArchUnit, comandos Docker/npm). Se borran los `AGENTS.md.template`.
 - DECISIÓN: `citas-web/AGENTS.md` se revisa de nuevo tras importar el diseño de AI Studio (S2 paso 4); si el stack importado difiere, gana lo importado y aprobado.
 - DECISIÓN: los remotos de trabajo pasan a `Jhonstewar` (FCV_Proyecto_Citas_v1, citas-api, citas-web); `jhonnunez-svg` queda como origen histórico.
+
+## [2026-09-18] learn | Plan de S3, alcance aprobado por delegación y decisiones D5–D13
+
+- HECHO: base verificada antes de S3 sobre `develop`: backend 104/104 pruebas, frontend 42/42 más build y lint en verde.
+- DECISIÓN: 18 HU pasan a `Aprobada` por aprobación delegada de S3 (HU-005, 010, 011, 013–019, 022–025, 029, 030, 032, 033). Cancelación, reprogramación, perfil, EPS y cierre de atención quedan para S4.
+- DECISIÓN (provisional): D5–D13 en [[dec-004-decisiones-s3-reserva]]: primer ADMIN por variables de entorno, contraseña inicial del profesional fijada por el ADMIN, Medicina General precargada, V5 de auditoría (E1/E2), 60 min en un mismo bloque, retención sin caducidad, profesional desactivado sin reservas nuevas, 409 al aprobar una cita vencida, hooks de git versionados.
+- PREFERENCIA: el usuario no usó Stitch; el diseño del frontend queda a criterio del agente ("bonito e intuitivo").
+- PREFERENCIA: trabajo por fases con puntos de control (commit por repo y casilla en `PLAN_RETOMA_S3.md`) para poder interrumpir, subir y retomar.

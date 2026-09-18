@@ -2,7 +2,7 @@
 titulo: "Síntesis — Preguntas abiertas del dominio"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-17
+actualizado: 2026-09-18
 fuentes: ["citas-api/docs/wiki/scrum/historias-de-usuario/", "PRD.md", "[[MODELO-DATOS-3FN]]"]
 tags: [sintesis, preguntas-abiertas, dominio]
 ---
@@ -61,14 +61,22 @@ Se tomaron para poder cerrar S2 y están implementadas, pero **no las ha confirm
 | D3 | Rotación de refresh con revocación por familia ante reuso y en el logout | [[dec-002-rotacion-refresh-tokens]] |
 | D4 | Locale fijo `es_CO`: la API ignora `Accept-Language` | [[contrato-rest-identidad]] |
 
+## Respondidas de forma provisional en S3 (aprobación delegada)
+
+Las preguntas **E1, E2, N2, N5 y A3**, y las incógnitas INC-009, INC-013, INC-014, INC-024 e
+INC-032, tienen una respuesta provisional (D5–D13) en [[dec-004-decisiones-s3-reserva]]. Siguen
+listadas arriba hasta que el usuario las confirme.
+
 ## Relacionado
 
+- [[dec-004-decisiones-s3-reserva]]
 - [[datos-modelo-3fn]]
 - [[dec-002-rotacion-refresh-tokens]]
 - [[contrato-rest-identidad]]
 
 ## Historial
 
+- 2026-09-18 — E1, E2, N2, N5 y A3 respondidas de forma provisional para S3 (D5–D13 en [[dec-004-decisiones-s3-reserva]]).
 - 2026-09-17 — A1 precisada con la divergencia cliente/servidor; añadida S4 (refresh token en memoria JS) y la tabla D1–D4 de decisiones tomadas bajo aprobación delegada.
 - 2026-09-16 — añadidas A1–A4 del informe de especificación (40 incógnitas `INC-NNN` registradas en las épicas).
 - 2026-09-16 — creada al terminar la especificación Scrum (33 HU). E1 y E2 verificadas contra `V3__schedule_and_appointments.sql`.

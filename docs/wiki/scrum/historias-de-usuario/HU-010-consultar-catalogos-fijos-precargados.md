@@ -2,7 +2,7 @@
 id: HU-010
 tipo: historia-de-usuario
 titulo: "Consultar los catálogos fijos precargados"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-003-catalogos-del-sistema]]"
 requisitos: [RF-05]
 esfuerzo: "Medio"
@@ -181,6 +181,7 @@ Esta HU es la base de datos maestros de todo el producto: la búsqueda de dispon
 
 ## Historial de validación
 
+- 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones

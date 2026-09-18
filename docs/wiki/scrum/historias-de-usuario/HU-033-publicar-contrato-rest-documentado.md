@@ -2,7 +2,7 @@
 id: HU-033
 tipo: historia-de-usuario
 titulo: "Publicar el contrato REST documentado"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-009-trazabilidad-y-contrato-rest]]"
 requisitos: [RF-20]
 esfuerzo: "Medio"
@@ -182,6 +182,7 @@ Ejecución de referencia: backend **49 pruebas** y frontend **11 pruebas**, 0 fa
 
 ## Historial de validación
 
+- 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones

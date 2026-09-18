@@ -2,7 +2,7 @@
 id: HU-022
 tipo: historia-de-usuario
 titulo: "Buscar disponibilidad con filtros"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-006-busqueda-de-disponibilidad-y-reserva]]"
 requisitos: [RF-10, RF-09]
 esfuerzo: "Alto"
@@ -188,6 +188,7 @@ Aunque pertenece a [[EP-006-busqueda-de-disponibilidad-y-reserva]], se planifica
 
 ## Historial de validación
 
+- 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones

@@ -141,3 +141,7 @@ Ninguna de estas incógnitas impide empezar: cada historia afectada las registra
 Según PRD §9: historia clínica, facturación real, pagos, diagnósticos y tratamientos, datos reales de FCV, integración con sistemas clínicos, CI/CD obligatorio, SMS y WhatsApp, y SMTP obligatorio para la recuperación de contraseña.
 
 Las automatizaciones n8n de S5 y S6 (recordatorios, notificación de cambio de estado y resumen operativo diario) se añaden después sin modificar el núcleo funcional y se versionan en `citas-api/automations/n8n/`.
+
+## Alcance de S3 (aprobación delegada del 2026-09-18)
+
+El usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente. Pasan a `Aprobada` por **aprobación delegada**: HU-005, HU-010, HU-011, HU-013 a HU-019, HU-022 a HU-025, HU-029, HU-030, HU-032 y HU-033. Cada una lo registra en su historial. Plan y decisiones D5–D13: `PLAN_RETOMA_S3.md` (raíz) y `../llm-wiki/wiki/dec-004-decisiones-s3-reserva.md`.
