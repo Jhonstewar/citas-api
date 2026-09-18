@@ -93,3 +93,11 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: el escáner bloqueó una contraseña ficticia en `application.yml` y el hook de `citas-web` bloqueó una prueba roja. La corrección (credenciales del primer ADMIN por variables de entorno) pasó: `citas-api@062725b`.
 - HECHO: la auditoría `--all` de los tres repos no encontró secretos; la regla de código daba 4 falsos positivos en mensajes de UI y rutas y se ajustó.
 - PREGUNTA ABIERTA: `FlywayMigratesEmptySchemaTest` falló una vez de forma intermitente. Ver [[riesgo-prueba-intermitente-flyway]].
+
+## [2026-09-18] learn | F2 de S3: autorización por rol, catálogos, especialidades, V5/V6
+
+- HECHO: Red → Green demostrado con `AuthorizationIntegrationTest` (9 de 10 en rojo antes del código; verde después). Suite: 126 pruebas en verde, ArchUnit incluido. Evidencia en `EVIDENCIAS_S3.md` §6.
+- HECHO: V5 quita el `ON DELETE CASCADE` del historial y añade el origen `PROFESSIONAL` (E1/E2 resueltas). V6 siembra `MEDICINA_GENERAL`. `FlywayMigratesEmptySchemaTest` comprueba ambas desde un esquema vacío.
+- HECHO: prefijos por rol en `SecurityConfig` (`/api/admin`, `/api/professional`, `/api/patient`) y `denyAll` por defecto; `/api/catalogs/**` para cualquier rol autenticado, sin escritura (405).
+- DECISIÓN (provisional, desviación): D14 en [[dec-004-decisiones-s3-reserva]]: lecturas con varias tablas por SQL (`JdbcTemplate`); escrituras por JPA. Choca con la letra de `RESTRICCIONES_TECNICAS.md` y queda pendiente de que el usuario la acepte.
+- PREFERENCIA: el usuario pidió seguir la skill `scrum-spec-orchestrator` también en la ejecución: las HU pasan a `En desarrollo` al empezar su fase y se cierran con matriz de evidencia.

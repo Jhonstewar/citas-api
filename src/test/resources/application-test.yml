@@ -26,3 +26,8 @@ app:
       refresh-ttl: 7d
   cors:
     allowed-origins: http://localhost:5173
+  # Las pruebas no crean el ADMIN inicial aunque el contenedor traiga las variables (D5): cada
+  # prueba crea sus propios usuarios y los borra.
+  admin-bootstrap:
+    email: ""
+    password: ""

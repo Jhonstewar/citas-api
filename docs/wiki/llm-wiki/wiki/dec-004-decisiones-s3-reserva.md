@@ -24,6 +24,7 @@ cuando el usuario las confirme; si rechaza alguna, se anota aquí y se abre la H
 | D10 | INC-024 · ¿Caduca la retención de una `REQUESTED`? | No caduca en S3 | Caducidad por tiempo | Requiere un proceso programado; se reevalúa en S5 con n8n |
 | D11 | INC-014 / N5 · Profesional desactivado | Puede iniciar sesión; no se ofrece ni admite reservas nuevas; sus citas existentes se conservan | Bloquear el login | Desactivar no debe borrar agenda ni impedir consultarla |
 | D12 | INC-032 · Aprobar una `REQUESTED` ya vencida | 409; el ADMIN debe rechazarla con motivo | Aprobarla igual | RN-06: no hay citas en el pasado |
+| D14 | ¿Todo el acceso a datos por Spring Data JPA? (`RESTRICCIONES_TECNICAS.md`) | **Escrituras** de agregados por JPA; **lecturas** con varias tablas (listados de citas, bandeja, catálogos fijos, disponibilidad) por SQL con `JdbcTemplate` en adaptadores de infraestructura | Todo por JPA con proyecciones | Las vistas cruzan hasta 8 tablas; con JPA serían N+1 o JPQL igual de largo. **Desviación de la restricción, pendiente de que el usuario la acepte** |
 | D13 | Hooks de S3 | Git hooks versionados en `.githooks/` de cada repo (`core.hooksPath`) | Hooks de Claude Code | La red debe decir "no" a cualquier commit, lo haga un agente o una persona |
 
 ## Consecuencias

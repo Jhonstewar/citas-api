@@ -20,4 +20,6 @@ public interface UserRepository {
     Optional<User> findByEmail(String normalizedEmail);
 
     Optional<User> findById(long id);
+
+    boolean existsByRole(Role role);
 }

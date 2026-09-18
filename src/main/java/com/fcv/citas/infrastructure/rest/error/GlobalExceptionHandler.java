@@ -18,7 +18,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
 import com.fcv.citas.domain.auth.InvalidCredentialsException;
+import com.fcv.citas.domain.shared.BusinessRuleException;
+import com.fcv.citas.domain.shared.CodedException;
+import com.fcv.citas.domain.shared.ConflictException;
+import com.fcv.citas.domain.shared.DuplicateValueException;
+import com.fcv.citas.domain.shared.InvalidRequestException;
+import com.fcv.citas.domain.shared.NotFoundException;
 import com.fcv.citas.domain.auth.InvalidRefreshTokenException;
 import com.fcv.citas.domain.user.DocumentAlreadyRegisteredException;
 import com.fcv.citas.domain.user.EmailAlreadyRegisteredException;
@@ -86,11 +95,65 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, "No encontrado", ex.getMessage());
     }
 
+    // ------------------------------------------------------------------ S3: excepciones con `code`
+
+    @ExceptionHandler(InvalidRequestException.class)
+    ProblemDetail invalidRequest(InvalidRequestException ex) {
+        ProblemDetail problem = coded(HttpStatus.BAD_REQUEST, "Datos inválidos", ex);
+        if (ex.field() != null) {
+            problem.setProperty("fieldErrors", Map.of(ex.field(), ex.getMessage()));
+        }
+        return problem;
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    ProblemDetail codedNotFound(NotFoundException ex) {
+        return coded(HttpStatus.NOT_FOUND, "No encontrado", ex);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    ProblemDetail codedConflict(ConflictException ex) {
+        ProblemDetail problem = coded(HttpStatus.CONFLICT, "Conflicto", ex);
+        if (ex instanceof DuplicateValueException duplicate) {
+            problem.setProperty("field", duplicate.field());
+        }
+        return problem;
+    }
+
+    @ExceptionHandler(BusinessRuleException.class)
+    ProblemDetail businessRule(BusinessRuleException ex) {
+        return coded(HttpStatus.UNPROCESSABLE_ENTITY, "Regla de negocio", ex);
+    }
+
+    /** Parametro de consulta o de ruta con tipo incorrecto ({@code ?date=manana}): 400 en español. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ProblemDetail typeMismatch(MethodArgumentTypeMismatchException ex) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "Datos inválidos",
+                "El parámetro «" + ex.getName() + "» tiene un formato inválido");
+        problem.setProperty("code", "VALIDATION");
+        return problem;
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(MissingServletRequestParameterException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "Datos inválidos",
+                "Falta el parámetro obligatorio «" + ex.getParameterName() + "»");
+        problem.setProperty("code", "VALIDATION");
+        return ResponseEntity.badRequest().body(problem);
+    }
+
     @ExceptionHandler(Exception.class)
     ProblemDetail unexpected(Exception ex) {
         // Solo el tipo: el mensaje de algunas excepciones puede arrastrar datos de la peticion.
         log.error("Error no controlado: {}", ex.getClass().getName());
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", "Ocurrió un error inesperado");
+    }
+
+    private static ProblemDetail coded(HttpStatus status, String title, CodedException ex) {
+        ProblemDetail problem = problem(status, title, ex.getMessage());
+        problem.setProperty("code", ex.code());
+        return problem;
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

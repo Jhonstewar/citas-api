@@ -12,6 +12,11 @@ import com.fcv.citas.application.auth.LogoutUseCase;
 import com.fcv.citas.application.auth.RefreshSessionUseCase;
 import com.fcv.citas.application.auth.RegisterUserUseCase;
 import com.fcv.citas.application.auth.SessionIssuer;
+import com.fcv.citas.application.appointment.AppointmentQueries;
+import com.fcv.citas.application.appointment.PatientAppointmentsUseCase;
+import com.fcv.citas.application.catalog.ManageSpecialtiesUseCase;
+import com.fcv.citas.application.user.BootstrapAdminUseCase;
+import com.fcv.citas.domain.catalog.SpecialtyRepository;
 import com.fcv.citas.domain.auth.AccessTokenIssuer;
 import com.fcv.citas.domain.auth.PasswordHasher;
 import com.fcv.citas.domain.auth.RefreshTokenRepository;
@@ -62,5 +67,23 @@ public class UseCaseConfig {
     @Bean
     GetCurrentUserUseCase getCurrentUserUseCase(UserRepository users) {
         return new GetCurrentUserUseCase(users);
+    }
+
+    // ------------------------------------------------------------------ S3
+
+    @Bean
+    ManageSpecialtiesUseCase manageSpecialtiesUseCase(SpecialtyRepository specialties, TransactionRunner tx) {
+        return new ManageSpecialtiesUseCase(specialties, tx);
+    }
+
+    @Bean
+    PatientAppointmentsUseCase patientAppointmentsUseCase(AppointmentQueries queries) {
+        return new PatientAppointmentsUseCase(queries);
+    }
+
+    @Bean
+    BootstrapAdminUseCase bootstrapAdminUseCase(UserRepository users, PasswordHasher passwordHasher,
+            TransactionRunner tx) {
+        return new BootstrapAdminUseCase(users, passwordHasher, tx);
     }
 }

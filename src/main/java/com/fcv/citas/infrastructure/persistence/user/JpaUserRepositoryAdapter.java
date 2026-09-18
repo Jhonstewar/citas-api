@@ -82,6 +82,11 @@ class JpaUserRepositoryAdapter implements UserRepository, DocumentTypeCatalog {
         return users.findById(id).map(JpaUserRepositoryAdapter::toDomain);
     }
 
+    @Override
+    public boolean existsByRole(Role role) {
+        return users.existsByRoles_Code(role.name());
+    }
+
     private static User toDomain(UserJpaEntity e) {
         Set<Role> domainRoles = e.getRoles().stream().map(r -> Role.valueOf(r.getCode()))
                 .collect(Collectors.toSet());

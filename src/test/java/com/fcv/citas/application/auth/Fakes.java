@@ -83,6 +83,11 @@ final class Fakes {
             return users.stream().filter(u -> u.id() == id).findFirst();
         }
 
+        @Override
+        public boolean existsByRole(com.fcv.citas.domain.user.Role role) {
+            return users.stream().anyMatch(u -> u.roles().contains(role));
+        }
+
         void replace(User user) {
             users.replaceAll(u -> u.id().equals(user.id()) ? user : u);
         }
