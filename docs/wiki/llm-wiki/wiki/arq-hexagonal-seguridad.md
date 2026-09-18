@@ -1,8 +1,8 @@
 ---
 titulo: "Arquitectura — Encaje de la seguridad en la hexagonal"
 tipo: arquitectura
-estado: Provisional
-actualizado: 2026-09-16
+estado: Vigente
+actualizado: 2026-09-17
 fuentes: ["[[RES-001-spring-security-jwt]]", "RESTRICCIONES_TECNICAS.md §Backend"]
 tags: [arquitectura, hexagonal, seguridad, backend]
 ---
@@ -17,6 +17,17 @@ en `infrastructure/`. `java.time` y el JDK son libres.
 
 Esto no es purismo: es lo que permite probar las reglas de negocio sin levantar un contexto de
 Spring, y lo que impide que una decisión de framework se filtre a las reglas del producto.
+
+**Se vigila con ArchUnit** (`HexagonalArchitectureTest`), que analiza el bytecode, no los imports:
+también detecta una referencia con nombre completo. Tiene cuatro reglas:
+
+- `domain` y `application` no dependen de frameworks;
+- tampoco dependen de `infrastructure`;
+- `domain` no depende de `application`;
+- ninguna clase escribe en la salida estándar, porque un `System.out` puede filtrar tokens.
+
+La verificación del 2026-09-17 las probó por mutación: una referencia a Spring dentro de `User` y
+otra de `application` a `infrastructure.security` hacen fallar la prueba.
 
 ## Puertos de seguridad (en el dominio)
 
@@ -37,7 +48,9 @@ puerto del dominio, son configuración del framework. No hay que inventarles una
 dominio solo por simetría.
 
 Esa distinción importa: envolver `SecurityConfig` tras un puerto no aporta testabilidad, solo
-indirección.
+indirección. Lo mismo vale para `PublicEndpointsBearerTokenResolver` y
+`ProblemJsonSecurityHandlers`: son configuración de la cadena de seguridad (ver
+[[riesgo-spring-security-65-trampas]], trampa 4, y [[contrato-rest-identidad]]).
 
 ## Dónde se comprueba la autorización
 
@@ -54,4 +67,6 @@ indirección.
 
 ## Historial
 
+- 2026-09-17 — la regla de capas pasa a vigilarse con ArchUnit en vez de con expresiones
+  regulares sobre los imports.
 - 2026-09-16 — página creada a partir de RES-001, antes de implementar el slice de auth.

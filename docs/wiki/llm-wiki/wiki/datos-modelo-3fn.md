@@ -2,7 +2,7 @@
 titulo: "Datos — Modelo 3FN propio de citas-api"
 tipo: datos
 estado: Vigente
-actualizado: 2026-09-16
+actualizado: 2026-09-17
 fuentes: ["[[MODELO-DATOS-3FN]]", "citas-api/src/main/resources/db/migration/V1__identity_and_fixed_catalogs.sql", "database/ANALISIS_NORMALIZACION_3FN.md"]
 tags: [datos, mysql, flyway, 3fn]
 ---
@@ -27,6 +27,19 @@ Cuatro migraciones Flyway aplicadas contra MySQL 8.4 (`flyway_schema_history` en
 | V4 | seeds: 5 tipos de documento, 3 roles, 2 tipos de cita, 6 estados de cita, 4 de reprogramación, 3 regímenes, sedes HIC e ICV |
 
 Hibernate corre con `ddl-auto: validate`: **Flyway manda sobre el esquema**.
+
+### Cómo se prueba el esquema
+
+- **Desde cero.** `FlywayMigratesEmptySchemaTest` crea un esquema desechable, aplica V1–V4 sobre
+  él, valida y cuenta 24 tablas; después lo borra. Así una migración que solo funcione sobre una
+  base ya migrada no pasa desapercibida.
+- **Base propia de pruebas.** Las pruebas de integración usan `citas_fcv_training_test`, no la
+  base de desarrollo `citas_fcv_training`. La crea `scripts/init-test-db.ps1` en la raíz, y el
+  compose le pasa el nombre como `DB_NAME_TEST`. Esa base no se recrea en cada ejecución: Flyway
+  la encuentra al día.
+- El script concede al usuario de la aplicación todos los privilegios sobre el patrón
+  `citas\_fcv\_%`, para que la prueba pueda crear y borrar su esquema desechable. Es aceptable en
+  laboratorio y **no** debe replicarse en un despliegue real.
 
 ## Reglas garantizadas por el motor, no por el código
 
@@ -60,4 +73,5 @@ Tokens: refresh y reset se guardan solo como hash; ver [[dec-002-rotacion-refres
 
 ## Historial
 
+- 2026-09-17 — añadido cómo se prueba el esquema: migración desde un esquema vacío y base de pruebas aislada.
 - 2026-09-16 — página creada por INGEST de `raw/MODELO-DATOS-3FN.md`, verificada contra las migraciones aplicadas.

@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,6 +45,23 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "La petición contiene campos inválidos");
         problem.setProperty("fieldErrors", fieldErrors);
         return ResponseEntity.badRequest().body(problem);
+    }
+
+    /**
+     * Cuerpo ausente, JSON mal formado o un valor de tipo incompatible (un objeto donde se espera
+     * un texto). Sin esta redefinicion salia el ProblemDetail generico de Spring, en ingles
+     * ({@code "Bad Request"} / {@code "Failed to read request"}), distinto del resto de errores.
+     *
+     * <p>El mensaje de la excepcion no se devuelve ni se registra: lo redacta Jackson, describe
+     * el analizador y la posicion del fallo y puede citar el fragmento del cuerpo que no supo leer
+     * —una contraseña mal entrecomillada, por ejemplo—. Sin {@code fieldErrors}: no hay un campo
+     * concreto al que atribuir el error.</p>
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        return ResponseEntity.badRequest().body(problem(HttpStatus.BAD_REQUEST, "Datos inválidos",
+                "El cuerpo de la petición falta o no es un JSON válido"));
     }
 
     @ExceptionHandler(UnknownDocumentTypeException.class)

@@ -20,6 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <archunit.version>1.4.1</archunit.version>
     </properties>
 
     <dependencies>
@@ -71,6 +72,18 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Analiza el bytecode compilado para imponer las reglas hexagonales. Sustituye a la
+          comprobacion por expresion regular sobre las lineas `import`, que no veia las
+          referencias con nombre completamente cualificado, los tipos de retorno, las
+          anotaciones ni las dependencias transitivas dentro del propio codigo.
+        -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -2,7 +2,7 @@
 titulo: "Índice de la LLM Wiki"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-16
+actualizado: 2026-09-17
 tags: [indice]
 ---
 
@@ -31,25 +31,25 @@ _(sin páginas todavía)_
 
 ## Contratos REST
 
-_(sin páginas todavía — se escriben cuando exista el primer endpoint real)_
+- [[contrato-rest-identidad]] — registro, login, refresh rotativo, logout y `/api/me`: rutas, cuerpos, `ProblemDetail` como formato de error uniforme, tabla de códigos y CORS
 
 ## Decisiones
 
 - [[dec-001-libreria-jwt]] — se usa el resource-server de Spring, no jjwt; con HMAC los beans `JwtDecoder`/`JwtEncoder` son obligatorios
-- [[dec-002-rotacion-refresh-tokens]] — refresh opaco rotativo con familia y detección de reuso, persistido como SHA-256
+- [[dec-002-rotacion-refresh-tokens]] — refresh opaco rotativo con familia y detección de reuso, persistido como SHA-256; qué obliga a hacer en el cliente (renovación única, épocas de sesión)
 - [[dec-003-libro-unico-slot-reservations]] — una sola tabla con PK `slot_id` hace imposible la doble reserva a nivel de motor
 
 ## Datos y modelo
 
-- [[datos-modelo-3fn]] — 4 migraciones Flyway, 24 tablas, qué garantiza el motor y qué el dominio, preguntas abiertas del esquema
+- [[datos-modelo-3fn]] — 4 migraciones Flyway, 24 tablas, qué garantiza el motor y qué el dominio, cómo se prueba el esquema (desde vacío, base de pruebas aislada), preguntas abiertas
 
 ## Riesgos
 
-- [[riesgo-spring-security-65-trampas]] — tres trampas de Spring Security 6.5.x detectadas antes de escribir código: API del encoder, longitud del secreto HMAC y prefijo `ROLE_`
+- [[riesgo-spring-security-65-trampas]] — cinco trampas de Spring Security 6.5.x: API del encoder, secreto HMAC (y placeholders), prefijo `ROLE_`, Bearer inválido frente a `permitAll`, y el truncado a 72 bytes de BCrypt en `checkpw`
 
 ## Síntesis
 
-- [[sintesis-preguntas-abiertas]] — huecos del PRD detectados al especificar las 33 HU, más dos defectos de esquema verificados (auditoría en cascada, origen PROFESSIONAL)
+- [[sintesis-preguntas-abiertas]] — huecos del PRD detectados al especificar las 33 HU, dos defectos de esquema verificados y las decisiones del agente bajo aprobación delegada pendientes de confirmar (D1–D4)
 
 ## Fuentes en `raw/`
 

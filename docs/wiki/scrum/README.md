@@ -10,7 +10,7 @@ Punto de entrada del grafo Obsidian de la especificación. Cubre todo el alcance
 
 **Fuentes de verdad:** `PRD.md`, `RESTRICCIONES_TECNICAS.md` y el modelo de datos propio (`../llm-wiki/raw/MODELO-DATOS-3FN.md`).
 
-> La especificación se generó sin ninguna historia `Aprobada`. Después, el agente orquestador de S2 pasó HU-001 a HU-004 a `Aprobada` como **aprobación delegada**: el usuario eligió ejecutar S2 en modo autónomo y autorizó al agente a asumir las aprobaciones (ver `AGENTS.md` §6). No hubo una aprobación humana HU por HU; el usuario puede confirmarlas o devolverlas a `Pendiente de aprobación`.
+> La especificación se generó sin ninguna historia `Aprobada`. Después, el agente orquestador de S2 pasó HU-001 a HU-004 a `Aprobada` como **aprobación delegada**: el usuario eligió ejecutar S2 en modo autónomo y autorizó al agente a asumir las aprobaciones (ver `AGENTS.md` §6). No hubo una aprobación humana HU por HU; el usuario puede confirmarlas o devolverlas a `Pendiente de aprobación`. El 2026-09-17 las cuatro pasaron a `Completada`, con la matriz de evidencia completa y toda su DoD en `Cumple` según la verificación independiente de backend y frontend.
 
 ## Objetivo del producto
 
@@ -45,17 +45,17 @@ Repositorios independientes con ramas `main` (estable) y `develop` (trabajo).
 
 ## Candidatas a aprobación para S2
 
-Estas cinco historias cubren RF-01 y RF-02. HU-001 a HU-004 están `Aprobada` (aprobación delegada, alcance de GOAL_01); HU-005 sigue en `Pendiente de aprobación`. El resto permanece en `Borrador`.
+Estas cinco historias cubren RF-01 y RF-02. HU-001 a HU-004 están `Completada` (aprobación delegada, alcance de GOAL_01; cierre del 2026-09-17); HU-005 sigue en `Pendiente de aprobación`. El resto permanece en `Borrador`.
 
-| HU | Título | Esfuerzo | RF |
-|---|---|---|---|
-| [[HU-001-registrar-cuenta-de-usuario]] | Registrar cuenta de usuario | Medio | RF-01 |
-| [[HU-002-iniciar-sesion-con-jwt]] | Iniciar sesión con JWT | Alto | RF-02 |
-| [[HU-003-renovar-sesion-con-refresh-token]] | Renovar sesión con refresh token | Medio | RF-02 |
-| [[HU-004-cerrar-sesion-revocando-refresh-token]] | Cerrar sesión revocando el refresh token | Bajo | RF-02 |
-| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Autorizar peticiones por rol y ownership | Alto | RF-02 |
+| HU | Título | Esfuerzo | RF | Estado |
+|---|---|---|---|---|
+| [[HU-001-registrar-cuenta-de-usuario]] | Registrar cuenta de usuario | Medio | RF-01 | `Completada` |
+| [[HU-002-iniciar-sesion-con-jwt]] | Iniciar sesión con JWT | Alto | RF-02 | `Completada` |
+| [[HU-003-renovar-sesion-con-refresh-token]] | Renovar sesión con refresh token | Medio | RF-02 | `Completada` |
+| [[HU-004-cerrar-sesion-revocando-refresh-token]] | Cerrar sesión revocando el refresh token | Bajo | RF-02 | `Completada` |
+| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Autorizar peticiones por rol y ownership | Alto | RF-02 | `Pendiente de aprobación` |
 
-Antes de aprobarlas conviene resolver **INC-001** (política de complejidad de contraseña) y **INC-002** (vigencia de los tokens), porque afectan directamente a sus criterios de aceptación.
+**INC-001** (política de complejidad de contraseña) e **INC-002** (vigencia de los tokens) siguen abiertas. HU-001 a HU-004 se cerraron con criterios definidos sobre el mecanismo y no sobre un umbral; HU-001, HU-002 y HU-003 registran en sus notas qué revisar cuando se decidan. Conviene resolverlas antes de aprobar HU-005.
 
 ## Propuesta de sprints
 
@@ -74,6 +74,7 @@ Cada sprint es un incremento funcional comprobable, no una caja de tiempo. No se
 
 Notas de ordenación:
 
+- Sprint 1: [[HU-001-registrar-cuenta-de-usuario]] a [[HU-004-cerrar-sesion-revocando-refresh-token]] están `Completada`; faltan [[HU-005-autorizar-peticiones-por-rol-y-ownership]] (`Pendiente de aprobación`) y [[HU-033-publicar-contrato-rest-documentado]] (`Borrador`).
 - [[HU-033-publicar-contrato-rest-documentado]] se inaugura en el Sprint 1 pero es un artefacto vivo: crece con cada endpoint publicado en los sprints posteriores.
 - [[HU-032-auditar-cambios-de-estado-de-cita]] se adelanta al Sprint 5, antes de la primera creación de citas, para que ninguna transición nazca sin historial.
 - [[HU-022-buscar-disponibilidad-con-filtros]] pertenece a EP-006 pero se planifica en el Sprint 4 porque cierra el incremento de disponibilidad y no tiene sentido sin bloques publicados.

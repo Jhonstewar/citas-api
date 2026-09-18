@@ -166,17 +166,19 @@ El repositorio ya contiene piezas de base: `app.cors.allowed-origins` en `applic
 
 ## Evidencia de validación
 
+Ejecución de referencia: backend **49 pruebas** y frontend **11 pruebas**, 0 fallos (2026-09-17).
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | [[contrato-rest-identidad]], enlazado desde `wiki/index.md` | **Cerrado en 2026-09-17.** Convenciones, formato de error, tabla de códigos y los cinco endpoints de identidad, cada uno contrastado contra el código |
+| CA-02 | Cumple | `AuthFlowIntegrationTest`: 400 con `fieldErrors`, 401, 404 y 409 verifican `application/problem+json` | Misma estructura `ProblemDetail` en todos |
+| CA-03 | Cumple | `duplicateEmailReturns409`, `duplicateDocumentReturns409`; tabla de códigos del contrato | La doble reserva de slots llegará en S3 con su propia HU |
+| CA-04 | Cumple | `GlobalExceptionHandler#unexpected` registra solo el **tipo** de excepción; `server.error.include-message: never` | Ningún cuerpo lleva traza, SQL, hash ni token |
+| CA-05 | Cumple | `citas-web/src/api/contracts.ts` lee `import.meta.env.VITE_API_URL` | Persiste el literal `http://localhost:8080` como valor por defecto: ver observación abajo |
+| CA-06 | Cumple | `AuthFlowIntegrationTest#corsPreflightAllowsFrontendOrigin`; `CorsConfig` aplica `app.cors.allowed-origins` | Sin comodín. `FRONTEND_ORIGIN` ya llega al contenedor desde `docker-compose.yml` (corregido el 2026-09-17) |
+| CA-07 | Cumple | `citas-web/package.json`: solo `react`, `react-dom` y `react-router` en `dependencies` | No hay Express, BFF ni proxy; todas las pantallas pasan por `httpClient` |
+| CA-08 | Cumple | Regla escrita en la sección "Reglas e invariantes" del contrato | Criterio de mantenimiento continuo: se reevalúa en cada HU que publique endpoint |
+| DoD | Parcial | Contrato publicado; manejador global probado; CORS probado; `.env.example` sin secretos reales | **INC-038 e INC-040 los decidió el agente bajo aprobación delegada**, no el usuario: Markdown a mano y `ProblemDetail`. Conviene confirmarlo explícitamente |
 
 ## Historial de validación
 

@@ -1,6 +1,7 @@
 package com.fcv.citas.infrastructure.security;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -34,18 +35,30 @@ public class JwtConfig {
     /** RFC 7518 §3.2: HS256 exige una clave de al menos 256 bits. */
     static final int MIN_SECRET_BYTES = 32;
 
+    /** Marcador de los valores de ejemplo de {@code .env.example}: nunca es un secreto real. */
+    static final String PLACEHOLDER_MARKER = "CHANGE_ME";
+
     @Bean
     SecretKey jwtAccessSecretKey(JwtProperties properties) {
         return buildHmacKey(properties.accessSecret());
     }
 
     /**
-     * TRAMPA 2: valida la longitud al construir la clave para que la aplicacion NO arranque con
-     * un secreto debil. El mensaje nunca incluye el secreto.
+     * TRAMPA 2: valida el secreto al construir la clave para que la aplicacion NO arranque con
+     * uno debil. El mensaje nunca incluye el secreto.
      */
     static SecretKey buildHmacKey(String secret) {
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("JWT_ACCESS_SECRET no esta configurado");
+        }
+        // Va antes que el control de longitud porque lo complementa: el .env.example de la raiz
+        // trae un marcador de 36 bytes que SI lo supera. Quien copiara el ejemplo sin tocarlo
+        // firmaria los tokens con una clave publicada en el repositorio, y cualquiera podria
+        // forjar un access token con el rol que quisiera. Sin distinguir mayusculas.
+        if (secret.toUpperCase(Locale.ROOT).contains(PLACEHOLDER_MARKER)) {
+            throw new IllegalStateException("JWT_ACCESS_SECRET conserva el valor de ejemplo de .env.example "
+                    + "(contiene " + PLACEHOLDER_MARKER + "); sustituyalo por un secreto aleatorio propio de al "
+                    + "menos " + MIN_SECRET_BYTES + " bytes");
         }
         byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
         if (bytes.length < MIN_SECRET_BYTES) {

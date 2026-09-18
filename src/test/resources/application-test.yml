@@ -1,5 +1,22 @@
-# Perfil de pruebas. La base de datos llega por las mismas variables de entorno (DB_*) que usa
-# docker compose (servicio citas-api-dev -> mysql:3306). Las pruebas limpian sus propios datos.
+# Perfil de pruebas.
+#
+# La base de datos es PROPIA de las pruebas (`citas_fcv_training_test`), no la de desarrollo:
+# hasta S2 los tests de integracion escribian en `citas_fcv_training`, de modo que un fallo a
+# mitad de una prueba dejaba residuos en la base de trabajo. Crearla: `.\scripts\init-test-db.ps1`.
+#
+# Flyway NO la recrea en cada arranque: solo aplica las migraciones pendientes, y si no hay
+# ninguna registra "Schema ... is up to date. No migration necessary". Las pruebas conviven con
+# el esquema ya migrado y borran sus propios datos. La evidencia de que V1..Vn levantan el
+# esquema desde una base VACIA (CA-08 de HU-001) la da FlywayMigratesEmptySchemaTest, que crea,
+# migra y destruye su propio esquema desechable con una instancia de Flyway independiente.
+#
+# `spring.flyway.clean-disabled` se hereda de `application.yml` (true): nadie ejecuta `clean`
+# sobre esta base, y FlywayMigratesEmptySchemaTest vacia su esquema con DROP DATABASE, no con
+# `clean`, asi que no hay motivo para abrir esa puerta ni siquiera en pruebas.
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME_TEST:citas_fcv_training_test}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionTimeZone=America/Bogota&forceConnectionTimeZoneToSession=true
+
 app:
   security:
     jwt:

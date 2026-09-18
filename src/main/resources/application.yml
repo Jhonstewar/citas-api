@@ -38,6 +38,14 @@ spring:
     time-zone: America/Bogota
     default-property-inclusion: non_null
 
+  # La aplicacion es solo en español. Con el resolver por defecto (Accept-Language) los mensajes
+  # de Bean Validation de `fieldErrors` salian en el idioma que pidiera el cliente o, sin
+  # cabecera, en el de la JVM (ingles dentro del contenedor): "must not be blank". El resolver
+  # fijo ignora Accept-Language y la respuesta es la misma para todos los clientes.
+  web:
+    locale: es_CO
+    locale-resolver: fixed
+
 server:
   port: ${SERVER_PORT:8080}
   error:
@@ -62,8 +70,6 @@ app:
   security:
     jwt:
       access-secret: ${JWT_ACCESS_SECRET}
-      # Sin uso: el refresh token es opaco (DEC-002), no un JWT firmado. Se mantiene opcional.
-      refresh-secret: ${JWT_REFRESH_SECRET:}
       access-ttl: ${JWT_ACCESS_MINUTES:15}m
       refresh-ttl: ${JWT_REFRESH_DAYS:7}d
 

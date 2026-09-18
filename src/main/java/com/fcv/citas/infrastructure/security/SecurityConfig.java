@@ -1,5 +1,7 @@
 package com.fcv.citas.infrastructure.security;
 
+import java.util.Arrays;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -12,6 +14,9 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
@@ -27,6 +32,16 @@ public class SecurityConfig {
     static final String[] PUBLIC_AUTH_POST = {
         "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout"
     };
+
+    /**
+     * Un unico matcher para las rutas publicas de autenticacion, compartido por la regla
+     * {@code permitAll} y por {@link PublicEndpointsBearerTokenResolver}. Si cada uno tuviera su
+     * propia lista podrian divergir: una ruta publica que aun rechaza un Bearer caducado, o una
+     * ruta protegida que deja de leer el token.
+     */
+    static final RequestMatcher PUBLIC_AUTH_ENDPOINTS = new OrRequestMatcher(Arrays.stream(PUBLIC_AUTH_POST)
+            .map(path -> (RequestMatcher) PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, path))
+            .toList());
 
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -44,10 +59,13 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, PUBLIC_AUTH_POST).permitAll()
+                        .requestMatchers(PUBLIC_AUTH_ENDPOINTS).permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        // Las rutas publicas de auth ignoran la cabecera Authorization: un Bearer
+                        // caducado no puede impedir renovar ni cerrar sesion.
+                        .bearerTokenResolver(new PublicEndpointsBearerTokenResolver(PUBLIC_AUTH_ENDPOINTS))
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                         .authenticationEntryPoint(problemHandlers)
                         .accessDeniedHandler(problemHandlers))
