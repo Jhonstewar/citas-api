@@ -33,7 +33,7 @@ Los campos nulos se omiten del JSON (`default-property-inclusion: non_null`): `r
 | 401 | Sin token, token inválido o caducado | — |
 | 403 | Rol insuficiente | — |
 | 404 | No existe o no es del usuario | `NOT_FOUND` |
-| 409 | Conflicto de estado o de unicidad | `DUPLICATE` (+ `field`), `SLOT_TAKEN`, `BLOCK_OVERLAP`, `BLOCK_HAS_APPOINTMENTS`, `INVALID_TRANSITION`, `APPOINTMENT_EXPIRED`, `SPECIALTY_REFERENCED`, `PROTECTED_SPECIALTY` |
+| 409 | Conflicto de estado o de unicidad | `DUPLICATE` (+ `field`), `SLOT_TAKEN`, `BLOCK_OVERLAP`, `BLOCK_HAS_APPOINTMENTS`, `INVALID_TRANSITION`, `APPOINTMENT_EXPIRED`, `SPECIALTY_REFERENCED`, `PROTECTED_SPECIALTY`, `CONCURRENT_CHANGE` (otra transacción cambió los datos a la vez; reintentar) |
 | 422 | Regla de negocio | `PAST_TIME`, `SITE_NOT_ASSIGNED`, `SPECIALTY_INACTIVE`, `SPECIALTY_NOT_ASSIGNED`, `PROFESSIONAL_INACTIVE`, `WRONG_FLOW`, `SLOT_NOT_AVAILABLE` |
 
 Todo error lleva `title` y `detail` en español listos para mostrarse. El frontend decide por
@@ -74,6 +74,7 @@ AdminAppointment  AppointmentDetail & { patient: PatientRef }
 | GET | `/api/catalogs/specialties` | `Specialty[]` **solo activas** |
 | GET | `/api/catalogs/appointment-types` | `{ code, name, requiresAdminApproval }[]` |
 | GET | `/api/catalogs/appointment-statuses` | `{ code, name, terminal }[]` |
+| GET | `/api/catalogs/reschedule-statuses` | `{ code, name, terminal }[]` (incluye `PENDING`, HU-010 CA-04) |
 | GET | `/api/catalogs/document-types` | `{ code, name }[]` |
 | GET | `/api/catalogs/roles` | `{ code, name }[]` |
 | GET | `/api/catalogs/regimes` | `{ code, name }[]` |
@@ -85,8 +86,8 @@ No hay escritura sobre catálogos fijos: `POST/PUT/DELETE` → 405.
 | Método | Ruta | Cuerpo | Respuesta |
 |---|---|---|---|
 | GET | `/api/admin/specialties` | — | `Specialty[]` (activas e inactivas) |
-| POST | `/api/admin/specialties` | `{ code, name, appointmentType, durationMinutes }` | 201 `Specialty` · 400 · 409 `DUPLICATE` |
-| PUT | `/api/admin/specialties/{id}` | `{ name, appointmentType, durationMinutes }` | 200 `Specialty` · 409 `PROTECTED_SPECIALTY` si se cambia el tipo de Medicina General |
+| POST | `/api/admin/specialties` | `{ code, name, appointmentType, durationMinutes }` | 201 `Specialty` · 400 · 409 `DUPLICATE` (`field` = `code` o `name`; nombre único sin distinguir mayúsculas) |
+| PUT | `/api/admin/specialties/{id}` | `{ name, appointmentType, durationMinutes }` | 200 `Specialty` · 409 `PROTECTED_SPECIALTY` si se cambia el tipo de Medicina General · 409 `SPECIALTY_REFERENCED` si se cambia el tipo de una especialidad con profesionales o citas · 409 `DUPLICATE` |
 | PATCH | `/api/admin/specialties/{id}/status` | `{ active }` | 200 `Specialty` · 409 `PROTECTED_SPECIALTY` al desactivar Medicina General |
 | DELETE | `/api/admin/specialties/{id}` | — | 204 · 409 `SPECIALTY_REFERENCED` si la usa un profesional o una cita |
 
@@ -126,8 +127,8 @@ slots de 30 min. El titular sale siempre del token; un bloque ajeno → 404.
 
 | Método | Ruta | Cuerpo / query | Respuesta |
 |---|---|---|---|
-| GET | `/api/patient/availability` | `specialtyId`, `date` obligatorios; `siteId`, `professionalId` opcionales | `Offer[]` ordenadas por hora |
-| GET | `/api/patient/availability/days` | `specialtyId`, `from`, `to` (máx. 62 días); `siteId`, `professionalId` | `{ date, offers }[]` solo días con oferta |
+| GET | `/api/patient/availability` | `date` obligatorio; `specialtyId` **o** `appointmentType` (`GENERAL`/`SPECIALIZED`) obligatorio, pueden ir los dos; `siteId`, `professionalId` opcionales (RF-10) | `Offer[]` ordenadas por hora |
+| GET | `/api/patient/availability/days` | `from`, `to` (máx. 62 días); mismos filtros que la anterior | `{ date, offers }[]` solo días con oferta |
 | POST | `/api/patient/appointments/general` | `{ professionalId, siteId, specialtyId, date, startTime }` | 201 `Appointment` `APPROVED` |
 | POST | `/api/patient/appointments/specialized` | igual | 201 `Appointment` `REQUESTED` |
 | GET | `/api/patient/appointments` | `status`, `date` opcionales | `Appointment[]` (próximas primero) |
@@ -155,7 +156,7 @@ inactivas o no asignadas. Buscar no retiene nada.
 Aprobar conserva las reservas de slots; rechazar las borra en la misma transacción (RN-09).
 Cada transición escribe una fila de historial en la misma transacción (HU-032): creación general
 → `SYSTEM` sin actor, solicitud especializada → `USER`, decisión → `ADMIN` con motivo si rechaza.
-El historial no tiene rutas de escritura. En S4 la bandeja incluirá `type: 'RESCHEDULE_REQUEST'`.
+En el detalle del **paciente**, `actorName` de las entradas `ADMIN` es "Administración" (no el nombre del empleado); el ADMIN ve el nombre real. El historial no tiene rutas de escritura. En S4 la bandeja incluirá `type: 'RESCHEDULE_REQUEST'`.
 
 ## Relacionado
 
@@ -165,4 +166,5 @@ El historial no tiene rutas de escritura. En S4 la bandeja incluirá `type: 'RES
 
 ## Historial
 
+- 2026-09-18 — tras la verificación independiente: filtro `appointmentType` en disponibilidad, catálogo de estados de reprogramación, `CONCURRENT_CHANGE`, nombre de especialidad único, tipo no editable si está en uso, `actorName` enmascarado para el paciente. La bandeja ya no filtra por el tipo actual de la especialidad.
 - 2026-09-18 — creado antes de implementar S3, como contrato común de backend y frontend.

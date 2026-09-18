@@ -131,3 +131,9 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO (defecto de S2 destapado en S3): la zona horaria del JVM se fijaba en un `@PostConstruct`, después de abrir conexiones; las horas `TIME` se desplazaban 5 h según el orden de las pruebas. Mitigado y documentado en [[riesgo-zona-horaria-columnas-time]].
 - HECHO: 210 pruebas en verde, dos ejecuciones seguidas. [[contrato-rest-citas]] pasa a `Vigente`: todas sus rutas existen y tienen pruebas de integración.
 - PREGUNTA ABIERTA: la bandeja devuelve `history: []` en cada entrada, porque el historial completo se pide en el detalle. Si el frontend lo necesita en la lista, habría que ampliarla.
+
+## [2026-09-18] learn | Claude Code: AGENTS.md de cada repo cargado vía CLAUDE.md
+
+- HECHO: Claude Code carga `CLAUDE.md`, no `AGENTS.md`. `citas-api/CLAUDE.md` y `citas-web/CLAUDE.md` (nuevos) importan su `AGENTS.md` con `@AGENTS.md`; el `CLAUDE.md` raíz ahora importa el `AGENTS.md` raíz en vez de solo enlazarlo.
+- HECHO: los agentes `backend-*` y `frontend-*` leen el `AGENTS.md` de su repo antes de actuar (sección "Contexto obligatorio").
+- HECHO: un subagente no puede lanzar subagentes; `s2-orchestrator` solo delega si corre como hilo principal (`claude --agent s2-orchestrator`).
