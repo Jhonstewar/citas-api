@@ -143,6 +143,20 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(problem);
     }
 
+    /**
+     * Ultima barrera: una restriccion de la base rechazo un cambio que las comprobaciones previas no
+     * vieron (carrera entre transacciones). Es un conflicto, no un error interno. No se devuelve ni se
+     * registra el mensaje: el motor lo redacta con los valores duplicados (p. ej. un email).
+     */
+    @ExceptionHandler({ org.springframework.dao.DataIntegrityViolationException.class,
+            org.springframework.dao.ConcurrencyFailureException.class })
+    ProblemDetail integrityConflict(org.springframework.dao.DataAccessException ex) {
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, "Conflicto",
+                "Otro cambio simultáneo impidió completar la operación; vuelva a intentarlo");
+        problem.setProperty("code", "CONCURRENT_CHANGE");
+        return problem;
+    }
+
     @ExceptionHandler(Exception.class)
     ProblemDetail unexpected(Exception ex) {
         // Solo el tipo: el mensaje de algunas excepciones puede arrastrar datos de la peticion.

@@ -36,12 +36,35 @@ public class ManageSpecialtiesUseCase {
             if (specialties.existsByCode(specialty.code())) {
                 throw new DuplicateValueException("code", "Ya existe una especialidad con ese código");
             }
+            requireUniqueName(specialty.name(), null);
             return specialties.save(specialty);
         });
     }
 
+    /**
+     * Cambiar el tipo de una especialidad en uso cambiaria la politica de aprobacion de citas ya
+     * pedidas: una REQUESTED dejaria de ser "especializada" y quedaria retenida sin nadie que la
+     * decida (verificacion de S3, F1). La duracion si se puede cambiar: rige para reservas nuevas;
+     * las citas existentes conservan sus horas (RF-09).
+     */
     public Specialty update(int id, String name, AppointmentType type, int durationMinutes) {
-        return tx.inTransaction(() -> specialties.save(get(id).withDetails(name, type, durationMinutes)));
+        return tx.inTransaction(() -> {
+            Specialty current = get(id);
+            if (type != current.appointmentType() && specialties.isReferenced(id)) {
+                throw new ConflictException("SPECIALTY_REFERENCED",
+                        "No se puede cambiar el tipo de una especialidad con profesionales o citas: cree una nueva");
+            }
+            Specialty updated = current.withDetails(name, type, durationMinutes);
+            requireUniqueName(updated.name(), id);
+            return specialties.save(updated);
+        });
+    }
+
+    /** DoD de HU-011: el nombre es unico, sin distinguir mayusculas. */
+    private void requireUniqueName(String name, Integer excludingId) {
+        if (specialties.existsByName(name, excludingId)) {
+            throw new DuplicateValueException("name", "Ya existe una especialidad con ese nombre");
+        }
     }
 
     public Specialty setActive(int id, boolean active) {

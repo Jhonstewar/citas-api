@@ -26,6 +26,9 @@ public interface CatalogQueries {
 
     List<StatusView> appointmentStatuses();
 
+    /** HU-010 CA-04: incluye PENDING, estado inicial de toda reprogramacion (RF-15, S4). */
+    List<StatusView> rescheduleStatuses();
+
     List<CodeName> documentTypes();
 
     List<CodeName> roles();

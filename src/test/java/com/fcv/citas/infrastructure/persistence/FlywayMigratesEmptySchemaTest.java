@@ -96,7 +96,7 @@ class FlywayMigratesEmptySchemaTest {
 
     @Test
     void aplicaTodasLasMigracionesEnOrden() throws SQLException {
-        assertThat(result.migrationsExecuted).isEqualTo(6);
+        assertThat(result.migrationsExecuted).isEqualTo(7);
 
         // Se lee el historial con SQL plano en vez de la API de Flyway: lo que importa es lo que
         // quedo registrado en la base, no lo que el objeto de resultado dice haber hecho.
@@ -113,7 +113,7 @@ class FlywayMigratesEmptySchemaTest {
                 versions.add(rows.getString("version"));
             }
         }
-        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6");
+        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7");
     }
 
     @Test
@@ -133,6 +133,22 @@ class FlywayMigratesEmptySchemaTest {
             assertThat(countRows(table))
                     .as("el catalogo fijo %s quedo vacio tras V4", table)
                     .isPositive();
+        }
+    }
+
+    /** HU-010 CA-02 (V7): las dos sedes con la direccion literal del PRD §3. */
+    @Test
+    void siembraLasDosSedesConSuDireccion() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery("SELECT code, address FROM sites ORDER BY id")) {
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getString("code")).isEqualTo("HIC");
+            assertThat(rows.getString("address")).isEqualTo("Km 7 Autopista Bucaramanga–Piedecuesta, Valle de Menzulí");
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getString("code")).isEqualTo("ICV");
+            assertThat(rows.getString("address")).isEqualTo("Calle 155A No. 23-58, Urbanización El Bosque");
+            assertThat(rows.next()).isFalse();
         }
     }
 

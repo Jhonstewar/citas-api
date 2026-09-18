@@ -70,19 +70,22 @@ class PatientBookingController {
     }
 
     @GetMapping("/availability")
-    List<OfferResponse> offers(@RequestParam int specialtyId,
+    List<OfferResponse> offers(@RequestParam(required = false) Integer specialtyId,
+            @RequestParam(required = false) String appointmentType,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) Integer siteId, @RequestParam(required = false) Long professionalId) {
-        return availability.offers(specialtyId, date, siteId, professionalId).stream().map(OfferResponse::from)
+        return availability.offers(specialtyId, appointmentType, date, siteId, professionalId).stream()
+                .map(OfferResponse::from)
                 .toList();
     }
 
     @GetMapping("/availability/days")
-    List<DayResponse> days(@RequestParam int specialtyId,
+    List<DayResponse> days(@RequestParam(required = false) Integer specialtyId,
+            @RequestParam(required = false) String appointmentType,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Integer siteId, @RequestParam(required = false) Long professionalId) {
-        return availability.days(specialtyId, from, to, siteId, professionalId).stream()
+        return availability.days(specialtyId, appointmentType, from, to, siteId, professionalId).stream()
                 .map(d -> new DayResponse(d.date().toString(), d.offers())).toList();
     }
 

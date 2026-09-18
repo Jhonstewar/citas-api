@@ -50,6 +50,12 @@ class JpaSpecialtyRepositoryAdapter implements SpecialtyRepository {
     }
 
     @Override
+    public boolean existsByName(String name, Integer excludingId) {
+        return excludingId == null ? specialties.existsByNameIgnoreCase(name)
+                : specialties.existsByNameIgnoreCaseAndIdNot(name, excludingId);
+    }
+
+    @Override
     public Specialty save(Specialty specialty) {
         AppointmentTypeJpaEntity type = types.findByCode(specialty.appointmentType().name())
                 .orElseThrow(() -> new IllegalStateException("Catalogo appointment_types incompleto (V4)"));

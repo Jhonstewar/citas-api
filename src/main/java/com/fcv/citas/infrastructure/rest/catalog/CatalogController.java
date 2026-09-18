@@ -49,6 +49,11 @@ class CatalogController {
         return catalogs.appointmentStatuses();
     }
 
+    @GetMapping("/reschedule-statuses")
+    List<StatusView> rescheduleStatuses() {
+        return catalogs.rescheduleStatuses();
+    }
+
     @GetMapping("/document-types")
     List<CodeName> documentTypes() {
         return catalogs.documentTypes();

@@ -27,7 +27,7 @@ class JdbcAvailabilityQueries implements AvailabilityQueries {
             JOIN availability_blocks b ON b.id = s1.availability_block_id
             JOIN professionals p ON p.id = b.professional_id AND p.active
             JOIN users pu ON pu.id = p.user_id
-            JOIN professional_specialties ps ON ps.professional_id = p.id AND ps.specialty_id = :specialty
+            JOIN professional_specialties ps ON ps.professional_id = p.id
             JOIN specialties sp ON sp.id = ps.specialty_id AND sp.active
             JOIN appointment_types ty ON ty.id = sp.appointment_type_id
             JOIN professional_sites psi ON psi.professional_id = p.id AND psi.site_id = b.site_id
@@ -47,17 +47,19 @@ class JdbcAvailabilityQueries implements AvailabilityQueries {
     }
 
     @Override
-    public List<Offer> offers(int specialtyId, LocalDate date, Integer siteId, Long professionalId,
+    public List<Offer> offers(Integer specialtyId, String appointmentType, LocalDate date, Integer siteId,
+            Long professionalId,
             LocalDateTime now) {
-        MapSqlParameterSource params = params(specialtyId, siteId, professionalId, now).addValue("date", date);
+        MapSqlParameterSource params = params(specialtyId, appointmentType, siteId, professionalId, now)
+                .addValue("date", date);
         String sql = """
                 SELECT p.id AS professional_id, CONCAT(pu.first_names, ' ', pu.last_names) AS professional_name,
                        si.id AS site_id, si.code AS site_code, si.name AS site_name,
                        sp.id AS specialty_id, sp.code AS specialty_code, sp.name AS specialty_name,
                        ty.code AS specialty_type, sp.duration_minutes,
                        b.block_date, s1.start_time
-                """ + FROM_WHERE + " AND b.block_date = :date" + filters(siteId, professionalId)
-                + " ORDER BY s1.start_time, professional_name";
+                """ + FROM_WHERE + " AND b.block_date = :date" + filters(specialtyId, appointmentType, siteId, professionalId)
+                + " ORDER BY s1.start_time, professional_name, specialty_name";
         return jdbc.query(sql, params, (rs, i) -> {
             LocalTime start = rs.getObject("start_time", LocalTime.class);
             int duration = rs.getInt("duration_minutes");
@@ -71,28 +73,36 @@ class JdbcAvailabilityQueries implements AvailabilityQueries {
     }
 
     @Override
-    public List<DayCount> days(int specialtyId, LocalDate from, LocalDate to, Integer siteId, Long professionalId,
+    public List<DayCount> days(Integer specialtyId, String appointmentType, LocalDate from, LocalDate to,
+            Integer siteId, Long professionalId,
             LocalDateTime now) {
-        MapSqlParameterSource params = params(specialtyId, siteId, professionalId, now).addValue("from", from)
+        MapSqlParameterSource params = params(specialtyId, appointmentType, siteId, professionalId, now)
+                .addValue("from", from)
                 .addValue("to", to);
         String sql = "SELECT b.block_date, COUNT(*) AS offers " + FROM_WHERE
-                + " AND b.block_date BETWEEN :from AND :to" + filters(siteId, professionalId)
+                + " AND b.block_date BETWEEN :from AND :to"
+                + filters(specialtyId, appointmentType, siteId, professionalId)
                 + " GROUP BY b.block_date ORDER BY b.block_date";
         return jdbc.query(sql, params,
                 (rs, i) -> new DayCount(rs.getObject("block_date", LocalDate.class), rs.getInt("offers")));
     }
 
-    private static MapSqlParameterSource params(int specialtyId, Integer siteId, Long professionalId,
+    private static MapSqlParameterSource params(Integer specialtyId, String appointmentType, Integer siteId,
+            Long professionalId,
             LocalDateTime now) {
         return new MapSqlParameterSource("specialty", specialtyId)
+                .addValue("type", appointmentType)
                 .addValue("site", siteId)
                 .addValue("professional", professionalId)
                 .addValue("today", now.toLocalDate())
                 .addValue("nowTime", now.toLocalTime().withNano(0));
     }
 
-    private static String filters(Integer siteId, Long professionalId) {
-        return (siteId == null ? "" : " AND b.site_id = :site")
+    private static String filters(Integer specialtyId, String appointmentType, Integer siteId,
+            Long professionalId) {
+        return (specialtyId == null ? "" : " AND ps.specialty_id = :specialty")
+                + (appointmentType == null ? "" : " AND ty.code = :type")
+                + (siteId == null ? "" : " AND b.site_id = :site")
                 + (professionalId == null ? "" : " AND p.id = :professional");
     }
 }

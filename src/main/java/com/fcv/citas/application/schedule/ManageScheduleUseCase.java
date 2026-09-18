@@ -67,6 +67,9 @@ public class ManageScheduleUseCase {
     public BlockView update(long userId, long blockId, BlockCommand command) {
         tx.inTransaction(() -> {
             Professional professional = professionalOf(userId);
+            // Bloquear ANTES de comprobar reservas: si no, una reserva simultanea entraria entre la
+            // comprobacion y el cambio (verificacion S3, F7).
+            blocks.lockProfessional(professional.id());
             requireModifiable(ownBlock(professional, blockId));
             blocks.replace(validated(professional, blockId, command));
             return null;
@@ -77,6 +80,9 @@ public class ManageScheduleUseCase {
     public void delete(long userId, long blockId) {
         tx.inTransaction(() -> {
             Professional professional = professionalOf(userId);
+            // Bloquear ANTES de comprobar reservas: si no, una reserva simultanea entraria entre la
+            // comprobacion y el cambio (verificacion S3, F7).
+            blocks.lockProfessional(professional.id());
             requireModifiable(ownBlock(professional, blockId));
             blocks.delete(blockId);
             return null;

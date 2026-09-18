@@ -24,9 +24,14 @@ public interface AvailabilityQueries {
     record DayCount(LocalDate date, int offers) {
     }
 
-    /** {@code siteId} y {@code professionalId} opcionales ({@code null} = todos). */
-    List<Offer> offers(int specialtyId, LocalDate date, Integer siteId, Long professionalId, LocalDateTime now);
+    /**
+     * Todos los filtros salvo la fecha son opcionales ({@code null} = todos), pero el caso de uso exige
+     * especialidad o tipo de cita (RF-10). {@code appointmentType}: {@code GENERAL} o {@code SPECIALIZED}.
+     */
+    List<Offer> offers(Integer specialtyId, String appointmentType, LocalDate date, Integer siteId,
+            Long professionalId, LocalDateTime now);
 
-    List<DayCount> days(int specialtyId, LocalDate from, LocalDate to, Integer siteId, Long professionalId,
+    List<DayCount> days(Integer specialtyId, String appointmentType, LocalDate from, LocalDate to,
+            Integer siteId, Long professionalId,
             LocalDateTime now);
 }

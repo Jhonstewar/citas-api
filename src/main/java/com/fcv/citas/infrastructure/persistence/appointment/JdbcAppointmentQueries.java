@@ -104,7 +104,7 @@ class JdbcAppointmentQueries implements AppointmentQueries {
     @Override
     public List<AppointmentView> findPendingRequests(InboxFilter filter) {
         MapSqlParameterSource params = new MapSqlParameterSource();
-        List<String> where = new ArrayList<>(List.of("st.code = 'REQUESTED'", "ty.code = 'SPECIALIZED'"));
+        List<String> where = new ArrayList<>(List.of("st.code = 'REQUESTED'"));
         if (filter.siteId() != null) {
             where.add("a.site_id = :site");
             params.addValue("site", filter.siteId());

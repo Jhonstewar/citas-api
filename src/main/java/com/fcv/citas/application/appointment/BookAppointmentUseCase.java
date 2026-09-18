@@ -89,6 +89,10 @@ public class BookAppointmentUseCase {
             if (!java.time.LocalDateTime.of(c.date(), c.startTime()).isAfter(SystemZone.now(clock))) {
                 throw new BusinessRuleException("PAST_TIME", "No se pueden reservar franjas en el pasado");
             }
+            // Serializa la reserva con la edicion/borrado de la agenda del mismo profesional: sin esto,
+            // borrar un bloque mientras se reserva uno de sus slots acababa en un 500 (verificacion S3, F7).
+            // La doble reserva entre pacientes la sigue impidiendo la PK de slot_reservations.
+            blocks.lockProfessional(professional.id());
             int slots = specialty.slotsRequired();
             AvailabilityBlock block = blocks.findByProfessionalAndDate(professional.id(), c.date()).stream()
                     .filter(b -> b.siteId() == c.siteId() && b.canHost(c.startTime(), slots))

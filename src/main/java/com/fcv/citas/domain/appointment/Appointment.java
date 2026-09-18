@@ -66,10 +66,11 @@ public record Appointment(
 
     /** HU-030 CA-02 y CA-03 (RN-04): rechazo con motivo obligatorio. */
     public Transition reject(long adminUserId, String reason) {
+        // Primero el estado: sobre una cita ya decidida el problema es la transicion (409), no el motivo.
+        requireRequested();
         if (reason == null || reason.isBlank()) {
             throw InvalidRequestException.field("reason", "El motivo del rechazo es obligatorio");
         }
-        requireRequested();
         return transitionTo(AppointmentStatus.REJECTED, adminUserId, AuditSource.ADMIN, reason);
     }
 

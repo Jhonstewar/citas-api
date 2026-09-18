@@ -8,6 +8,10 @@ interface SpringDataSpecialtyRepository extends JpaRepository<SpecialtyJpaEntity
 
     boolean existsByCode(String code);
 
+    boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Integer id);
+
     List<SpecialtyJpaEntity> findAllByOrderByNameAsc();
 
     List<SpecialtyJpaEntity> findByActiveTrueOrderByNameAsc();

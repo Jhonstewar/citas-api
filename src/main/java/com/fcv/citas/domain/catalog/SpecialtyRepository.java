@@ -14,6 +14,9 @@ public interface SpecialtyRepository {
 
     boolean existsByCode(String code);
 
+    /** Nombre ya usado por otra especialidad (sin distinguir mayusculas); {@code excludingId} opcional. */
+    boolean existsByName(String name, Integer excludingId);
+
     /** Inserta si {@code id} es nulo; si no, actualiza nombre, tipo, duracion y estado. */
     Specialty save(Specialty specialty);
 

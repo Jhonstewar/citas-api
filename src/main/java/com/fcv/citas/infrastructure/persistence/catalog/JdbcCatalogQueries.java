@@ -42,6 +42,12 @@ class JdbcCatalogQueries implements CatalogQueries {
     }
 
     @Override
+    public List<StatusView> rescheduleStatuses() {
+        return jdbc.query("SELECT code, name, is_terminal FROM reschedule_statuses ORDER BY id",
+                (rs, i) -> new StatusView(rs.getString("code"), rs.getString("name"), rs.getBoolean("is_terminal")));
+    }
+
+    @Override
     public List<CodeName> documentTypes() {
         return codeNames("SELECT code, name FROM document_types WHERE active ORDER BY id");
     }

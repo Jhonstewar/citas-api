@@ -30,6 +30,17 @@ public class PatientAppointmentsUseCase {
         AppointmentView view = queries.findById(appointmentId)
                 .filter(a -> a.patient().id() == patientUserId)
                 .orElseThrow(() -> new NotFoundException("La cita no existe"));
-        return new Detail(view, queries.history(appointmentId));
+        return new Detail(view, queries.history(appointmentId).stream()
+                .map(PatientAppointmentsUseCase::forPatient).toList());
+    }
+
+    /**
+     * El paciente ve quien decidio como rol, no como persona: el nombre del ADMIN es dato personal
+     * del empleado y no le aporta nada (verificacion S3, F9). El ADMIN si ve el nombre completo.
+     */
+    private static HistoryView forPatient(HistoryView h) {
+        return "ADMIN".equals(h.source())
+                ? new HistoryView(h.status(), h.statusName(), h.source(), "Administración", h.reason(), h.changedAt())
+                : h;
     }
 }

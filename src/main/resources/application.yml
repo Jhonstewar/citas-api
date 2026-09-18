@@ -83,3 +83,6 @@ logging:
     root: INFO
     com.fcv.citas: INFO
     org.flywaydb: INFO
+    # Hibernate registra el valor duplicado de una violacion de unicidad ("Duplicate entry 'correo'"):
+    # un email en el log es un dato personal (PRD seccion 8). La excepcion sigue llegando a la aplicacion.
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF
