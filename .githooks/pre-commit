@@ -1,0 +1,37 @@
+#!/bin/sh
+# Hook pre-commit de citas-api (S3, verificacion 8): la red que dice "no".
+#   1. Escaneo de secretos en las lineas agregadas (siempre).
+#   2. Suite completa de pruebas (mvn -B test) si el commit toca algo mas que documentacion.
+# Maven corre dentro de Docker (AGENTS.md: no se usa el JDK del host), con el compose del workspace.
+# Las pruebas se ejecutan sobre el arbol de trabajo, no solo sobre lo staged.
+# Instalar: .\scripts\install-hooks.ps1 desde la raiz del workspace.
+
+echo "[pre-commit] citas-api: 1/2 escaneo de secretos"
+node .githooks/secret-scan.mjs || exit 1
+
+if ! git diff --cached --name-only | grep -qvE '^docs/|\.md$'; then
+  echo "[pre-commit] citas-api: 2/2 pruebas omitidas (el commit solo toca documentacion)"
+  exit 0
+fi
+
+echo "[pre-commit] citas-api: 2/2 pruebas (mvn -B test en Docker)..."
+if [ -f ../docker-compose.yml ] && docker info >/dev/null 2>&1; then
+  docker compose -f ../docker-compose.yml run --rm -T citas-api-dev mvn -B -q test > .git/pre-commit-tests.log 2>&1
+  status=$?
+elif command -v mvn >/dev/null 2>&1; then
+  mvn -B -q test > .git/pre-commit-tests.log 2>&1
+  status=$?
+else
+  echo "[pre-commit] COMMIT BLOQUEADO: no hay Docker (con ../docker-compose.yml) ni Maven para ejecutar las pruebas."
+  echo "             Arranca Docker Desktop y MySQL: docker compose up -d mysql"
+  exit 1
+fi
+
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "[pre-commit] COMMIT BLOQUEADO: hay pruebas en rojo. Resumen:"
+  grep -aE "Tests run:.*(Failures: [1-9]|Errors: [1-9])|\[ERROR\] +[A-Za-z].*(Test|expected|Expected)|FAILURE" .git/pre-commit-tests.log | head -20
+  echo "             Log completo: .git/pre-commit-tests.log"
+  exit 1
+fi
+echo "[pre-commit] citas-api: pruebas en verde"
