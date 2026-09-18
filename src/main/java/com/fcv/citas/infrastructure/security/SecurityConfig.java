@@ -61,7 +61,15 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(PUBLIC_AUTH_ENDPOINTS).permitAll()
                         .requestMatchers("/error").permitAll()
-                        .anyRequest().authenticated())
+                        // HU-005: un prefijo por rol. Los roles vienen del claim `roles` del token.
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")
+                        .requestMatchers("/api/patient/**").hasRole("USER")
+                        // Lecturas comunes a cualquier rol. Todos los metodos para que una escritura
+                        // sobre un catalogo fijo llegue a MVC y responda 405 (HU-010 CA-06).
+                        .requestMatchers("/api/catalogs/**", "/api/me").authenticated()
+                        // HU-005 CA-07: denegacion por defecto de toda ruta no declarada.
+                        .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Las rutas publicas de auth ignoran la cabecera Authorization: un Bearer
                         // caducado no puede impedir renovar ni cerrar sesion.

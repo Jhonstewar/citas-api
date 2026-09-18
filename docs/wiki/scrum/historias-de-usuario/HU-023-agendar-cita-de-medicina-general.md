@@ -2,7 +2,7 @@
 id: HU-023
 tipo: historia-de-usuario
 titulo: "Agendar cita de Medicina General"
-estado: Borrador
+estado: En desarrollo
 epica: "[[EP-006-busqueda-de-disponibilidad-y-reserva]]"
 requisitos: [RF-11, RF-19]
 esfuerzo: "Alto"
@@ -194,6 +194,8 @@ La cita nace con historial: [[HU-032-auditar-cambios-de-estado-de-cita]] se plan
 
 ## Historial de validación
 
+- 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F5 de `PLAN_RETOMA_S3.md`.
+- 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones

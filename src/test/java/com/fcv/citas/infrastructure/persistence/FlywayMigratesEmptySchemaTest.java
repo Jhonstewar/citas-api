@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * HU-001 CA-08 — las migraciones levantan el esquema completo partiendo de una base VACIA.
  *
  * <p>La verificacion independiente de S2 marco este criterio como NO VERIFICABLE: el resto de las
- * pruebas corren contra una base ya migrada, asi que ninguna demostraba que V1..V4 funcionen
+ * pruebas corren contra una base ya migrada, asi que ninguna demostraba que V1..Vn funcionen
  * desde cero. Esta prueba crea su propio esquema desechable, lo migra y lo destruye, sin tocar ni
  * la base de desarrollo ni la de pruebas.</p>
  *
@@ -95,8 +95,8 @@ class FlywayMigratesEmptySchemaTest {
     }
 
     @Test
-    void aplicaLasCuatroMigracionesEnOrden() throws SQLException {
-        assertThat(result.migrationsExecuted).isEqualTo(4);
+    void aplicaTodasLasMigracionesEnOrden() throws SQLException {
+        assertThat(result.migrationsExecuted).isEqualTo(7);
 
         // Se lee el historial con SQL plano en vez de la API de Flyway: lo que importa es lo que
         // quedo registrado en la base, no lo que el objeto de resultado dice haber hecho.
@@ -113,7 +113,7 @@ class FlywayMigratesEmptySchemaTest {
                 versions.add(rows.getString("version"));
             }
         }
-        assertThat(versions).containsExactly("1", "2", "3", "4");
+        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7");
     }
 
     @Test
@@ -133,6 +133,59 @@ class FlywayMigratesEmptySchemaTest {
             assertThat(countRows(table))
                     .as("el catalogo fijo %s quedo vacio tras V4", table)
                     .isPositive();
+        }
+    }
+
+    /** HU-010 CA-02 (V7): las dos sedes con la direccion literal del PRD §3. */
+    @Test
+    void siembraLasDosSedesConSuDireccion() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery("SELECT code, address FROM sites ORDER BY id")) {
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getString("code")).isEqualTo("HIC");
+            assertThat(rows.getString("address")).isEqualTo("Km 7 Autopista Bucaramanga–Piedecuesta, Valle de Menzulí");
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getString("code")).isEqualTo("ICV");
+            assertThat(rows.getString("address")).isEqualTo("Calle 155A No. 23-58, Urbanización El Bosque");
+            assertThat(rows.next()).isFalse();
+        }
+    }
+
+    /** V6 (decision D7): Medicina General existe desde la migracion, general y de 30 minutos. */
+    @Test
+    void siembraMedicinaGeneral() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery(
+                        "SELECT s.duration_minutes, t.code FROM specialties s "
+                                + "JOIN appointment_types t ON t.id = s.appointment_type_id "
+                                + "WHERE s.code = 'MEDICINA_GENERAL' AND s.active")) {
+            assertThat(rows.next()).as("falta la especialidad MEDICINA_GENERAL").isTrue();
+            assertThat(rows.getInt(1)).isEqualTo(30);
+            assertThat(rows.getString(2)).isEqualTo("GENERAL");
+        }
+    }
+
+    /** V5 (decision D8): el historial ya no se borra en cascada y admite el origen PROFESSIONAL. */
+    @Test
+    void elHistorialEsAppendOnlyYAdmiteOrigenProfesional() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement()) {
+            try (ResultSet rows = statement.executeQuery(
+                    "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS "
+                            + "WHERE CONSTRAINT_SCHEMA = '" + SCHEMA + "' "
+                            + "AND CONSTRAINT_NAME = 'fk_ash_appointment'")) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).isIn("RESTRICT", "NO ACTION");
+            }
+            try (ResultSet rows = statement.executeQuery(
+                    "SELECT COLUMN_TYPE FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' "
+                            + "AND TABLE_NAME = 'appointment_status_history' AND COLUMN_NAME = 'source'")) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).contains("'PROFESSIONAL'");
+            }
         }
     }
 

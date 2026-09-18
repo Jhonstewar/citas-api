@@ -2,7 +2,7 @@
 id: HU-014
 tipo: historia-de-usuario
 titulo: "Asignar especialidades y especialidad primaria al profesional"
-estado: Borrador
+estado: En desarrollo
 epica: "[[EP-004-gestion-de-profesionales]]"
 requisitos: [RF-07]
 esfuerzo: "Medio"
@@ -166,6 +166,8 @@ El esquema ya existe en V2: `professional_specialties` es la relación N:M con e
 
 ## Historial de validación
 
+- 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F3 de `PLAN_RETOMA_S3.md`.
+- 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones

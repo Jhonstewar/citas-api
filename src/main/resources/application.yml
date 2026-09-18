@@ -72,9 +72,17 @@ app:
       access-secret: ${JWT_ACCESS_SECRET}
       access-ttl: ${JWT_ACCESS_MINUTES:15}m
       refresh-ttl: ${JWT_REFRESH_DAYS:7}d
+  # Primer ADMIN (decision D5): se crea al arrancar solo si no existe ninguno y ambas variables
+  # tienen valor. Vacias por defecto: sin ellas no se crea nadie. Nunca un valor literal aqui.
+  admin-bootstrap:
+    email: ${ADMIN_BOOTSTRAP_EMAIL:}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}
 
 logging:
   level:
     root: INFO
     com.fcv.citas: INFO
     org.flywaydb: INFO
+    # Hibernate registra el valor duplicado de una violacion de unicidad ("Duplicate entry 'correo'"):
+    # un email en el log es un dato personal (PRD seccion 8). La excepcion sigue llegando a la aplicacion.
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF

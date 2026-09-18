@@ -82,6 +82,19 @@ class JpaUserRepositoryAdapter implements UserRepository, DocumentTypeCatalog {
         return users.findById(id).map(JpaUserRepositoryAdapter::toDomain);
     }
 
+    @Override
+    public boolean existsByRole(Role role) {
+        return users.existsByRoles_Code(role.name());
+    }
+
+    @Override
+    public void updateContact(long userId, String firstNames, String lastNames, String phone) {
+        UserJpaEntity entity = users.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("Usuario inexistente: " + userId));
+        entity.updateContact(firstNames, lastNames, phone);
+        users.saveAndFlush(entity);
+    }
+
     private static User toDomain(UserJpaEntity e) {
         Set<Role> domainRoles = e.getRoles().stream().map(r -> Role.valueOf(r.getCode()))
                 .collect(Collectors.toSet());

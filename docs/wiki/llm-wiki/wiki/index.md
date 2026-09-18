@@ -2,7 +2,7 @@
 titulo: "Índice de la LLM Wiki"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-17
+actualizado: 2026-09-18
 tags: [indice]
 ---
 
@@ -16,8 +16,9 @@ Historia cronológica: [[log]].
 
 ## Estado del proyecto
 
-- **Sesión en curso:** S2 — especificar, inicializar y construir el primer incremento
-- **Repos:** `jhonnunez-svg/citas-api`, `jhonnunez-svg/citas-web`, `jhonnunez-svg/FCV_Proyecto_Citas_v1`
+- **Sesión en curso:** S3 — flujo de citas y red automatizada que dice "no" (plan: `PLAN_RETOMA_S3.md` en la raíz)
+- **Sesión anterior:** S2 cerrada salvo la prueba manual en navegador y el diseño en Stitch (sustituido por un diseño propio en S3)
+- **Repos:** `Jhonstewar/citas-api`, `Jhonstewar/citas-web`, `Jhonstewar/FCV_Proyecto_Citas_v1` (origen histórico: `jhonnunez-svg`)
 - **Stack fijado:** Java 21 LTS · Spring Boot 3.5.x · hexagonal · MySQL 8.4 · Flyway · JWT ·
   React + TypeScript + Vite · Node 24 LTS
 
@@ -32,12 +33,14 @@ _(sin páginas todavía)_
 ## Contratos REST
 
 - [[contrato-rest-identidad]] — registro, login, refresh rotativo, logout y `/api/me`: rutas, cuerpos, `ProblemDetail` como formato de error uniforme, tabla de códigos y CORS
+- [[contrato-rest-citas]] — S3: catálogos, especialidades, profesionales, bloques, disponibilidad, reserva general/especializada, bandeja y decisión; tabla de códigos 400/409/422 con `code`
 
 ## Decisiones
 
 - [[dec-001-libreria-jwt]] — se usa el resource-server de Spring, no jjwt; con HMAC los beans `JwtDecoder`/`JwtEncoder` son obligatorios
 - [[dec-002-rotacion-refresh-tokens]] — refresh opaco rotativo con familia y detección de reuso, persistido como SHA-256; qué obliga a hacer en el cliente (renovación única, épocas de sesión)
 - [[dec-003-libro-unico-slot-reservations]] — una sola tabla con PK `slot_id` hace imposible la doble reserva a nivel de motor
+- [[dec-004-decisiones-s3-reserva]] — D5–D13, provisionales: primer ADMIN por variables de entorno, Medicina General precargada, V5 de auditoría, 60 min en un mismo bloque, hooks de git
 
 ## Datos y modelo
 
@@ -46,6 +49,8 @@ _(sin páginas todavía)_
 ## Riesgos
 
 - [[riesgo-spring-security-65-trampas]] — cinco trampas de Spring Security 6.5.x: API del encoder, secreto HMAC (y placeholders), prefijo `ROLE_`, Bearer inválido frente a `permitAll`, y el truncado a 72 bytes de BCrypt en `checkpw`
+- [[riesgo-prueba-intermitente-flyway]] — `FlywayMigratesEmptySchemaTest` falló una vez sin relación con el cambio; hipótesis: `target/` en el montaje de Windows
+- [[riesgo-zona-horaria-columnas-time]] — mitigado: la zona del JVM se fijaba tarde (`@PostConstruct`) y las horas `TIME` se desplazaban 5 h según el orden de las pruebas
 
 ## Síntesis
 
