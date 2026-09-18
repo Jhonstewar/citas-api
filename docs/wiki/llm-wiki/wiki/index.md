@@ -33,6 +33,7 @@ _(sin páginas todavía)_
 ## Contratos REST
 
 - [[contrato-rest-identidad]] — registro, login, refresh rotativo, logout y `/api/me`: rutas, cuerpos, `ProblemDetail` como formato de error uniforme, tabla de códigos y CORS
+- [[contrato-rest-citas]] — S3: catálogos, especialidades, profesionales, bloques, disponibilidad, reserva general/especializada, bandeja y decisión; tabla de códigos 400/409/422 con `code`
 
 ## Decisiones
 
