@@ -72,3 +72,9 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: defectos reales encontrados y corregidos: el login aceptaba una contraseña distinta con los mismos 72 primeros bytes (truncado de `BCrypt.checkpw`), y un Bearer caducado bloqueaba refresh y logout. En el cliente había cuatro carreras de sesión y un reintento con la identidad de otra sesión. Registrados en [[riesgo-spring-security-65-trampas]] (trampas 4 y 5) y [[dec-002-rotacion-refresh-tokens]].
 - DECISIÓN (aprobación delegada, pendiente de confirmar): locale fijo `es_CO`; las rutas públicas de auth ignoran `Authorization`; límite de contraseña en bytes UTF-8 en infraestructura. [[contrato-rest-identidad]] alineado con el código; tabla D1–D4 en [[sintesis-preguntas-abiertas]].
 - PREGUNTA ABIERTA: política de contraseña (INC-001, el cliente aplica una que el servidor no), refresh token en cookie `HttpOnly` (S4), `error_description` en inglés en `WWW-Authenticate`. Queda la prueba manual en navegador.
+
+## [2026-09-18] learn | AGENTS.md por repo (S2 paso 2) y repos en `Jhonstewar`
+
+- HECHO: `citas-api/AGENTS.md` y `citas-web/AGENTS.md` generados con `PROMPT_AGENT_CITAS_API.md` y `PROMPT_AGENT_CITAS_WEB.md` a partir del código real (stack, capas hexagonales, reglas ArchUnit, comandos Docker/npm). Se borran los `AGENTS.md.template`.
+- DECISIÓN: `citas-web/AGENTS.md` se revisa de nuevo tras importar el diseño de AI Studio (S2 paso 4); si el stack importado difiere, gana lo importado y aprobado.
+- DECISIÓN: los remotos de trabajo pasan a `Jhonstewar` (FCV_Proyecto_Citas_v1, citas-api, citas-web); `jhonnunez-svg` queda como origen histórico.
