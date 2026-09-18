@@ -123,3 +123,4 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO (trampa): `SlotReservationJpaEntity` implementa `Persistable.isNew() = true`. Con id asignado, Spring Data haría `merge`, que ante un slot ya reservado ACTUALIZARÍA la reserva ajena en vez de fallar: se perdería la garantía de RN-01 sin que ninguna prueba de un solo hilo lo notara.
 - HECHO: el historial se escribe con un `Repository` de solo `save` (sin métodos de borrado ni actualización, RN-12). La disponibilidad empareja en SQL el slot siguiente del mismo bloque para 60 min (RN-05, D9).
 - HECHO: 199 pruebas en verde. GOAL_02: falta la parte de navegador (E2E) contra el backend real.
+- HECHO (verificado por mutación): con `isNew() = false`, la segunda reserva del mismo slot devuelve 201 y sobrescribe la reserva ajena; `doubleBookingIsRejectedWith409` lo detecta, la prueba concurrente no. Registrado en [[dec-003-libro-unico-slot-reservations]].
