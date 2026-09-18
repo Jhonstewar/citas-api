@@ -86,3 +86,10 @@ Formato fijo del encabezado, para que sea parseable:
 - DECISIÓN (provisional): D5–D13 en [[dec-004-decisiones-s3-reserva]]: primer ADMIN por variables de entorno, contraseña inicial del profesional fijada por el ADMIN, Medicina General precargada, V5 de auditoría (E1/E2), 60 min en un mismo bloque, retención sin caducidad, profesional desactivado sin reservas nuevas, 409 al aprobar una cita vencida, hooks de git versionados.
 - PREFERENCIA: el usuario no usó Stitch; el diseño del frontend queda a criterio del agente ("bonito e intuitivo").
 - PREFERENCIA: trabajo por fases con puntos de control (commit por repo y casilla en `PLAN_RETOMA_S3.md`) para poder interrumpir, subir y retomar.
+
+## [2026-09-18] learn | F1 de S3: la red que dice "no" (hooks locales)
+
+- HECHO: hooks `pre-commit` versionados en `.githooks/` de los tres repos, activados con `scripts/install-hooks.ps1` (`core.hooksPath`). Raíz: secretos. `citas-api`: secretos + `mvn test` en Docker. `citas-web`: secretos + typecheck + lint + vitest. Evidencia en `EVIDENCIAS_S3.md`.
+- HECHO: el escáner bloqueó una contraseña ficticia en `application.yml` y el hook de `citas-web` bloqueó una prueba roja. La corrección (credenciales del primer ADMIN por variables de entorno) pasó: `citas-api@062725b`.
+- HECHO: la auditoría `--all` de los tres repos no encontró secretos; la regla de código daba 4 falsos positivos en mensajes de UI y rutas y se ajustó.
+- PREGUNTA ABIERTA: `FlywayMigratesEmptySchemaTest` falló una vez de forma intermitente. Ver [[riesgo-prueba-intermitente-flyway]].
