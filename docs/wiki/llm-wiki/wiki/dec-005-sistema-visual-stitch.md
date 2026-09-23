@@ -85,11 +85,20 @@ desviaciones (borde de campo, color de foco y franja elegida); con la del frontm
 
 ## Todo lo que Stitch inventó se descarta
 
-**HECHO.** Los mockups traían funcionalidad que el producto no tiene: plan de EPS, historia
+**HECHO.** Los mockups traían funcionalidad que el producto no tiene: historia
 clínica, resultados y órdenes, chat de asesores, línea telefónica prioritaria, "SSL 256-bit",
 acreditación JCI, confirmación por SMS/WhatsApp, un contador de pacientes y un toggle de
 simulación. Nada de eso entró en el código, en coherencia con la regla de no inventar
 requerimientos fuera del PRD ni de las HU aprobadas.
+
+> **Matizado en el LINT del 2026-09-23.** Esta lista incluía también el **plan de EPS**. Ya no
+> corresponde: ese mismo día se aprobó **HU-009** y el registro lleva un selector de plan
+> opcional, alimentado por `GET /api/catalogs/insurance-plans`
+> (`citas-web/src/pages/RegistroPage.tsx`, `src/api/catalogApi.ts`, prueba
+> `src/registroAfiliacion.test.tsx`; contrato en [[contrato-rest-identidad]]). La diferencia con
+> el mockup es la **procedencia**: el campo entró porque una HU aprobada lo pidió, no porque
+> Stitch lo dibujara, y solo en el registro público de pacientes. El resto de la lista sigue
+> descartado.
 
 Stitch también nombró mal las sedes ("HIC Bucaramanga", "Instituto del Corazón de
 Floridablanca"). Las del catálogo son **HIC Piedecuesta** e **ICV Floridablanca**; el frontend
@@ -101,3 +110,20 @@ El mockup del panel del administrador incluye un gráfico "Citas por sede esta s
 expone esa serie: `GET /api/admin/summary` solo devuelve contadores. Queda sin implementar hasta
 que exista una HU que la pida; si se aprueba, es un endpoint nuevo, no un cálculo en el
 frontend. Ver [[sintesis-preguntas-abiertas]].
+
+## Relacionado
+
+- [[contrato-rest-citas]] — los endpoints que estas pantallas consumen, incluido `GET /api/catalogs/sites` y el `GET /api/admin/summary` del panel
+- [[contrato-rest-identidad]] — el registro y el selector de plan de EPS que pinta la pantalla de alta
+- [[dec-004-decisiones-s3-reserva]] — el resto de decisiones de la sesión a la que sustituye en lo visual
+- [[riesgo-dos-copias-mismo-proyecto-docker]] — el `strictPort` del 5174 sin el cual estas pantallas no llegan a la API
+- [[sintesis-preguntas-abiertas]]
+
+## Historial
+
+- 2026-09-23 (LINT) — la página era **huérfana** (solo la enlazaban `index` y `log`): añadidos
+  `Relacionado` e `Historial` y enlaces entrantes desde los dos contratos y el riesgo de Docker.
+  Matizado que el plan de EPS ya **no** está entre lo descartado, por HU-009.
+- 2026-09-23 — corregida la paleta: manda el `colors:` del frontmatter de `DESIGN.md`, no la
+  prosa; con ella desaparecen las tres desviaciones por contraste. Commit `07eaa05`.
+- 2026-09-23 — página creada al aplicar el diseño de Stitch en código. Commit `08cbe02`.

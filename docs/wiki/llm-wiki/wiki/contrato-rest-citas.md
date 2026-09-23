@@ -2,7 +2,7 @@
 titulo: "Contrato REST — Catálogos, profesionales, agenda y citas (S3)"
 tipo: contrato
 estado: Vigente
-actualizado: 2026-09-18
+actualizado: 2026-09-23
 fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032", "[[dec-004-decisiones-s3-reserva]]"]
 tags: [contrato, rest, s3, citas]
 ---
@@ -22,7 +22,9 @@ Los campos nulos se omiten del JSON (`default-property-inclusion: non_null`): `r
 - **Identificadores** numéricos (`id`). Los códigos de catálogo (`HIC`, `APPROVED`…) son estables.
 - **Prefijo por rol** (HU-005): `/api/admin/**` → `ADMIN`, `/api/professional/**` →
   `PROFESSIONAL`, `/api/patient/**` → `USER`. `/api/catalogs/**` y `/api/me` → cualquier rol
-  autenticado. Cualquier otra ruta no declarada → denegada.
+  autenticado, **con una excepción**: `/api/catalogs/insurance-plans` es público desde HU-009
+  (`SecurityConfig.java:69` la declara `permitAll` **antes** del `authenticated()` de
+  `/api/catalogs/**` de la línea 76). Cualquier otra ruta no declarada → denegada.
 - **Ownership:** un recurso ajeno responde **404** (no revela que existe).
 
 ### Códigos de error
@@ -78,8 +80,12 @@ AdminAppointment  AppointmentDetail & { patient: PatientRef }
 | GET | `/api/catalogs/document-types` | `{ code, name }[]` |
 | GET | `/api/catalogs/roles` | `{ code, name }[]` |
 | GET | `/api/catalogs/regimes` | `{ code, name }[]` |
+| GET | `/api/catalogs/insurance-plans` | **público, sin token** (HU-009) — planes de EPS ofrecibles; el detalle del cuerpo vive en [[contrato-rest-identidad]] |
 
-No hay escritura sobre catálogos fijos: `POST/PUT/DELETE` → 405.
+Las nueve rutas salen del mismo `CatalogController` (`@RequestMapping("/api/catalogs")`,
+`CatalogController.java:22,33-78`). No hay escritura sobre catálogos fijos: `POST/PUT/DELETE` → 405.
+`insurance-plans` se declara **sin método** en `SecurityConfig` justamente para conservar ese 405
+en vez del 401 que daría la cadena de seguridad.
 
 ## Especialidades — ADMIN (HU-011)
 
@@ -163,8 +169,13 @@ En el detalle del **paciente**, `actorName` de las entradas `ADMIN` es "Administ
 - [[contrato-rest-identidad]]
 - [[dec-003-libro-unico-slot-reservations]]
 - [[dec-004-decisiones-s3-reserva]]
+- [[dec-005-sistema-visual-stitch]] — el frontend que consume estas rutas; las sedes que pinta salen de `/api/catalogs/sites`, no de los mockups
+- [[riesgo-zona-horaria-columnas-time]] — por qué las horas de `Block`, `Slot` y `Offer` son fiables
 
 ## Historial
 
+- 2026-09-23 (LINT) — resuelta la contradicción con [[contrato-rest-identidad]]: esta página
+  afirmaba que **todo** `/api/catalogs/**` exigía rol autenticado, cuando desde HU-009
+  `insurance-plans` es público. Añadida la ruta al catálogo y la excepción a la regla de prefijo.
 - 2026-09-18 — tras la verificación independiente: filtro `appointmentType` en disponibilidad, catálogo de estados de reprogramación, `CONCURRENT_CHANGE`, nombre de especialidad único, tipo no editable si está en uso, `actorName` enmascarado para el paciente. La bandeja ya no filtra por el tipo actual de la especialidad.
 - 2026-09-18 — creado antes de implementar S3, como contrato común de backend y frontend.

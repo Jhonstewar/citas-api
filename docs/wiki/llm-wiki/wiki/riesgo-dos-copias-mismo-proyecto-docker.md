@@ -40,8 +40,9 @@ este repo tenía 7 migraciones y 14 repositorios. Nada en el arranque lo advert�
 | `docker compose run --rm citas-api-dev …` | crea uno **nuevo** desde este `docker-compose.yml` | siempre **este** repo |
 | `docker compose exec citas-api-dev …` | se engancha al contenedor **que ya existe** | lo que montara quien lo creó |
 
-El hook pre-commit de `citas-api` usa `run --rm`, así que sus 210 pruebas siempre corrieron
-contra el código correcto y nunca delataron nada. El diagnóstico manual, hecho con `exec`, fue el
+El hook pre-commit de `citas-api` usa `run --rm`, así que su suite siempre corrió
+contra el código correcto y nunca delató nada (eran **210 pruebas** el 2026-09-18, cuando se
+escribió esto; hoy son **242** — `EVIDENCIAS_S3.md` §11). El diagnóstico manual, hecho con `exec`, fue el
 que se equivocó de carpeta. Ver [[riesgo-prueba-intermitente-flyway]]: aquel fallo intermitente
 es **otro** problema, porque el hook usa `run`.
 
@@ -52,11 +53,22 @@ Este workspace tiene identidad propia, así que las dos copias pueden convivir:
 | | Antes (compartido) | Este workspace |
 |---|---|---|
 | Proyecto Docker | `fcv-citas-training` | `fcv-citas-v1` |
-| Contenedores | `fcv-citas-*` | `fcv-citas-v1-*` |
+| Contenedores | `fcv-citas-mysql`, `fcv-citas-api-dev`, `fcv-citas-web-dev` | `fcv-citas-v1-mysql`, `fcv-citas-v1-api-dev`, `fcv-citas-v1-web-dev` |
 | MySQL (host) | 3307 | **3308** |
 | API (host) | 8080 | **8081** |
 | Servidor de desarrollo del host | 5173 | **5174** (fijo en `vite.config.ts`) |
 | Contenedor web / Angular | 5173 / 4200 | **5175 / 4201** |
+
+Verificado contra `docker-compose.yml`: `name: fcv-citas-v1` (línea 5),
+`container_name: fcv-citas-v1-mysql` / `-api-dev` / `-web-dev` (líneas 11, 41, 85) y los mapeos
+`${MYSQL_PORT:-3308}:3306` (línea 22) y `${API_PORT:-8081}:8080` (línea 71); `.env.example` de la
+raíz fija `COMPOSE_PROJECT_NAME=fcv-citas-v1`, `MYSQL_PORT=3308`, `API_PORT=8081`,
+`REACT_PORT=5175`, `ANGULAR_PORT=4201` y `FRONTEND_ORIGIN=http://localhost:5174`.
+
+**Los puertos del host cambian; los de dentro del contenedor no.** MySQL sigue escuchando en el
+3306 y la API en el 8080 *dentro* de la red de Docker: `3308` y `8081` son solo el lado del host.
+Por eso desde el backend en contenedor la base es `mysql:3306`, y por eso el mensaje
+*"Port 8080 was already in use"* del corolario de abajo habla del puerto interno.
 
 `docker-compose.yml` lleva además un `name:` de nivel superior como red de seguridad, aunque
 `COMPOSE_PROJECT_NAME` del `.env` tiene prioridad sobre él y debe valer lo mismo.
@@ -104,8 +116,32 @@ docker compose exec citas-api-dev git log --oneline -1
 
 Si el montaje o el commit no son los de este repo, no hay bug que buscar.
 
+## Pregunta abierta detectada en el LINT del 2026-09-23
+
+Los dos `.env.example` **no dicen lo mismo**, y el del repo es el desfasado:
+
+| Archivo | `FRONTEND_ORIGIN` | Puerto de la API |
+|---|---|---|
+| `.env.example` de la raíz | `http://localhost:5174` | `API_PORT=8081` |
+| `citas-api/.env.example` (líneas 25 y 28) | `http://localhost:5173` | `SERVER_PORT=8080` |
+
+El que manda en Docker es el de la raíz, así que el stack arranca bien; pero quien copie
+`citas-api/.env.example` para correr la API fuera del contenedor reproduce el fallo de CORS
+descrito arriba. El *fallback* de `application.yml:69`
+(`${FRONTEND_ORIGIN:http://localhost:5173}`) y el de `docker-compose.yml:65` apuntan también al
+5173. **No se toca desde la wiki**: queda anotado para que el usuario decida si alinear los
+`.env.example` y los fallbacks es parte de S3 o de S4.
+
 ## Relacionado
 
 - [[riesgo-prueba-intermitente-flyway]]
 - [[contrato-rest-identidad]] — el CORS de origen exacto que hace visible este fallo
 - [[datos-modelo-3fn]] — las 7 migraciones que la base vieja no tenía
+- [[dec-005-sistema-visual-stitch]] — el frontend que sirve ese 5174
+
+## Historial
+
+- 2026-09-23 (LINT) — añadidos los nombres de contenedor completos con su verificación contra
+  `docker-compose.yml`, la distinción puerto de host / puerto interno, la fecha de la cifra de
+  pruebas del hook y la divergencia entre los dos `.env.example`.
+- 2026-09-23 — creada al descubrir que los contenedores en marcha eran de otra copia.

@@ -2,7 +2,7 @@
 titulo: "Log de la LLM Wiki"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-16
+actualizado: 2026-09-23
 tags: [log]
 ---
 
@@ -186,3 +186,10 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: la garantía última sigue siendo del motor. En el camino de escritura **no hay ningún pre-chequeo de "slot libre"** en la aplicación, y `SlotReservationJpaEntity` implementa `Persistable` con `isNew() = true` para que Spring Data haga `persist` y no `merge`: con `merge` actualizaría la fila ajena en vez de fallar y la doble reserva pasaría inadvertida.
 - PREGUNTA ABIERTA: `appointments` no tiene restricción que obligue a una cita a tener filas en `slot_reservations`. Que toda cita ocupe su franja lo garantiza hoy el código, porque existe un único camino de creación; la base no lo impediría si apareciera otro.
 - HECHO: suite del backend en **242** pruebas. Evidencia en `EVIDENCIAS_S3.md` §11.
+
+## [2026-09-23] lint | Cierre de F11 de S3: saneado completo de `wiki/`
+
+- Contradicciones resueltas: `/api/catalogs/**` (en [[contrato-rest-citas]] decía que **todo** exigía rol autenticado, cuando `insurance-plans` es público desde HU-009, `SecurityConfig.java:69`) y el "plan de EPS" que [[dec-005-sistema-visual-stitch]] listaba como invento de Stitch descartado. La paleta de `DESIGN.md` ya estaba bien resuelta en la página (manda el frontmatter); el rastro desfasado estaba en `index.md`, que aún hablaba de "tres desviaciones por contraste".
+- Claims obsoletos corregidos con verificación: [[datos-modelo-3fn]] decía **cuatro** migraciones y `flyway_schema_history` en v4 → son **siete** (V1..V7, 24 tablas, `FlywayMigratesEmptySchemaTest.java:37,118`), `affiliations` existe desde `V2:145`, y E1/E2/S3 pasan de abiertas a cerradas por `V5` y `V6`. Las cifras de pruebas quedan fechadas (210 = 2026-09-18) frente a las vigentes: **242** backend (`EVIDENCIAS_S3.md` §11) y **88** frontend (`npm test` ejecutado). Puertos y contenedores del proyecto `fcv-citas-v1` verificados contra `docker-compose.yml`; el CORS de [[contrato-rest-identidad]] pasa de "5173" a 5174 con el matiz del fallback.
+- Salud: cero enlaces rotos y cero secretos. Dos huérfanas adoptadas ([[dec-005-sistema-visual-stitch]] y [[riesgo-zona-horaria-columnas-time]], que solo enlazaban `index` y `log`). Colisión de identificadores `A1–A3` deshecha en [[sintesis-preguntas-abiertas]] → `AF1–AF3`. Dos bytes NUL literales retirados de [[riesgo-spring-security-65-trampas]]. `fuentes: []` de [[contrato-rest-identidad]] rellenado.
+- Queda abierto: los dos `.env.example` divergen (raíz 5174/8081 frente a `citas-api/` 5173/8080) — anotado en [[riesgo-dos-copias-mismo-proyecto-docker]], sin tocar código; la comparación del esquema contra `database/reference/` sigue pendiente y el `db.sql` que se citaba **no existe**; y `dominio-` sigue sin ninguna página (candidatas: slot/disponibilidad, estados de la cita, afiliación).

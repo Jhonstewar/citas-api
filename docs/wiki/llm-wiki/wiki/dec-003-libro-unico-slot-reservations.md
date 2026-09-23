@@ -80,13 +80,24 @@ el general dos veces y el especializado una: escrita con un ganador fijo habría
 
 Evidencia completa en `EVIDENCIAS_S3.md` §11, incluida la comprobación contra la API real con dos
 clientes HTTP distintos.
+
+## Pregunta abierta
+
+`appointments` **no** tiene restricción que obligue a una cita a tener filas en
+`slot_reservations`. Que toda cita ocupe su franja lo garantiza hoy el código, porque existe un
+único camino de creación; la base no lo impediría si apareciera otro. Ver [[datos-modelo-3fn]].
+
 ## Relacionado
 
 - [[datos-modelo-3fn]]
 - [[contrato-rest-citas]]
+- [[dec-004-decisiones-s3-reserva]] — D9: los dos slots de 60 min salen del **mismo** bloque
 
 ## Historial
 
+- 2026-09-23 — el `code` del 409 depende también del `SELECT … FOR UPDATE` sobre el profesional,
+  no solo de la PK; la prueba concurrente pasa a afirmar `code`. Suite del backend en **242**
+  pruebas (`EVIDENCIAS_S3.md` §11).
 - 2026-09-18 — S3: trampa de `merge` con id asignado verificada por mutación; la reserva se hace con `persist` (`Persistable.isNew`).
 
 - 2026-09-16 — decisión registrada; es la única desviación del análisis 3FN previo.

@@ -2,7 +2,7 @@
 titulo: "Riesgo — Desfase de 5 h en columnas TIME por la zona horaria del JVM"
 tipo: riesgo
 estado: Vigente
-actualizado: 2026-09-18
+actualizado: 2026-09-23
 fuentes: ["citas-api/src/main/java/com/fcv/citas/CitasApiApplication.java", "citas-api/pom.xml", "EVIDENCIAS_S3.md"]
 tags: [riesgo, zona-horaria, hibernate, jdbc, mysql, resuelto]
 ---
@@ -38,8 +38,9 @@ cambiar la zona a mitad de camino.
 4. Vigilancia: `ScheduleIntegrationTest` lee con SQL crudo (`TIME_FORMAT`) la hora guardada y
    `BookingIntegrationTest` compara las horas devueltas. Si vuelve el desfase, fallan.
 
-Tras la corrección, la suite completa (210 pruebas) pasó dos veces seguidas con el orden que
-fallaba.
+Tras la corrección, la suite completa pasó dos veces seguidas con el orden que fallaba. **Eran
+210 pruebas el 2026-09-18**; la cifra se deja como evidencia de aquel momento, no como estado
+actual — hoy la suite del backend son **242** (`EVIDENCIAS_S3.md` §11).
 
 ## Regla para el futuro
 
@@ -50,9 +51,12 @@ fallaba.
 ## Relacionado
 
 - [[riesgo-prueba-intermitente-flyway]]
-- [[datos-modelo-3fn]]
+- [[datos-modelo-3fn]] — las columnas `TIME` afectadas (`availability_blocks`, `availability_slots`)
 - [[dec-004-decisiones-s3-reserva]]
+- [[contrato-rest-citas]] — el contrato que publica esas horas como `"08:30"` en `America/Bogota`
 
 ## Historial
 
+- 2026-09-23 (LINT) — la cifra de 210 pruebas queda fechada como evidencia del 2026-09-18, no
+  como estado actual; añadidos los enlaces entrantes que faltaban (la página era huérfana).
 - 2026-09-18 — detectado y mitigado en F6 de S3.

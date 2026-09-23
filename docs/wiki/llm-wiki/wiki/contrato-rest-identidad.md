@@ -3,7 +3,18 @@ titulo: "Contrato REST — identidad y acceso"
 tipo: contrato
 estado: Vigente
 actualizado: 2026-09-23
-fuentes: []
+fuentes:
+  [
+    "citas-api/src/main/java/com/fcv/citas/infrastructure/rest/auth/AuthController.java",
+    "citas-api/src/main/java/com/fcv/citas/infrastructure/rest/me/MeController.java",
+    "citas-api/src/main/java/com/fcv/citas/infrastructure/rest/catalog/CatalogController.java",
+    "citas-api/src/main/java/com/fcv/citas/infrastructure/rest/error/GlobalExceptionHandler.java",
+    "citas-api/src/main/java/com/fcv/citas/infrastructure/security/SecurityConfig.java",
+    "citas-api/src/main/java/com/fcv/citas/infrastructure/security/ProblemJsonSecurityHandlers.java",
+    "citas-api/src/main/resources/application.yml",
+    "PRD.md §8",
+    "HU-033 (docs/wiki/scrum/)",
+  ]
 tags: [contrato, rest, auth, HU-033]
 ---
 
@@ -286,8 +297,15 @@ exigiendo access token.
 
 ## CORS
 
-- Orígenes **exactos** desde `app.cors.allowed-origins`, alimentado por `FRONTEND_ORIGIN`
-  (por defecto `http://localhost:5173`). Nunca comodín (PRD §8).
+- Orígenes **exactos** desde `app.cors.allowed-origins`, alimentado por `FRONTEND_ORIGIN`.
+  Nunca comodín (PRD §8).
+- **En este workspace el origen permitido es `http://localhost:5174`**, no el 5173: desde el
+  2026-09-23 el laboratorio tiene proyecto Docker propio y el servidor de desarrollo de Vite se
+  fija al 5174 con `strictPort` (`.env.example` de la raíz: `FRONTEND_ORIGIN=http://localhost:5174`;
+  ver [[riesgo-dos-copias-mismo-proyecto-docker]]). El *fallback* escrito en el código sigue
+  siendo `${FRONTEND_ORIGIN:http://localhost:5173}` (`application.yml:69`), y las pruebas de
+  integración usan 5173 porque `application-test.yml:28` lo fija así: el 5173 es un valor por
+  defecto histórico, **no** el origen que sirve hoy la API.
 - Un preflight desde un origen no configurado recibe `403` sin cabeceras de permiso, con cuerpo
   en texto plano `Invalid CORS request`: no es `ProblemDetail`, porque lo escribe
   `DefaultCorsProcessor` de Spring antes de llegar a los manejadores propios. El navegador no
@@ -331,6 +349,9 @@ no puedan divergir.
 - [[dec-001-libreria-jwt]] — por qué los beans `JwtEncoder`/`JwtDecoder` son propios
 - [[arq-hexagonal-seguridad]] — dónde vive cada pieza y por qué el controlador no decide nada
 - [[riesgo-spring-security-65-trampas]] — el prefijo `ROLE_` y la longitud del secreto HMAC
+- [[contrato-rest-citas]] — el resto de `/api/catalogs/**`, que **sí** exige token
+- [[datos-modelo-3fn]] — `affiliations`, `eps` y `eps_plans`, las tablas detrás de HU-009
+- [[riesgo-dos-copias-mismo-proyecto-docker]] — el origen CORS y el puerto reales de este workspace
 
 ## Preguntas abiertas
 
@@ -355,6 +376,9 @@ no puedan divergir.
 
 ## Historial
 
+- 2026-09-23 (LINT) — se rellenó el `fuentes` del frontmatter, que estaba vacío pese a que la
+  página se había contrastado contra el código; y se corrigió el origen CORS: decía
+  `http://localhost:5173` sin matizar, cuando el efectivo es el **5174**.
 - 2026-09-17 — página creada al cerrar el hallazgo de la verificación independiente de S2, que
   marcó HU-033 como FAIL en sus cuatro puntos de DoD por no existir contrato documentado.
   **INC-040 decidido**: el formato de error uniforme es `ProblemDetail` (RFC 9457), que es lo que
