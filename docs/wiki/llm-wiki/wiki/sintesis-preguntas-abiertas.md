@@ -61,24 +61,35 @@ Se tomaron para poder cerrar S2 y están implementadas, pero **no las ha confirm
 | D3 | Rotación de refresh con revocación por familia ante reuso y en el logout | [[dec-002-rotacion-refresh-tokens]] |
 | D4 | Locale fijo `es_CO`: la API ignora `Accept-Language` | [[contrato-rest-identidad]] |
 
-## Afiliación opcional en el registro (planteada 2026-09-23)
+## Afiliación opcional en el registro — RESUELTA el 2026-09-23
 
-El usuario trajo un plan que pide añadir `insurancePlanId` opcional al registro. **No se
-implementó: requiere tres decisiones suyas.** Verificado contra el código el 2026-09-23.
+Las tres preguntas las contestó el usuario el mismo día y el primer corte de HU-009 ya está
+implementado. Se conservan aquí porque la decisión de contrato tiene alcance más allá de la HU.
 
-| # | Pregunta | Por qué bloquea |
+| # | Pregunta | Respuesta |
 |---|---|---|
-| A1 | ¿Se amplía el contrato de `POST /api/auth/register`, que pertenece a HU-001 ya `Completada`? | Cambiar una HU cerrada exige reabrirla o abrir una HU nueva; ver [[contrato-rest-identidad]] |
-| A2 | La afiliación es HU-009, en `Borrador` y fuera del alcance de S3. ¿Se aprueba y se adelanta? | Solo el usuario aprueba una HU |
-| A3 | No existe ni un solo plan de EPS: `eps` y `eps_plans` están vacías y `V4__seed_fixed_catalogs.sql` dice explícitamente que los catálogos configurables no se siembran. ¿Migración semilla, o CRUD de HU-012? | Sin datos, el paso "elegir plan" del registro no tiene nada que mostrar |
+| A1 | ¿Se amplía el contrato de `POST /api/auth/register`, de HU-001 ya `Completada`? | Sí, con un campo **opcional**. HU-001 **sigue `Completada`**: al ser aditivo y opcional, todos sus criterios siguen siendo ciertos. El campo y sus reglas pertenecen a HU-009, que carga con la evidencia |
+| A2 | ¿Se aprueba HU-009 y se adelanta? | Sí, aprobación **directa del usuario**, no delegada. Acotada a un primer corte: solo la ruta de registro. Consultar y cambiar la afiliación desde el perfil queda para después, porque eso sí depende de HU-008 |
+| A3 | Sin planes en la base, ¿migración semilla o CRUD de HU-012? | **Ninguna de las dos: script.** `scripts/seed-eps-plans.ps1`, idempotente, con EPS ficticias. No contradice a `V4`, que siembra solo catálogos fijos, y deja HU-012 fuera |
 
-**HECHO verificado:** el esquema sí está listo desde `V2` (`eps`, `eps_plans`, `affiliations` con
-`uq_affiliations_user_plan`) y `appointments.affiliation_id` desde `V3`, pero **no hay entidad JPA,
-repositorio, caso de uso ni endpoint** para ninguna de las tres. `users` no tiene columnas de EPS ni
-de plan, así que la regla de no desnormalizar ya se cumple sola.
+**DECISIÓN de contrato, tomada por el agente bajo A1:** `GET /api/catalogs/insurance-plans` es la
+**única lectura de catálogo pública** del sistema. Quien se registra no tiene sesión todavía, así que
+exigir token haría el campo inutilizable. Se declara en `SecurityConfig` **sin método** para que un
+`POST` responda 405 y no 401, igual que el resto de catálogos (HU-010 CA-06). El resto de
+`/api/catalogs/**` sigue exigiendo token, y hay una prueba que lo fija.
 
-**HECHO verificado:** `GET /api/catalogs/regimes` existe en el backend y está declarado en el cliente
-REST del frontend, pero ningún componente lo llama. Es una ruta muerta a la espera de esta HU.
+**DECISIÓN:** plan inexistente, inactivo o de EPS inactiva comparten respuesta —
+`422 INSURANCE_PLAN_UNAVAILABLE` con el mismo cuerpo— para no revelar si el plan existe.
+
+**HECHO verificado contra la API real** (no solo con pruebas): catálogo público con 7 planes
+ofrecibles de los 9 sembrados (excluye el retirado y el de EPS inactiva), 405 en `POST`/`PUT`/
+`DELETE`, 401 en los demás catálogos, afiliación creada por FK con `is_current = 1` y
+`started_on` de hoy en `America/Bogota`, y **cero usuarios creados** en los tres casos de 422: la
+transacción revierte el `INSERT` del usuario, no solo evita la afiliación.
+
+**PREFERENCIA del usuario:** el selector de plan vive solo en el registro público de pacientes. El
+alta de profesionales que hace el ADMIN no lo lleva: un profesional se da de alta por su rol, no
+por su cobertura.
 ## Respondidas de forma provisional en S3 (aprobación delegada)
 
 Las preguntas **E1, E2, N2, N5 y A3**, y las incógnitas INC-009, INC-013, INC-014, INC-024 e

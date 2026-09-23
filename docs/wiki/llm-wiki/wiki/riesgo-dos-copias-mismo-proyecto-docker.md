@@ -74,6 +74,24 @@ un backend caído — *"No pudimos contactar al servidor"*— y manda a depurar 
 `FRONTEND_ORIGIN` vale `http://localhost:5174` y el preflight se verificó devolviendo
 `Access-Control-Allow-Origin: http://localhost:5174`.
 
+## Corolario: matar `docker compose exec` no mata el proceso de dentro
+
+**HECHO verificado el 2026-09-23.** Si la API se arranca con
+`docker compose exec citas-api-dev mvn spring-boot:run` y se corta el comando del host, el JVM
+**sigue vivo dentro del contenedor** y retiene el 8080. El arranque siguiente falla con
+*"Port 8080 was already in use"* y el puerto lo sigue sirviendo el **código viejo**, así que se ve
+como si un cambio recién hecho no funcionara. Pasó exactamente así al verificar HU-009: un
+`GET` público devolvía 401 pese a que su prueba de integración daba 200.
+
+Para reiniciar de verdad hay que matarlo dentro:
+
+```bash
+docker compose exec citas-api-dev bash -lc "pkill -f '[C]itasApiApplication'"
+```
+
+Los corchetes del patrón evitan que `pkill` se encuentre a sí mismo en su propia línea de
+comandos y se suicide antes de matar al objetivo.
+
 ## Cómo reconocerlo la próxima vez
 
 Si la API responde pero se comporta como una versión vieja, antes de tocar código:
