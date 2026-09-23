@@ -2,7 +2,7 @@
 id: HU-009
 tipo: historia-de-usuario
 titulo: "Registrar la afiliación a EPS y plan"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-002-perfil-y-afiliacion-del-paciente]]"
 requisitos: [RF-04]
 esfuerzo: "Medio"
@@ -32,7 +32,8 @@ La decisión de diseño que gobierna toda la historia es de normalización. La a
 
 De esa decisión se derivan dos consecuencias visibles. La primera es que la prevención de duplicados de RF-04 se resuelve impidiendo que un mismo usuario registre dos veces el mismo plan, porque el plan ya determina la EPS y el régimen. La segunda es que la selección disponible al usuario se limita a los planes activos del catálogo, en coherencia con la desactivación en lugar de borrado que exige RF-06.
 
-Esta HU introduce la tabla de afiliaciones, por lo que requiere una migración Flyway propia.
+~~Esta HU introduce la tabla de afiliaciones, por lo que requiere una migración Flyway propia.~~
+**Corregido el 2026-09-23:** la tabla `affiliations` ya existe desde `V2__configurable_catalogs_and_professionals.sql`, con la restricción `uq_affiliations_user_plan`, igual que `eps` y `eps_plans`. Esta HU **no** lleva migración: solo faltaba el código (entidad, repositorio, caso de uso y endpoints).
 
 ## Alcance
 
@@ -45,6 +46,30 @@ Esta HU introduce la tabla de afiliaciones, por lo que requiere una migración F
 - Migración Flyway que crea la tabla de afiliaciones con la restricción que impide la duplicidad.
 - Pantalla de afiliación en `citas-web` integrada con la de perfil.
 
+### Recorte acordado el 2026-09-23 — primer corte: solo el registro
+
+El usuario aprobó esta HU para desbloquear la afiliación **durante el registro público**, que es
+un momento distinto al que describe la historia (allí el usuario ya está autenticado). Este primer
+corte implementa únicamente:
+
+- `GET /api/catalogs/insurance-plans`, **público**, con los planes activos de EPS activas. Es la
+  única lectura de catálogo sin token, porque el formulario de registro no tiene sesión.
+- `POST /api/auth/register` con `insurancePlanId` **opcional**: si viene, crea la afiliación en la
+  misma transacción que el usuario; si no viene, el registro queda exactamente como estaba.
+- Plan inexistente, inactivo o de EPS inactiva → `422` con `INSURANCE_PLAN_UNAVAILABLE`. Los tres
+  casos comparten código para no revelar si el plan existe.
+
+Queda para un corte posterior de esta misma HU: consultar y cambiar la afiliación desde el perfil
+del usuario autenticado, que es lo que dependía de [[HU-008-consultar-y-actualizar-perfil]].
+
+**El selector de plan vive solo en el registro público de pacientes.** El alta de profesionales que
+hace el ADMIN no lo lleva: un profesional se da de alta por su rol, no por su cobertura.
+
+### Dependencia de HU-012 sustituida por una semilla
+
+La historia dependía de [[HU-012-gestionar-eps-y-planes]] para tener catálogo. El usuario decidió el
+2026-09-23 que los datos se crean **por script**, no por CRUD: `scripts/seed-eps-plans.ps1` en la
+raíz del workspace, con EPS y planes ficticios e idempotente. HU-012 sigue fuera de alcance.
 ## Fuera de alcance
 
 - Creación, edición, activación y desactivación de EPS y planes, que corresponde a ADMIN en [[HU-012-gestionar-eps-y-planes]].
@@ -189,6 +214,7 @@ Esta HU introduce la tabla de afiliaciones, por lo que requiere una migración F
 ## Historial de validación
 
 - Sesión S2 — HU creada en estado `Borrador`.
+- 2026-09-23 — **el usuario la aprueba** y la adelanta fuera del Sprint 2 para cubrir la afiliación opcional durante el registro. Aprobación directa del usuario, no delegada. Se recorta el alcance a ese primer corte y se sustituye la dependencia de [[HU-012-gestionar-eps-y-planes]] por una semilla por script.
 
 ## Notas y decisiones
 
