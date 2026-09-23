@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fcv.citas.application.TransactionRunner;
+import com.fcv.citas.domain.affiliation.AffiliationRepository;
+import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
 import com.fcv.citas.application.auth.GetCurrentUserUseCase;
 import com.fcv.citas.application.auth.LoginUseCase;
 import com.fcv.citas.application.auth.LogoutUseCase;
@@ -48,8 +50,10 @@ public class UseCaseConfig {
 
     @Bean
     RegisterUserUseCase registerUserUseCase(UserRepository users, DocumentTypeCatalog documentTypes,
-            PasswordHasher passwordHasher, TransactionRunner tx) {
-        return new RegisterUserUseCase(users, documentTypes, passwordHasher, tx);
+            PasswordHasher passwordHasher, InsurancePlanCatalog insurancePlans,
+            AffiliationRepository affiliations, TransactionRunner tx, Clock clock) {
+        return new RegisterUserUseCase(users, documentTypes, passwordHasher, insurancePlans, affiliations, tx,
+                clock);
     }
 
     @Bean

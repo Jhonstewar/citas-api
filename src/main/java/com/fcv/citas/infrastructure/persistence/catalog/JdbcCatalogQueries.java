@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import com.fcv.citas.application.catalog.CatalogQueries;
+import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
 
 /**
  * Lectura de catalogos fijos con SQL plano: son tablas de solo lectura sin comportamiento y un
@@ -13,7 +14,18 @@ import com.fcv.citas.application.catalog.CatalogQueries;
  * de agregados siguen pasando por JPA.
  */
 @Component
-class JdbcCatalogQueries implements CatalogQueries {
+class JdbcCatalogQueries implements CatalogQueries, InsurancePlanCatalog {
+
+    /**
+     * Un plan solo se ofrece y solo se acepta si esta activo y su EPS tambien (RF-06). El
+     * predicado se escribe una vez para que la lista publica y la validacion del registro no
+     * puedan divergir (HU-009).
+     */
+    private static final String SELECTABLE_PLAN = """
+            FROM eps_plans p
+            JOIN eps e ON e.id = p.eps_id
+            JOIN regimes r ON r.id = p.regime_id
+            WHERE p.active AND e.active""";
 
     private final JdbcTemplate jdbc;
 
@@ -60,6 +72,27 @@ class JdbcCatalogQueries implements CatalogQueries {
     @Override
     public List<CodeName> regimes() {
         return codeNames("SELECT code, name FROM regimes ORDER BY id");
+    }
+
+    @Override
+    public List<InsurancePlanView> insurancePlans() {
+        return jdbc.query("""
+                SELECT p.id AS plan_id, p.code AS plan_code, p.name AS plan_name,
+                       e.id AS eps_id, e.code AS eps_code, e.name AS eps_name,
+                       r.id AS regime_id, r.code AS regime_code, r.name AS regime_name
+                """ + SELECTABLE_PLAN + " ORDER BY e.name, p.name",
+                (rs, i) -> new InsurancePlanView(rs.getInt("plan_id"), rs.getString("plan_code"),
+                        rs.getString("plan_name"),
+                        new CatalogRef(rs.getInt("eps_id"), rs.getString("eps_code"), rs.getString("eps_name")),
+                        new CatalogRef(rs.getInt("regime_id"), rs.getString("regime_code"),
+                                rs.getString("regime_name"))));
+    }
+
+    @Override
+    public boolean isSelectable(int epsPlanId) {
+        Integer found = jdbc.queryForObject("SELECT COUNT(*) " + SELECTABLE_PLAN + " AND p.id = ?",
+                Integer.class, epsPlanId);
+        return found != null && found > 0;
     }
 
     private List<CodeName> codeNames(String sql) {

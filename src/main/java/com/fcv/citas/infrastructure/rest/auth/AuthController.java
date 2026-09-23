@@ -38,7 +38,7 @@ class AuthController {
     UserResponse register(@Valid @RequestBody RegisterRequest request) {
         return UserResponse.from(registerUser.register(new RegisterUserCommand(request.firstNames(),
                 request.lastNames(), request.documentType(), request.documentNumber(), request.email(),
-                request.phone(), request.password())));
+                request.phone(), request.password(), request.insurancePlanId())));
     }
 
     @PostMapping("/login")

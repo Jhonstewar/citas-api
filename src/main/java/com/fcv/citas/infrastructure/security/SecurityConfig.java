@@ -61,6 +61,12 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(PUBLIC_AUTH_ENDPOINTS).permitAll()
                         .requestMatchers("/error").permitAll()
+                        // HU-009: unica lectura de catalogo publica. La consume el formulario de
+                        // registro, que por definicion no tiene sesion todavia, asi que exigir
+                        // token la haria inutilizable. Se declara SIN metodo, como el resto de
+                        // catalogos, para que un POST llegue a MVC y responda 405 y no 401
+                        // (HU-010 CA-06). No expone nada sensible: son planes comerciales de EPS.
+                        .requestMatchers("/api/catalogs/insurance-plans").permitAll()
                         // HU-005: un prefijo por rol. Los roles vienen del claim `roles` del token.
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")

@@ -21,7 +21,11 @@ public record RegisterRequest(
         @NotBlank @Size(max = 30) String phone,
         // Maximo 72 BYTES UTF-8 (limite de BCrypt), no 72 caracteres: @Size contaba caracteres y
         // 40 x ñ (80 bytes) llegaba al hasher y acababa en 500. INC-001: sin politica de complejidad.
-        @NotBlank @BcryptPasswordLength String password) {
+        @NotBlank @BcryptPasswordLength String password,
+        // HU-009: afiliacion OPCIONAL. Ausente o nulo = registro sin afiliacion. Que el plan exista
+        // y sea seleccionable no se puede decidir aqui: depende del catalogo y lo valida el caso
+        // de uso, que responde 422 INSURANCE_PLAN_UNAVAILABLE.
+        Integer insurancePlanId) {
 
     @Override
     public String toString() {

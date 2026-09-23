@@ -40,8 +40,10 @@ class SessionUseCasesTest {
         login = new LoginUseCase(users, hasher, issuer, Fakes.DIRECT_TX);
         refresh = new RefreshSessionUseCase(refreshTokens, users, issuer, Fakes.DIRECT_TX, clock);
         logout = new LogoutUseCase(refreshTokens, Fakes.DIRECT_TX, clock);
-        new RegisterUserUseCase(users, Fakes.DOCUMENT_TYPES, hasher, Fakes.DIRECT_TX)
-                .register(new RegisterUserCommand("Ana", "Pérez", "CC", "1", "ana@example.com", "300", "Clave#1"));
+        new RegisterUserUseCase(users, Fakes.DOCUMENT_TYPES, hasher, Fakes.plans(), new Fakes.InMemoryAffiliations(),
+                Fakes.DIRECT_TX, Fakes.FIXED_CLOCK)
+                .register(new RegisterUserCommand("Ana", "Pérez", "CC", "1", "ana@example.com", "300", "Clave#1",
+                        null));
         user = users.findByEmail("ana@example.com").orElseThrow();
     }
 

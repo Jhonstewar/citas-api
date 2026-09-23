@@ -1,13 +1,22 @@
 package com.fcv.citas.application.auth;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import com.fcv.citas.application.TransactionRunner;
+import com.fcv.citas.domain.affiliation.Affiliation;
+import com.fcv.citas.domain.affiliation.AffiliationRepository;
+import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
 import com.fcv.citas.domain.auth.AccessTokenIssuer;
 import com.fcv.citas.domain.auth.IssuedAccessToken;
 import com.fcv.citas.domain.auth.PasswordHasher;
@@ -145,5 +154,31 @@ final class Fakes {
             return new IssuedAccessToken("access-" + user.id() + "-" + counter.incrementAndGet(),
                     issuedAt.plusSeconds(900));
         }
+    }
+
+    /**
+     * Reloj fijo en un instante cuya fecha en UTC (11 de marzo) NO coincide con la de Bogota (10
+     * de marzo): asi una afiliacion fechada en UTC se distingue de una fechada en la zona del
+     * sistema.
+     */
+    static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-11T02:00:00Z"), ZoneOffset.UTC);
+
+    static final LocalDate TODAY_IN_BOGOTA = LocalDate.of(2026, 3, 10);
+
+    static final class InMemoryAffiliations implements AffiliationRepository {
+        final List<Affiliation> affiliations = new ArrayList<>();
+
+        @Override
+        public Affiliation saveNew(Affiliation affiliation) {
+            Affiliation saved = affiliation.withId(affiliations.size() + 1L);
+            affiliations.add(saved);
+            return saved;
+        }
+    }
+
+    /** Solo son seleccionables los planes indicados; los demas no existen o estan inactivos. */
+    static InsurancePlanCatalog plans(int... selectable) {
+        Set<Integer> ids = Arrays.stream(selectable).boxed().collect(Collectors.toSet());
+        return ids::contains;
     }
 }

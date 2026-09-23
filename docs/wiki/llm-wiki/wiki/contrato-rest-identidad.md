@@ -2,7 +2,7 @@
 titulo: "Contrato REST — identidad y acceso"
 tipo: contrato
 estado: Vigente
-actualizado: 2026-09-17
+actualizado: 2026-09-23
 fuentes: []
 tags: [contrato, rest, auth, HU-033]
 ---
@@ -77,6 +77,7 @@ texto plano `Invalid CORS request` y sin `Content-Type` (ver CORS).
 | 403 | `Acceso denegado` | Autenticado pero sin rol u *ownership* | reservado para [[HU-005-autorizar-peticiones-por-rol-y-ownership]] |
 | 404 | `No encontrado` | El recurso no existe | usuario del token ya borrado |
 | 409 | `Conflicto` | Choque con datos únicos o de estado | email o documento ya registrados |
+| 422 | `Regla de negocio` | Petición bien formada que una regla del PRD rechaza. Lleva la extensión `code`, estable, para que el cliente decida | `INSURANCE_PLAN_UNAVAILABLE` al registrar con un plan de EPS no seleccionable (HU-009) |
 | 500 | `Error interno` | Fallo no controlado | cuerpo genérico, sin detalles |
 
 **401 frente a 403**: 401 significa "no sé quién eres o tu token ya no sirve" y es lo que dispara
@@ -117,7 +118,8 @@ Público. No inicia sesión: no devuelve tokens.
   "documentNumber": "1098765432",
   "email": "ana.perez@ejemplo.test",
   "phone": "3001234567",
-  "password": "Clave-Secreta#2026"
+  "password": "Clave-Secreta#2026",
+  "insurancePlanId": 3
 }
 ```
 
@@ -131,6 +133,7 @@ Alias aceptados por compatibilidad: `firstName`, `lastName`, `documentTypeCode`.
 | `email` | obligatorio, formato email, máx. 160 |
 | `phone` | obligatorio, máx. 30 |
 | `password` | obligatorio, máx. **72 bytes UTF-8** (límite de BCrypt), no 72 caracteres: la ñ y las vocales con tilde ocupan 2 bytes y los emojis 4. Sin política de complejidad — INC-001 |
+| `insurancePlanId` | **opcional** (HU-009), entero. Ausente o `null` = cuenta sin afiliación. Si viene, debe ser el `id` de un plan del catálogo público `GET /api/catalogs/insurance-plans` |
 
 Una contraseña de más de 72 bytes da `400` con `fieldErrors.password = "no debe superar 72 bytes
 en UTF-8 (la ñ y las vocales con tilde ocupan 2 bytes; los emojis, 4)"`.
@@ -150,8 +153,16 @@ en UTF-8 (la ñ y las vocales con tilde ocupan 2 bytes; los emojis, 4)"`.
 }
 ```
 
+La respuesta **no cambia** por llevar o no `insurancePlanId`: no incluye la afiliación. Si el
+plan es válido, la afiliación se crea en la **misma transacción** que la cuenta
+(`is_current = 1`, `started_on` = hoy en `America/Bogota`, sin número de afiliado ni fecha de
+fin). Si no lo es, no se crea ni la afiliación ni el usuario.
+
 **Errores**: `400` validación (con `fieldErrors`) · `409` `El email ya está registrado` /
-`El documento ya está registrado`.
+`El documento ya está registrado` · `422` `code: INSURANCE_PLAN_UNAVAILABLE`, `detail: "El plan
+de EPS seleccionado no está disponible"`, cuando el plan **no existe**, está **inactivo** o
+pertenece a una **EPS inactiva**. Los tres casos dan la misma respuesta: no revela si el plan
+existe.
 
 ### `POST /api/auth/login` — iniciar sesión (HU-002)
 
@@ -245,6 +256,34 @@ Requiere `Authorization: Bearer <accessToken>`.
 **Errores**: `401` sin token, con token mal firmado, expirado o de otro emisor · `404` si el
 usuario del token ya no existe.
 
+### `GET /api/catalogs/insurance-plans` — planes de EPS seleccionables (HU-009)
+
+**Público, sin token.** Es la **única** lectura de catálogo pública: la consume el formulario de
+registro, que por definición todavía no tiene sesión. El resto de `/api/catalogs/**` sigue
+exigiendo access token.
+
+**200** → lista ordenada por nombre de EPS y, dentro de cada EPS, por nombre de plan:
+
+```json
+[
+  {
+    "id": 3,
+    "code": "CONTRIB_BASICO",
+    "name": "Plan básico",
+    "eps": { "id": 1, "code": "EPS_DEMO", "name": "EPS de prueba" },
+    "regime": { "id": 1, "code": "CONTRIBUTIVO", "name": "Régimen contributivo" }
+  }
+]
+```
+
+- Solo aparecen los planes **activos** cuya **EPS también está activa** (RF-06). El mismo
+  predicado valida el `insurancePlanId` del registro, así que el cliente no puede ofrecer algo
+  que el servidor rechazaría.
+- La EPS y el régimen se **derivan** del plan; la afiliación del usuario no los copia (3FN).
+- La ruta es pública para **todos los métodos**, no solo `GET`: un `POST`, `PUT` o `DELETE` llega
+  a MVC y responde `405`, como el resto de catálogos de solo lectura (HU-010 CA-06), en vez del
+  `401` que daría la cadena de seguridad.
+
 ## CORS
 
 - Orígenes **exactos** desde `app.cors.allowed-origins`, alimentado por `FRONTEND_ORIGIN`
@@ -258,9 +297,15 @@ usuario del token ya no existe.
 ## Rutas públicas
 
 Solo estas escapan a la autenticación: `POST /api/auth/register`, `/login`, `/refresh`,
-`/logout`, más `/actuator/health`, `/actuator/health/**` y `/error`. Todo lo demás exige access
-token válido; por eso un método o una ruta inexistentes sin token responden `401`, no `405` ni
-`404`: la cadena de seguridad actúa antes.
+`/logout`, la lectura de catálogo `/api/catalogs/insurance-plans`, más `/actuator/health`,
+`/actuator/health/**` y `/error`. Todo lo demás exige access token válido; por eso un método o
+una ruta inexistentes sin token responden `401`, no `405` ni `404`: la cadena de seguridad actúa
+antes.
+
+`/api/catalogs/insurance-plans` se declara **sin método**, a diferencia de las cuatro rutas de
+autenticación: así una escritura sobre ella llega a MVC y responde `405` en vez de `401`, igual
+que el resto de catálogos fijos (HU-010 CA-06). Es pública porque el formulario de registro la
+necesita antes de existir la sesión, y no expone nada sensible: son planes comerciales de EPS.
 
 Las cuatro rutas `POST` de autenticación, con coincidencia **exacta**, **ignoran** la cabecera
 `Authorization` (`PublicEndpointsBearerTokenResolver`): se autentican con el cuerpo, y un Bearer
@@ -327,3 +372,7 @@ no puedan divergir.
   la cabecera `WWW-Authenticate` con `error_description` en inglés y el máximo de 256 caracteres
   de `refreshToken`. También se precisaron las rutas de `actuator` y el 401 ante rutas
   inexistentes.
+- 2026-09-23 — HU-009 acotada a la ruta de registro: `POST /api/auth/register` acepta el campo
+  opcional `insurancePlanId` y responde `422 INSURANCE_PLAN_UNAVAILABLE` si el plan no es
+  seleccionable; aparece el primer `422` del slice de identidad y la primera ruta de catálogo
+  pública, `GET /api/catalogs/insurance-plans`. La forma de la respuesta de registro no cambió.
