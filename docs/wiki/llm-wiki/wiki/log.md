@@ -161,3 +161,10 @@ Formato fijo del encabezado, para que sea parseable:
 - DECISIÓN: este workspace pasa a proyecto `fcv-citas-v1`, contenedores `fcv-citas-v1-*` y puertos 3308 / 8081 / 5174 (host) / 5175 (contenedor web) / 4201. Las dos copias pueden convivir.
 - DECISIÓN: `vite.config.ts` fija el 5174 con `strictPort: true`. Si Vite salta de puerto, el origen deja de coincidir con `FRONTEND_ORIGIN` y el fallo de CORS se ve en la interfaz como "no pudimos contactar al servidor", que manda a depurar donde no es.
 - HECHO: con el stack propio, Flyway aplicó las 7 migraciones sobre base vacía, Spring encontró 14 repositorios, el humo E2E dio 29/29 y `POST /api/auth/register` devolvió 201 con `Access-Control-Allow-Origin: http://localhost:5174`.
+
+## [2026-09-23] learn | El plan de S3 que trajo el usuario apunta a la otra copia del repo
+
+- HECHO verificado: el plan da por existente la migración `V1__identity.sql`, propone rutas `/api/v1/...` y pide "cerrar S2 marcando HU-001 y HU-002 como completadas". Nada de eso encaja aquí: el V1 real es `V1__identity_and_fixed_catalogs.sql` (vamos por V7), el prefijo es `/api/...` sin `v1`, y HU-001 a HU-004 están `Completada` desde S2. Encaja en cambio con `Documents\FCV_DES_AND\citas` — ver [[riesgo-dos-copias-mismo-proyecto-docker]].
+- HECHO: su numeración de HU tampoco coincide con la de `docs/wiki/scrum/`. Su "HU-011 = afiliación opcional" es nuestra HU-009; nuestra HU-011 es gestionar especialidades. Su "HU-025 aún no existe" es nuestra HU-025, ya implementada.
+- HECHO verificado por cobertura: de los cinco bloques del plan, lo único que no existe es la afiliación opcional. Backend con 185 pruebas y frontend con 83 cubren catálogos, especialidades, profesionales, bloques y slots, búsqueda, reserva general/especializada, bandeja, decisión e historial; el frontend no tiene ningún dato simulado ni `localStorage`.
+- PREGUNTA ABIERTA: la afiliación opcional exige tres decisiones del usuario (A1–A3 en [[sintesis-preguntas-abiertas]]), incluida la de que `eps` y `eps_plans` están vacías y `V4` no las siembra. No se implementó nada.

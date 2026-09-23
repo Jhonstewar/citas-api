@@ -2,7 +2,7 @@
 titulo: "Síntesis — Preguntas abiertas del dominio"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-18
+actualizado: 2026-09-23
 fuentes: ["citas-api/docs/wiki/scrum/historias-de-usuario/", "PRD.md", "[[MODELO-DATOS-3FN]]"]
 tags: [sintesis, preguntas-abiertas, dominio]
 ---
@@ -61,6 +61,24 @@ Se tomaron para poder cerrar S2 y están implementadas, pero **no las ha confirm
 | D3 | Rotación de refresh con revocación por familia ante reuso y en el logout | [[dec-002-rotacion-refresh-tokens]] |
 | D4 | Locale fijo `es_CO`: la API ignora `Accept-Language` | [[contrato-rest-identidad]] |
 
+## Afiliación opcional en el registro (planteada 2026-09-23)
+
+El usuario trajo un plan que pide añadir `insurancePlanId` opcional al registro. **No se
+implementó: requiere tres decisiones suyas.** Verificado contra el código el 2026-09-23.
+
+| # | Pregunta | Por qué bloquea |
+|---|---|---|
+| A1 | ¿Se amplía el contrato de `POST /api/auth/register`, que pertenece a HU-001 ya `Completada`? | Cambiar una HU cerrada exige reabrirla o abrir una HU nueva; ver [[contrato-rest-identidad]] |
+| A2 | La afiliación es HU-009, en `Borrador` y fuera del alcance de S3. ¿Se aprueba y se adelanta? | Solo el usuario aprueba una HU |
+| A3 | No existe ni un solo plan de EPS: `eps` y `eps_plans` están vacías y `V4__seed_fixed_catalogs.sql` dice explícitamente que los catálogos configurables no se siembran. ¿Migración semilla, o CRUD de HU-012? | Sin datos, el paso "elegir plan" del registro no tiene nada que mostrar |
+
+**HECHO verificado:** el esquema sí está listo desde `V2` (`eps`, `eps_plans`, `affiliations` con
+`uq_affiliations_user_plan`) y `appointments.affiliation_id` desde `V3`, pero **no hay entidad JPA,
+repositorio, caso de uso ni endpoint** para ninguna de las tres. `users` no tiene columnas de EPS ni
+de plan, así que la regla de no desnormalizar ya se cumple sola.
+
+**HECHO verificado:** `GET /api/catalogs/regimes` existe en el backend y está declarado en el cliente
+REST del frontend, pero ningún componente lo llama. Es una ruta muerta a la espera de esta HU.
 ## Respondidas de forma provisional en S3 (aprobación delegada)
 
 Las preguntas **E1, E2, N2, N5 y A3**, y las incógnitas INC-009, INC-013, INC-014, INC-024 e
