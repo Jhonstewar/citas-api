@@ -29,19 +29,41 @@ Esto sustituye al diseño propio que el agente improvisó en S3, cuando aún no 
 
 **HECHO** (2026-09-23): el diseño está aplicado en código. Marco de autenticación a pantalla
 partida, `AppShell` con tarjeta de identidad, inicio del paciente con hero claro, logo propio en
-SVG y los tres niveles de elevación del diseño. Commit `08cbe02` de `citas-web`.
+SVG y los tres niveles de elevación del diseño. Commits `08cbe02` (aplicación) y `07eaa05`
+(corrección de paleta) en `citas-web`.
+
+## Trampa: `DESIGN.md` lleva dos paletas y no coinciden
+
+**HECHO verificado** contra el `code.html` de los mockups. El archivo tiene una paleta en la
+prosa (`## Colors`) y otra en el frontmatter (`colors:`), y son distintas:
+
+| | Primario | Acento | Fondo | Texto | Texto 2.º | Borde |
+|---|---|---|---|---|---|---|
+| Prosa | `#0B5C8C` | `#14B8A6` | `#F4F7FA` | `#14212B` | `#5B6B7B` | `#DCE4EB` |
+| Frontmatter | `#00446A` | `#006B5F` | `#F6F9FF` | `#101D27` | `#41474F` | `#C1C7D0` |
+
+**Manda el frontmatter.** Es el bloque que cada `code.html` carga como configuración de Tailwind,
+o sea lo que los `screen.png` pintan de verdad. La prosa es narración desfasada de la misma
+herramienta. `#0B5C8C` sigue vivo, pero como `primary-container` y como primera parada del
+degradado del panel de marca (`from-[#0B5C8C] via-primary to-[#073A58]`).
+
+El primer intento de aplicar el diseño tomó la paleta de la prosa y **el usuario detectó que los
+colores no coincidían** con los mockups. Corregido en la misma sesión.
 
 ## Qué fija el diseño
 
 | Eje | Valor |
 |---|---|
-| Primario | `#0B5C8C` (hover `#094A71`, activo `#06334F`) |
-| Acento aqua | `#14B8A6`, solo en progreso, selección y realces |
-| Superficies | fondo `#F4F7FA`, tarjeta `#FFFFFF`, apagada `#EEF3F7`, borde `#DCE4EB` |
+| Primario | `#00446A` (`primary`); `#0B5C8C` queda como `primary-container` |
+| Acento | `#006B5F` (`secondary`); `#71F8E4` (`secondary-fixed`) solo sobre el panel azul |
+| Superficies | fondo `#F6F9FF`, tarjeta `#FFFFFF`, apagada `#EBF5FF`, bordes `#C1C7D0` / `#717880` |
 | Tipografía | Plus Jakarta Sans en titulares, Inter en cuerpo, datos y tablas |
 | Formas | 10 px controles, 12 px tarjetas, 16 px contenedores, pill solo en estados |
 | Elevación | tres niveles: tarjeta en reposo, tarjeta interactiva, modal |
 | Estados de cita | nunca solo color: color + icono + texto en español, y borde propio |
+
+Las pills de estado no salen de los tokens: en el `code.html` son utilidades de Tailwind
+(`bg-amber-100 text-amber-900` y equivalentes), que coinciden con las que ya usaba el frontend.
 
 ## Las fuentes van autoalojadas, no por CDN
 
@@ -51,17 +73,15 @@ diseño no se veía como el mockup. Se resolvió con `@fontsource-variable/inter
 `@fontsource/plus-jakarta-sans` (npm, en `src/styles/fonts.css`), **no** con Google Fonts: la app
 tiene que arrancar en un laboratorio sin salida a internet, igual que el resto del stack.
 
-## Desviaciones deliberadas por accesibilidad
+## Accesibilidad: la paleta buena no obliga a desviarse
 
-**DECISIÓN.** Donde el diseño de Stitch no alcanza el contraste que exige WCAG, gana la
-accesibilidad y la desviación queda escrita. Las tres son de bordes y de foco, nunca de
-identidad:
+**HECHO.** El esquema real de Stitch es Material, con los pares ya calculados para contraste, así
+que se implementa tal cual: `#717880` en bordes de control da ≈4.5:1 (WCAG 1.4.11 pide 3:1),
+`#41474F` como texto secundario da 9.4:1 y `#00446A` como acción principal, 10.3:1.
 
-| `DESIGN.md` pide | Se implementó | Motivo |
-|---|---|---|
-| Borde de campo `#DCE4EB` | `#B7C4D0` | `#DCE4EB` sobre blanco da ~1.3:1; WCAG 1.4.11 exige 3:1 en bordes de control |
-| Foco de botón en aqua `#14B8A6` | `#1D7FC0` | El aqua sobre blanco da 2.3:1 |
-| Franja horaria elegida con fondo `#14B8A6` | `#0F766E` | Texto blanco sobre `#14B8A6` da 2.3:1; sobre `#0F766E`, 4.9:1 |
+**DECISIÓN** que sigue en pie: si un valor del diseño no alcanzara el contraste exigido, gana la
+accesibilidad y la desviación se escribe. Con la paleta de la prosa hacían falta tres
+desviaciones (borde de campo, color de foco y franja elegida); con la del frontmatter, ninguna.
 
 ## Todo lo que Stitch inventó se descarta
 

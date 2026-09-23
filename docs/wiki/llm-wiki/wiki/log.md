@@ -145,3 +145,11 @@ Formato fijo del encabezado, para que sea parseable:
 - DECISIÓN: donde el diseño de Stitch no alcanza el contraste de WCAG gana la accesibilidad; tres desviaciones (borde de campo, color de foco, franja elegida) quedan documentadas en la página y en `citas-web/docs/diseno/stitch/RETOMA_REDISENO.md`.
 - HECHO: todo el contenido que Stitch inventó (EPS, historia clínica, SSL, JCI, SMS, sedes mal nombradas) se descartó. Commit `08cbe02` de `citas-web`; typecheck, lint, 83 pruebas y build en verde.
 - PREGUNTA ABIERTA: el gráfico "Citas por sede esta semana" del panel admin no tiene endpoint; `GET /api/admin/summary` solo devuelve contadores.
+
+## [2026-09-23] learn | Corrección: `DESIGN.md` lleva dos paletas y manda la del frontmatter
+
+- HECHO verificado contra el `code.html` de los mockups: la prosa de `DESIGN.md` (primario `#0B5C8C`, aqua `#14B8A6`, fondo `#F4F7FA`) **no** es la paleta que los mockups pintan. La buena es el bloque `colors:` del frontmatter, que el `code.html` carga como configuración de Tailwind: primario `#00446A`, acento `#006B5F`, fondo `#F6F9FF`, texto `#101D27` / `#41474F`, bordes `#C1C7D0` / `#717880`.
+- HECHO: el primer intento usó la paleta de la prosa; **el usuario detectó que los colores no coincidían**. Corregido en `tokens.css` y en [[dec-005-sistema-visual-stitch]] el mismo día.
+- DECISIÓN: `#0B5C8C` se conserva como `primary-container` y como primera parada del degradado del panel de marca, no como acción principal.
+- HECHO: con la paleta correcta desaparecen las tres desviaciones por contraste que se habían documentado; el esquema Material ya viene con los pares calculados.
+- PREFERENCIA del usuario: revisa la fidelidad visual contra los mockups y la reclama. Ante un export de diseño con varias fuentes de color, verificar primero cuál consume el código exportado.
