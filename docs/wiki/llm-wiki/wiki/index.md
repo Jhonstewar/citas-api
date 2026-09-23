@@ -2,7 +2,7 @@
 titulo: "Índice de la LLM Wiki"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-18
+actualizado: 2026-09-23
 tags: [indice]
 ---
 
@@ -16,8 +16,9 @@ Historia cronológica: [[log]].
 
 ## Estado del proyecto
 
-- **Sesión en curso:** S3 — flujo de citas y red automatizada que dice "no" (plan: `PLAN_RETOMA_S3.md` en la raíz)
-- **Sesión anterior:** S2 cerrada salvo la prueba manual en navegador y el diseño en Stitch (sustituido por un diseño propio en S3)
+- **Sesión en curso:** S3 — código completo (F1–F10); falta el cierre de F11: HU a `Completada`, LINT de wiki y commit de cierre (plan: `PLAN_RETOMA_S3.md` en la raíz)
+- **En paralelo:** rediseño del frontend con los mockups de Stitch, ya aplicado en código — ver [[dec-005-sistema-visual-stitch]]
+- **Sesión anterior:** S2 cerrada salvo la prueba manual en navegador
 - **Repos:** `Jhonstewar/citas-api`, `Jhonstewar/citas-web`, `Jhonstewar/FCV_Proyecto_Citas_v1` (origen histórico: `jhonnunez-svg`)
 - **Stack fijado:** Java 21 LTS · Spring Boot 3.5.x · hexagonal · MySQL 8.4 · Flyway · JWT ·
   React + TypeScript + Vite · Node 24 LTS
@@ -41,6 +42,7 @@ _(sin páginas todavía)_
 - [[dec-002-rotacion-refresh-tokens]] — refresh opaco rotativo con familia y detección de reuso, persistido como SHA-256; qué obliga a hacer en el cliente (renovación única, épocas de sesión)
 - [[dec-003-libro-unico-slot-reservations]] — una sola tabla con PK `slot_id` hace imposible la doble reserva a nivel de motor
 - [[dec-004-decisiones-s3-reserva]] — D5–D13, provisionales: primer ADMIN por variables de entorno, Medicina General precargada, V5 de auditoría, 60 min en un mismo bloque, hooks de git
+- [[dec-005-sistema-visual-stitch]] — el `DESIGN.md` de Stitch es la fuente de verdad visual; fuentes autoalojadas sin CDN, tres desviaciones por contraste y todo lo que Stitch inventó se descarta
 
 ## Datos y modelo
 

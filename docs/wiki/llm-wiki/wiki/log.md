@@ -137,3 +137,11 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: Claude Code carga `CLAUDE.md`, no `AGENTS.md`. `citas-api/CLAUDE.md` y `citas-web/CLAUDE.md` (nuevos) importan su `AGENTS.md` con `@AGENTS.md`; el `CLAUDE.md` raíz ahora importa el `AGENTS.md` raíz en vez de solo enlazarlo.
 - HECHO: los agentes `backend-*` y `frontend-*` leen el `AGENTS.md` de su repo antes de actuar (sección "Contexto obligatorio").
 - HECHO: un subagente no puede lanzar subagentes; `s2-orchestrator` solo delega si corre como hilo principal (`claude --agent s2-orchestrator`).
+
+## [2026-09-23] learn | Rediseño: el DESIGN.md de Stitch aplicado en código
+
+- DECISIÓN del usuario: aplicar ya el diseño en código con los cuatro mockups disponibles, sin volver a Stitch por las pantallas que faltaban. Página nueva [[dec-005-sistema-visual-stitch]]; índice actualizado.
+- HECHO verificado: las fuentes del diseño estaban declaradas en `tokens.css` pero nadie las cargaba, así que el navegador usaba la pila del sistema. Ahora se autoalojan con `@fontsource` (npm, sin CDN).
+- DECISIÓN: donde el diseño de Stitch no alcanza el contraste de WCAG gana la accesibilidad; tres desviaciones (borde de campo, color de foco, franja elegida) quedan documentadas en la página y en `citas-web/docs/diseno/stitch/RETOMA_REDISENO.md`.
+- HECHO: todo el contenido que Stitch inventó (EPS, historia clínica, SSL, JCI, SMS, sedes mal nombradas) se descartó. Commit `08cbe02` de `citas-web`; typecheck, lint, 83 pruebas y build en verde.
+- PREGUNTA ABIERTA: el gráfico "Citas por sede esta semana" del panel admin no tiene endpoint; `GET /api/admin/summary` solo devuelve contadores.
