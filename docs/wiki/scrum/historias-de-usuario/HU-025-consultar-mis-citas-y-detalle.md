@@ -2,7 +2,7 @@
 id: HU-025
 tipo: historia-de-usuario
 titulo: "Consultar mis citas y su detalle"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]"
 requisitos: [RF-13]
 esfuerzo: "Medio"
@@ -149,32 +149,44 @@ Es además el punto de entrada de las dos acciones posteriores del paciente: la 
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
-- [ ] El filtro de ownership se aplica en la capa de aplicación o de persistencia del backend, y no depende de que el frontend envíe el identificador del usuario.
-- [ ] El listado y el detalle son operaciones de solo lectura verificadas: ejecutarlas no produce ningún registro nuevo en el historial de estados de cita.
-- [ ] La proyección de detalle expone exactamente los siete campos de RF-13 y ningún dato de otro paciente.
-- [ ] El repositorio de lectura resuelve el listado sin emitir una consulta adicional por cada cita devuelta.
-- [ ] Las pantallas de "mis citas" y "detalle" de PRD §6 existen en `citas-web` y consumen `citas-api` directamente, con la URL base leída de la configuración de entorno.
-- [ ] Existen pruebas automatizadas del listado propio, de cada filtro, del detalle con y sin motivo de rechazo y del acceso denegado a la cita ajena, y pasan.
-- [ ] El contrato de los endpoints de listado y detalle está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [x] El filtro de ownership se aplica en la capa de aplicación o de persistencia del backend, y no depende de que el frontend envíe el identificador del usuario.
+- [x] El listado y el detalle son operaciones de solo lectura verificadas: ejecutarlas no produce ningún registro nuevo en el historial de estados de cita.
+- [x] La proyección de detalle expone exactamente los siete campos de RF-13 y ningún dato de otro paciente.
+- [x] El repositorio de lectura resuelve el listado sin emitir una consulta adicional por cada cita devuelta.
+- [x] Las pantallas de "mis citas" y "detalle" de PRD §6 existen en `citas-web` y consumen `citas-api` directamente, con la URL base leída de la configuración de entorno.
+- [x] Existen pruebas automatizadas del listado propio, de cada filtro, del detalle con y sin motivo de rechazo y del acceso denegado a la cita ajena, y pasan.
+- [x] El contrato de los endpoints de listado y detalle está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` | Con dos pacientes y tres citas, el listado del primero devuelve exactamente sus dos. El filtro de propiedad está en el SQL (`JdbcAppointmentQueries#findByPatient`, `WHERE a.patient_user_id = :patient`), no en el cliente |
+| CA-02 | Cumple | `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` (`?status=APPROVED` devuelve una cita y su estado es `APPROVED`, dejando fuera la `REQUESTED`); `citas-web/src/patientBooking.test.tsx`: «filtra por estado con las opciones del catálogo de la API (HU-010 CA-08, HU-025 CA-02)» | El filtro es genérico (`AND st.code = :status`). Las pruebas lo ejercitan con `APPROVED` frente a `REQUESTED`; el caso `REJECTED` aparece en `AdminDecisionIntegrationTest#rejectionReleasesSlotsAndThePatientSeesTheReason`. `CANCELLED` no es producible en S3 (llega con [[HU-026-cancelar-una-cita-futura]]) y usa exactamente la misma comparación |
+| CA-03 | Cumple | `infrastructure/rest/VerificationGapsIntegrationTest#myAppointmentsFilterByDate` | Combina `date` y `status` en la misma petición: devuelve una sola cita y su fecha es la pedida |
+| CA-04 | Cumple | `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` (el detalle trae `professional.fullName` y el historial); `#generalAppointmentIsApprovedReservedAndAudited` (sede, especialidad, hora de inicio, hora de fin, duración y estado); `infrastructure/rest/appointment/AppointmentResponses.AppointmentResponse` | Los siete datos de RF-13: sede, profesional, especialidad, fecha y hora, duración, estado y motivo de rechazo. La duración se calcula en SQL a partir de las horas de la cita |
+| CA-05 | Cumple | `infrastructure/rest/AdminDecisionIntegrationTest#rejectionReleasesSlotsAndThePatientSeesTheReason` | El paciente ve `status = REJECTED`, el `rejectionReason` con el texto literal del ADMIN y la misma razón en la entrada de historial |
+| CA-06 | Cumple | `citas-web/src/patientBooking.test.tsx`: «una cita aprobada sin motivo no muestra el campo ni falla (HU-025 CA-06)»; `application.yml` (`default-property-inclusion: non_null`) y `JdbcAppointmentQueries` (el `CASE WHEN st.code = 'REJECTED'` deja el motivo nulo en cualquier otro estado) | El campo se omite del JSON y la pantalla no lo pinta |
+| CA-07 | Cumple | `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` (el detalle de una cita ajena responde 404, sin cuerpo de la cita); `citas-web/src/patientBooking.test.tsx`: «una cita ajena (404) se explica sin romper la pantalla» | Se responde 404 y no 403 para no revelar que la cita existe: convención de ownership del contrato |
+| CA-08 | Cumple | `infrastructure/rest/AuthorizationIntegrationTest#onlyUserReachesPatientRoutes` (sin token de USER no se llega); `infrastructure/rest/AuthFlowIntegrationTest#protectedEndpointRejectsMissingMalformedAndExpiredTokens` (ausente, malformado y caducado → 401) | — |
+| DoD — CA-01 a CA-08 validados con evidencia concreta | Cumple | Filas CA-01 a CA-08 de esta tabla | — |
+| DoD — El filtro de propiedad se aplica en el backend, no depende del cliente | Cumple | `application/appointment/PatientAppointmentsUseCase` recibe el id del token; `JdbcAppointmentQueries#findByPatient` filtra en SQL; `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` | El contrato del endpoint no admite ningún parámetro de paciente |
+| DoD — Listado y detalle son de solo lectura y no crean historial | Cumple | `JdbcAppointmentQueries` solo emite `SELECT`; `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` consulta listado y detalle y después comprueba que el historial de la cita sigue teniendo una única entrada | — |
+| DoD — La proyección de detalle expone los siete campos de RF-13 y ningún dato de otro paciente | Cumple | `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` afirma que `$.patient` **no existe** en la respuesta del paciente; `AppointmentResponses` | El bloque `patient` solo aparece en la proyección del ADMIN (`AdminAppointment`) |
+| DoD — El listado se resuelve sin una consulta adicional por cita | Cumple | `JdbcAppointmentQueries.SELECT`: una sola sentencia con los `JOIN` de estado, sede, profesional, especialidad y paciente, más una subconsulta correlacionada solo para el motivo de rechazo | Sin agregados JPA ni carga perezosa: decisión D14 |
+| DoD — Las pantallas «mis citas» y «detalle» existen y consumen `citas-api` con la URL del entorno | Cumple | `citas-web/src/pages/patient/MyAppointmentsPage.tsx` y `AppointmentDetailPage.tsx`; `citas-web/src/api/patientApi.ts` sobre `API_ROUTES`; `citas-web/src/api/contracts.test.ts` | Consumo REST directo, sin capa intermedia |
+| DoD — Pruebas del listado propio, de cada filtro, del detalle con y sin motivo y del acceso denegado | Cumple | `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail`; `VerificationGapsIntegrationTest#myAppointmentsFilterByDate`; `AdminDecisionIntegrationTest#rejectionReleasesSlotsAndThePatientSeesTheReason`; `citas-web/src/patientBooking.test.tsx` (5 pruebas del bloque «mis citas y detalle») | — |
+| DoD — Contrato de listado y detalle reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Reserva — USER (HU-022 a HU-025)», con los tipos `Appointment`, `HistoryEntry` y `AppointmentDetail` | — |
+| DoD — Trazabilidad de esta HU y de [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 8 criterios y los 9 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F2 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

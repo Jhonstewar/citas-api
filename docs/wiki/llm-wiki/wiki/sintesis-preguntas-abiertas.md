@@ -107,6 +107,27 @@ incógnitas INC-009, INC-013, INC-014, INC-024 e INC-032, tienen una respuesta p
 en [[dec-004-decisiones-s3-reserva]]. Siguen listadas arriba hasta que el usuario las confirme.
 E1, E2 y S3 ya tienen además la corrección **aplicada** en `V5` y `V6`.
 
+## Defectos de especificación que salieron al cerrar S3 (2026-09-23)
+
+Los tres aparecieron al exigir evidencia HU por HU, no al escribir el código: son casos donde una
+Definition of Done pide algo que la implementación no cumple, y por eso su HU **no** cerró.
+Verificados contra el esquema y el código, no deducidos.
+
+| # | Defecto | Impide cerrar | Decisión pendiente |
+|---|---|---|---|
+| S1 | `specialties` **no tiene restricción única sobre `name`**. Solo existe `uq_specialties_code`; la unicidad del nombre vive únicamente en `ManageSpecialtiesUseCase`, así que dos procesos concurrentes podrían crear especialidades homónimas | HU-011 | ¿Migración posterior a V7 que añada la única, o se acepta que la regla viva solo en el caso de uso? |
+| S2 | Activar y desactivar un profesional **no son operaciones del dominio**. `Professional` no tiene `activate()` ni `deactivate()`: se pasa por el puerto genérico `ProfessionalRepository#setActive(long, boolean)`, que es justo lo que la DoD de la HU descarta. Tampoco hay prueba de que desactivar conserve las citas existentes | HU-016 | ¿Se sube la transición al dominio, o se relaja la DoD? |
+| S3 | La regla de **consecutividad de 60 minutos está escrita dos veces**: en `AvailabilityBlock#canHost` (la usa la reserva) y en el SQL de `JdbcAvailabilityQueries` (la usa la búsqueda). Hoy coinciden, pero nada impide que divierjan y entonces la búsqueda ofrecería franjas que la reserva rechaza | HU-022 | ¿Se unifica en un solo sitio, o se añade una prueba que compare las dos implementaciones? |
+
+Ninguno es un fallo de comportamiento observable: los tres son riesgos de que el comportamiento
+correcto de hoy deje de serlo sin que nada avise. Ver [[datos-modelo-3fn]] y
+[[dec-004-decisiones-s3-reserva]].
+
+**HECHO relacionado:** no existe productor de retenciones por reprogramación
+(`reservation_type = 'RESCHEDULE_REQUEST'`). El esquema las soporta desde `V3`, pero hasta que
+HU-027 y HU-031 existan, cualquier criterio que dependa de ellas es literalmente no verificable.
+Es la causa de que HU-022 y HU-029 queden abiertas.
+
 ## Relacionado
 
 - [[dec-004-decisiones-s3-reserva]]

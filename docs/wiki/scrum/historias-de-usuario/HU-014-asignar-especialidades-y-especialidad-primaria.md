@@ -2,7 +2,7 @@
 id: HU-014
 tipo: historia-de-usuario
 titulo: "Asignar especialidades y especialidad primaria al profesional"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-004-gestion-de-profesionales]]"
 requisitos: [RF-07]
 esfuerzo: "Medio"
@@ -141,31 +141,43 @@ El esquema ya existe en V2: `professional_specialties` es la relación N:M con e
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-07 están validados con evidencia concreta.
-- [ ] La invariante "exactamente una primaria" está implementada en el dominio sin depender de Spring ni de JPA, y la restricción única de V2 actúa como segunda barrera.
-- [ ] La actualización del conjunto es atómica: ante cualquier error la asignación previa queda intacta.
-- [ ] No se crean migraciones nuevas salvo que se requiera un cambio de esquema, en cuyo caso es una migración Flyway posterior a V4.
-- [ ] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
-- [ ] La pantalla de `citas-web` solo ofrece especialidades activas y no permite marcar dos primarias.
-- [ ] Existen pruebas automatizadas de las invariantes, de la asignación válida, del cambio de primaria y de la especialidad inactiva, y pasan.
-- [ ] El contrato de los endpoints de especialidades del profesional está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-07 están validados con evidencia concreta.
+- [x] La invariante "exactamente una primaria" está implementada en el dominio sin depender de Spring ni de JPA, y la restricción única de V2 actúa como segunda barrera.
+- [x] La actualización del conjunto es atómica: ante cualquier error la asignación previa queda intacta.
+- [x] No se crean migraciones nuevas salvo que se requiera un cambio de esquema, en cuyo caso es una migración Flyway posterior a V4.
+- [x] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
+- [x] La pantalla de `citas-web` solo ofrece especialidades activas y no permite marcar dos primarias.
+- [x] Existen pruebas automatizadas de las invariantes, de la asignación válida, del cambio de primaria y de la especialidad inactiva, y pasan.
+- [x] El contrato de los endpoints de especialidades del profesional está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/ProfessionalAdminIntegrationTest#createsProfessionalWithUserRoleAndHashedPassword` (alta con `MEDICINA_GENERAL` primaria + una especializada, `specialties.length() = 2`); `#changesThePrimarySpecialty` (el detalle devuelve las dos, con exactamente una `primary: true`) | — |
+| CA-02 | Cumple | `domain/professional/SpecialtyAssignmentTest#rejectsMissingPrimary` y `#rejectsEmptySet`; `ProfessionalAdminIntegrationTest#invalidPrimaryIsRejectedWithoutChanges` (400 con `fieldErrors.primarySpecialtyId` y el detalle sigue con sus 2 especialidades) | «Dos primarias» no es representable por construcción: el contrato lleva un único `primarySpecialtyId` (`AdminProfessionalController.SpecialtiesRequest`) y la base añade `uq_professional_specialties_primary` sobre la columna generada `primary_marker` (V2 líneas 107-109) |
+| CA-03 | Cumple | `SpecialtyAssignmentTest#rejectsPrimaryOutsideTheSet`; `ProfessionalAdminIntegrationTest#invalidPrimaryIsRejectedWithoutChanges` | La invariante se evalúa en `SpecialtyAssignment.of(...)` antes de abrir la transacción, así que no hay escritura parcial |
+| CA-04 | Cumple | `ProfessionalAdminIntegrationTest#inactiveSpecialtyCannotBeAssigned` (422 `SPECIALTY_INACTIVE`); `application/professional/ManageProfessionalsUseCase#requireActiveSpecialties` | La especialidad inexistente cae por la misma comprobación, con `fieldErrors.specialtyIds` y el id que falla; ese lado concreto se verifica por lectura del código, no por prueba dedicada |
+| CA-05 | Cumple | `ProfessionalAdminIntegrationTest#changesThePrimarySpecialty` | Tras marcar la segunda, la aserción recorre las dos especialidades y exige `primary == (id == cardiología)`: la anterior sigue asignada, sin ser primaria |
+| CA-06 | Cumple | `SecurityConfig` (`/api/admin/**` → `hasRole("ADMIN")`); `infrastructure/rest/AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes` y `#onlyAdminReachesAdminRoutes` (USER y PROFESSIONAL → 403) | La ruta de asignación es `PUT /api/admin/professionals/{id}/specialties`: un PROFESSIONAL tampoco puede tocar la suya |
+| CA-07 | Cumple | `infrastructure/rest/VerificationGapsIntegrationTest#availabilityFiltersByAppointmentTypeWithoutSpecialty` (buscando `SPECIALIZED` no aparece el médico general); `infrastructure/rest/BookingIntegrationTest#specialtyNotAssignedToTheProfessionalIsRejected` (422 `SPECIALTY_NOT_ASSIGNED`); `JdbcAvailabilityQueries` une por `professional_specialties` | La asignación manda en los dos lados: la oferta y la reserva |
+| DoD — CA-01 a CA-07 validados con evidencia concreta | Cumple | Filas CA-01 a CA-07 de esta tabla | — |
+| DoD — «Exactamente una primaria» en el dominio, con la restricción única de V2 como segunda barrera | Cumple | `domain/professional/SpecialtyAssignment` (Java puro, 5 pruebas en `SpecialtyAssignmentTest`); `HexagonalArchitectureTest`; `V2__configurable_catalogs_and_professionals.sql` líneas 107-109 (`primary_marker` generada + `uq_professional_specialties_primary`) | — |
+| DoD — Actualización atómica: ante cualquier error la asignación previa queda intacta | Cumple | `ManageProfessionalsUseCase#assignSpecialties` (`tx.inTransaction` con `replaceSpecialties`); `ProfessionalAdminIntegrationTest#invalidPrimaryIsRejectedWithoutChanges` comprueba el estado tras el rechazo | — |
+| DoD — Sin migraciones nuevas salvo cambio de esquema | Cumple | Se usa `professional_specialties` de V2; las migraciones posteriores (V5, V6, V7) son de otras HU | — |
+| DoD — Los endpoints exigen rol ADMIN aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | `SecurityConfig`; `AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` | — |
+| DoD — La pantalla solo ofrece especialidades activas y no permite marcar dos primarias | Cumple | `citas-web/src/adminOperations.test.tsx` → «M11: el alta no ofrece especialidades inactivas» y «alta: envía especialidades con principal y sedes; un 409 DUPLICATE marca el campo»; `citas-web/src/pages/admin/professionalPickers.tsx` | La principal es un selector único sobre el conjunto elegido, no una casilla por especialidad |
+| DoD — Pruebas de las invariantes, la asignación válida, el cambio de primaria y la especialidad inactiva | Cumple | `SpecialtyAssignmentTest` (5); `ProfessionalAdminIntegrationTest#invalidPrimaryIsRejectedWithoutChanges`, `#inactiveSpecialtyCannotBeAssigned`, `#changesThePrimarySpecialty` | — |
+| DoD — Contrato de los endpoints de especialidades del profesional reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Profesionales — ADMIN (HU-013 a HU-016)» | — |
+| DoD — Trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 7 criterios y los 9 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F3 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

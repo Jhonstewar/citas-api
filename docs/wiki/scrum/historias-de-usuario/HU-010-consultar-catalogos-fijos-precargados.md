@@ -2,7 +2,7 @@
 id: HU-010
 tipo: historia-de-usuario
 titulo: "Consultar los catálogos fijos precargados"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-003-catalogos-del-sistema]]"
 requisitos: [RF-05]
 esfuerzo: "Medio"
@@ -155,32 +155,44 @@ Esta HU es la base de datos maestros de todo el producto: la búsqueda de dispon
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
-- [ ] Existe una migración Flyway versionada que crea las cinco tablas de catálogo fijo y su seed, y se aplica correctamente sobre una base vacía sin pasos manuales.
-- [ ] Las dos sedes precargadas reproducen el nombre, la sigla y la dirección literales del PRD §3.
-- [ ] El código no contiene ninguna operación de escritura, ni en aplicación ni en adaptador REST, sobre roles, estados de cita, estados de reprogramación, regímenes o sedes.
-- [ ] El dominio que representa los catálogos no depende de Spring ni de JPA, respetando la separación hexagonal.
-- [ ] `citas-web` obtiene los catálogos mediante la URL del backend leída de la configuración de entorno y no duplica sus valores en constantes locales.
-- [ ] Existen pruebas automatizadas que verifican el contenido del seed y el acceso autenticado de consulta, y pasan.
-- [ ] Los contratos de consulta de catálogos están reflejados en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-003-catalogos-del-sistema]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [x] Existe una migración Flyway versionada que crea las cinco tablas de catálogo fijo y su seed, y se aplica correctamente sobre una base vacía sin pasos manuales.
+- [x] Las dos sedes precargadas reproducen el nombre, la sigla y la dirección literales del PRD §3.
+- [x] El código no contiene ninguna operación de escritura, ni en aplicación ni en adaptador REST, sobre roles, estados de cita, estados de reprogramación, regímenes o sedes.
+- [x] El dominio que representa los catálogos no depende de Spring ni de JPA, respetando la separación hexagonal.
+- [x] `citas-web` obtiene los catálogos mediante la URL del backend leída de la configuración de entorno y no duplica sus valores en constantes locales.
+- [x] Existen pruebas automatizadas que verifican el contenido del seed y el acceso autenticado de consulta, y pasan.
+- [x] Los contratos de consulta de catálogos están reflejados en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-003-catalogos-del-sistema]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/persistence/FlywayMigratesEmptySchemaTest#aplicaTodasLasMigracionesEnOrden`, `#dejaElModeloCompletoDe24Tablas`, `#elEsquemaMigradoValidaContraLasMigraciones`, `#siembraLosCatalogosFijos` | Esquema desechable vacío: V1–V7 aplicadas en orden y marcadas `success`, 24 tablas, `flyway.validate()` sin excepción y los cinco catálogos fijos con filas |
+| CA-02 | Cumple | `FlywayMigratesEmptySchemaTest#siembraLasDosSedesConSuDireccion`; `V4__seed_fixed_catalogs.sql` líneas 51-57 y `V7__site_addresses_as_in_prd.sql`; `infrastructure/persistence/catalog/JdbcCatalogQueries#sites`; `infrastructure/rest/AuthorizationIntegrationTest#anyAuthenticatedRoleReadsCatalogs` (`$.length()` = 2) | Exactamente dos sedes, con su código y su nombre completo. Ciudad y departamento están en columnas propias (`city`, `department`), así que `address` guarda el tramo de calle y la sede completa reproduce el literal del PRD §3. V7 corrigió la raya de «Bucaramanga–Piedecuesta» tras la verificación independiente |
+| CA-03 | Cumple | `V4__seed_fixed_catalogs.sql` líneas 29-35; `domain/appointment/AppointmentStatus`; `infrastructure/rest/catalog/CatalogController#appointmentStatuses` (`GET /api/catalogs/appointment-statuses`) | Los seis códigos `REQUESTED`, `APPROVED`, `REJECTED`, `CANCELLED`, `COMPLETED` y `NO_SHOW`, con `is_terminal` y `releases_slots`. El enum del dominio declara exactamente los mismos seis |
+| CA-04 | Cumple | `infrastructure/rest/VerificationGapsIntegrationTest#rescheduleStatusesCatalogIncludesPending`; `V4__seed_fixed_catalogs.sql` líneas 38-42 | Devuelve `PENDING` más `APPROVED`, `REJECTED` y `CANCELLED` como estados de resolución |
+| CA-05 | Cumple | `V4__seed_fixed_catalogs.sql` (roles líneas 17-20, regímenes líneas 45-48); `CatalogController#roles` y `#regimes`; `infrastructure/rest/RegistrationAffiliationIntegrationTest#insurancePlanExposesItsEpsAndRegimeDerivedFromThePlan` | Roles `USER`, `PROFESSIONAL` y `ADMIN`; tres regímenes. El formulario de afiliación de [[HU-009-registrar-afiliacion-a-eps-y-plan]] recibe el régimen derivado del plan, que sale de esta misma tabla |
+| CA-06 | Cumple | `AuthorizationIntegrationTest#fixedCatalogsRejectWrites` (POST y DELETE → 405); `CatalogController` solo declara `@GetMapping`; `application/catalog/CatalogQueries` no expone ninguna escritura | `SecurityConfig` declara `/api/catalogs/**` sin método para que la petición llegue a MVC y responda 405, no 401 |
+| CA-07 | Cumple | `AuthorizationIntegrationTest#catalogsRequireAuthentication` (401 sin cabecera) y `#anyAuthenticatedRoleReadsCatalogs` (USER, PROFESSIONAL y ADMIN → 200) | Excepción documentada y ajena a esta HU: `/api/catalogs/insurance-plans` es pública desde [[HU-009-registrar-afiliacion-a-eps-y-plan]] y no es un catálogo fijo |
+| CA-08 | Cumple | `citas-web/src/patientBooking.test.tsx` → «filtra por estado con las opciones del catálogo de la API (HU-010 CA-08, HU-025 CA-02)»; `citas-web/src/professionalAgenda.test.tsx` → «crea un bloque: solo sedes asignadas, cuenta las franjas y muestra el 409 en el formulario»; `citas-web/src/api/catalogApi.ts` | Los selectores de estado de cita y de sede se pueblan con la respuesta de la API |
+| DoD — CA-01 a CA-08 validados con evidencia concreta | Cumple | Filas CA-01 a CA-08 de esta tabla | — |
+| DoD — Migración Flyway con las cinco tablas de catálogo fijo y su seed, aplicada sobre base vacía | Cumple | `V1__identity_and_fixed_catalogs.sql` (tablas) y `V4__seed_fixed_catalogs.sql` (seed); `FlywayMigratesEmptySchemaTest` (7 pruebas) | Sin pasos manuales: la prueba crea un esquema desechable y lo migra desde cero |
+| DoD — Sedes con nombre, sigla y dirección literales del PRD §3 | Cumple | `FlywayMigratesEmptySchemaTest#siembraLasDosSedesConSuDireccion`; `V7__site_addresses_as_in_prd.sql` | — |
+| DoD — Sin operaciones de escritura sobre roles, estados, regímenes ni sedes | Cumple | `CatalogController` (solo `@GetMapping`); `JdbcCatalogQueries` (solo `SELECT`); `AuthorizationIntegrationTest#fixedCatalogsRejectWrites` | — |
+| DoD — Dominio de catálogos sin Spring ni JPA | Cumple | `HexagonalArchitectureTest` (ArchUnit sobre bytecode: `elNucleoNoDependeDeFrameworks`, `elNucleoNoDependeDeLaInfraestructura`) | `domain/catalog/SiteCatalog` y `domain/user/DocumentTypeCatalog` son puertos en Java puro |
+| DoD — `citas-web` lee los catálogos por la URL de entorno y no duplica sus valores | Cumple | `citas-web/src/api/contracts.test.ts` → «toma VITE_API_URL y le quita la barra final» y «falla al cargar si VITE_API_URL está vacía, en vez de usar un valor por defecto»; `citas-web/src/api/catalogApi.ts` | Matiz registrado: `citas-web/src/lib/status.ts` mantiene `STATUS_FALLBACK_LABEL` con las seis etiquetas en español. No alimenta ningún selector —las opciones vienen de la API— y solo actúa si el backend omite `statusName` |
+| DoD — Pruebas del contenido del seed y del acceso autenticado de consulta | Cumple | `FlywayMigratesEmptySchemaTest` (7); `AuthorizationIntegrationTest` (9); `VerificationGapsIntegrationTest#rescheduleStatusesCatalogIncludesPending` | — |
+| DoD — Contratos de consulta reflejados en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Catálogos — cualquier rol autenticado (HU-010)» | Las ocho rutas de catálogo con su respuesta y el 405 de las escrituras |
+| DoD — Trazabilidad de esta HU y de [[EP-003-catalogos-del-sistema]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 8 criterios y los 9 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F2 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

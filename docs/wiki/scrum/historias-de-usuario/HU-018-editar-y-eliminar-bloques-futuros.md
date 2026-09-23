@@ -2,7 +2,7 @@
 id: HU-018
 tipo: historia-de-usuario
 titulo: "Editar y eliminar bloques futuros"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-005-agenda-del-profesional]]"
 requisitos: [RF-08]
 esfuerzo: "Medio"
@@ -134,31 +134,44 @@ La edición de un bloque no es una simple actualización de campos: cambiar la f
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-06 están validados con evidencia concreta.
-- [ ] La regla de bloque modificable está implementada en el dominio y considera tanto la condición de bloque futuro como la ausencia de citas comprometidas.
-- [ ] La edición y el recálculo de slots ocurren en una única transacción: no queda ningún slot asociado a una franja que el bloque ya no cubre.
-- [ ] La eliminación no deja slots huérfanos en la base de datos.
-- [ ] Los endpoints de actualización y eliminación exigen rol `PROFESSIONAL` y verifican la titularidad del bloque contra el usuario autenticado.
-- [ ] Los errores de bloque con citas, bloque pasado, solapamiento y sede no asignada son distinguibles entre sí en la respuesta de la API.
-- [ ] La pantalla de gestión de bloques de `citas-web` refleja los slots recalculados tras la edición sin necesidad de recargar manualmente la aplicación.
-- [ ] Existen pruebas automatizadas del recálculo de slots, del rechazo por cita comprometida y del intento sobre un bloque ajeno, y pasan.
-- [ ] El contrato de los endpoints de actualización y eliminación está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-06 están validados con evidencia concreta.
+- [x] La regla de bloque modificable está implementada en el dominio y considera tanto la condición de bloque futuro como la ausencia de citas comprometidas.
+- [x] La edición y el recálculo de slots ocurren en una única transacción: no queda ningún slot asociado a una franja que el bloque ya no cubre.
+- [x] La eliminación no deja slots huérfanos en la base de datos.
+- [x] Los endpoints de actualización y eliminación exigen rol `PROFESSIONAL` y verifican la titularidad del bloque contra el usuario autenticado.
+- [x] Los errores de bloque con citas, bloque pasado, solapamiento y sede no asignada son distinguibles entre sí en la respuesta de la API.
+- [x] La pantalla de gestión de bloques de `citas-web` refleja los slots recalculados tras la edición sin necesidad de recargar manualmente la aplicación.
+- [x] Existen pruebas automatizadas del recálculo de slots, del rechazo por cita comprometida y del intento sobre un bloque ajeno, y pasan.
+- [x] El contrato de los endpoints de actualización y eliminación está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/ScheduleIntegrationTest#editRecalculatesSlotsAndDeleteRemovesTheBlock` | `PUT` de 08:00–12:00 a 08:00–10:00 → 200 con la franja nueva; `DELETE` → 204 y 0 bloques del profesional |
+| CA-02 | Cumple | `ScheduleIntegrationTest#blockWithAppointmentsCannotChange` | Con un slot ocupado por una cita `APPROVED`: `DELETE` → 409 `BLOCK_HAS_APPOINTMENTS` y `PUT` → 409; el calendario sigue mostrando el bloque con `editable: false` y el slot ocupado |
+| CA-03 | Cumple | `infrastructure/rest/VerificationGapsIntegrationTest#pastBlockCannotBeEditedNorDeleted` | `DELETE` y `PUT` → 400 `PAST_TIME`, y los 4 slots del bloque siguen existiendo |
+| CA-04 | Cumple | `ScheduleIntegrationTest#editRecalculatesSlotsAndDeleteRemovesTheBlock` (tras editar: `slots.length() = 4` y `slots[3].startTime = 09:30`); `infrastructure/persistence/schedule/JpaBlockRepositoryAdapter#replace` (`deleteAllOfBlock` + `insertSlots` en la misma transacción) | Los slots de 10:00 en adelante dejan de existir. Que la búsqueda ya no los ofrezca se sigue de que `JdbcAvailabilityQueries` sale de `availability_slots`: si la fila no existe, no hay franja que ofrecer. No hay una prueba que encadene «editar → buscar»; la equivalencia es por lectura de código |
+| CA-05 | Cumple | `VerificationGapsIntegrationTest#editingKeepsOverlapAndSiteRules` | Editar para solapar con el otro bloque → 409 `BLOCK_OVERLAP`; cambiar a ICV sin tenerla asignada → 422 `SITE_NOT_ASSIGNED`. La edición reutiliza `ManageScheduleUseCase#validated`, la misma ruta que el alta |
+| CA-06 | Cumple | `ScheduleIntegrationTest#professionalCannotTouchAnotherProfessionalsBlock` (`DELETE` con el token de otro profesional → 404 y el bloque sigue); `ManageScheduleUseCase#ownBlock`, filtro por titular que usan **tanto** `update` como `delete` | La prueba ejercita el borrado; la edición pasa por el mismo `ownBlock(...)`, verificado por lectura del código. Se responde 404 y no 403 para no revelar que el bloque ajeno existe (convención de ownership del contrato) |
+| DoD — CA-01 a CA-06 validados con evidencia concreta | Cumple | Filas CA-01 a CA-06 de esta tabla | — |
+| DoD — La regla de bloque modificable está en el dominio y cubre futuro y ausencia de citas | Cumple | `domain/schedule/AvailabilityBlock#hasStartedAt` (con `AvailabilityBlockTest#isPastOnceItHasStarted`) y `ManageScheduleUseCase#requireModifiable` sobre `BlockRepository#hasReservations` | La condición de futuro es del dominio; la de reservas consulta el libro único `slot_reservations` ([[dec-003-libro-unico-slot-reservations]]) |
+| DoD — Edición y recálculo en una única transacción, sin slots fuera de la franja | Cumple | `ManageScheduleUseCase#update` (`tx.inTransaction`); `JpaBlockRepositoryAdapter#replace`; `ScheduleIntegrationTest#editRecalculatesSlotsAndDeleteRemovesTheBlock` | — |
+| DoD — La eliminación no deja slots huérfanos | Cumple | `V3__schedule_and_appointments.sql` línea 58-59: `fk_availability_slots_block … ON DELETE CASCADE`; `JpaBlockRepositoryAdapter#delete` | La garantía es del motor, no del código de aplicación |
+| DoD — Actualización y eliminación exigen rol PROFESSIONAL y verifican titularidad | Cumple | `SecurityConfig` (`/api/professional/**`); `infrastructure/rest/AuthorizationIntegrationTest#onlyProfessionalReachesProfessionalRoutes`; `ManageScheduleUseCase#ownBlock`; `ScheduleIntegrationTest#professionalCannotTouchAnotherProfessionalsBlock` | — |
+| DoD — Los cuatro errores son distinguibles en la respuesta | Cumple | `BLOCK_HAS_APPOINTMENTS` (409), `PAST_TIME` (400), `BLOCK_OVERLAP` (409) y `SITE_NOT_ASSIGNED` (422), cada uno afirmado por su prueba: `blockWithAppointmentsCannotChange`, `pastBlockCannotBeEditedNorDeleted`, `editingKeepsOverlapAndSiteRules` | El `code` viaja como extensión del ProblemDetail; el frontend decide por `status` + `code` |
+| DoD — La pantalla refleja los slots recalculados sin recargar | Cumple | `citas-web/src/professionalAgenda.test.tsx` → «edita un bloque editable con PUT» y «elimina con confirmación; un 409 se muestra en el diálogo»; `citas-web/src/pages/professional/AgendaPage.tsx` | La vista se refresca con la respuesta de la propia operación |
+| DoD — Pruebas del recálculo, del rechazo por cita comprometida y del bloque ajeno | Cumple | `ScheduleIntegrationTest#editRecalculatesSlotsAndDeleteRemovesTheBlock`, `#blockWithAppointmentsCannotChange`, `#professionalCannotTouchAnotherProfessionalsBlock`; `VerificationGapsIntegrationTest#pastBlockCannotBeEditedNorDeleted`, `#editingKeepsOverlapAndSiteRules` | — |
+| DoD — Contrato de actualización y eliminación reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Agenda — PROFESSIONAL (HU-017 a HU-019)», con `PUT` y `DELETE` y sus errores | — |
+| DoD — Trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 6 criterios y los 10 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F4 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

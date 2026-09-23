@@ -2,7 +2,7 @@
 id: HU-016
 tipo: historia-de-usuario
 titulo: "Activar o desactivar profesional"
-estado: En desarrollo
+estado: En validación
 epica: "[[EP-004-gestion-de-profesionales]]"
 requisitos: [RF-07]
 esfuerzo: "Medio"
@@ -136,31 +136,44 @@ El efecto observable mínimo que exige la épica es que un profesional desactiva
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-07 están validados con evidencia concreta.
+- [x] Los criterios CA-01 a CA-07 están validados con evidencia concreta.
 - [ ] Activar y desactivar son operaciones explícitas del dominio, no una actualización genérica del campo `active`.
-- [ ] La condición de profesional activo está centralizada y la reutilizan la búsqueda y la reserva, sin copias divergentes.
-- [ ] No se introduce borrado físico ni se alteran citas, reservas de slot ni historial.
-- [ ] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
-- [ ] La acción de `citas-web` requiere confirmación explícita.
+- [x] La condición de profesional activo está centralizada y la reutilizan la búsqueda y la reserva, sin copias divergentes.
+- [x] No se introduce borrado físico ni se alteran citas, reservas de slot ni historial.
+- [x] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
+- [x] La acción de `citas-web` requiere confirmación explícita.
 - [ ] Existen pruebas automatizadas de desactivación, reactivación, conservación de citas y rol, y pasan; CA-03 y CA-04 se verifican cuando existan [[HU-022-buscar-disponibilidad-con-filtros]] y [[HU-023-agendar-cita-de-medicina-general]].
-- [ ] El contrato de los endpoints de activación está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
+- [x] El contrato de los endpoints de activación está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
+**La HU no se cierra.** Los siete criterios están respaldados, pero dos ítems de DoD no lo están.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/ProfessionalAdminIntegrationTest#deactivatesAndReactivatesKeepingAssignments` | `PATCH …/status` con `active: false` → 200 con `active: false` y sus 2 especialidades intactas; el listado `?active=true` deja de incluirlo. El usuario asociado no se toca |
+| CA-02 | Cumple | `ProfessionalAdminIntegrationTest#deactivatesAndReactivatesKeepingAssignments` | Al reactivar, `active: true` y la sede sigue asignada |
+| CA-03 | Cumple | `infrastructure/rest/BookingIntegrationTest#inactiveProfessionalIsNeitherOfferedNorBookable` (tras desactivarlo, ninguna franja suya aparece en la búsqueda); `infrastructure/persistence/appointment/JdbcAvailabilityQueries` (`JOIN professionals p … AND p.active`) | Verificado contra [[HU-022-buscar-disponibilidad-con-filtros]] |
+| CA-04 | Cumple | `BookingIntegrationTest#inactiveProfessionalIsNeitherOfferedNorBookable` (reserva directa sobre su slot → 422 `PROFESSIONAL_INACTIVE`); `application/appointment/BookAppointmentUseCase#book` | No se crea cita ni reserva de slot |
+| CA-05 | Cumple | `application/professional/ManageProfessionalsUseCase#setActive` y `infrastructure/persistence/professional/JpaProfessionalRepositoryAdapter#setActive`: la única escritura es el indicador `active` del perfil; no hay ninguna referencia a `appointments`, `slot_reservations` ni `appointment_status_history` en ese camino. `infrastructure/persistence/FlywayMigratesEmptySchemaTest#elHistorialEsAppendOnlyYAdmiteOrigenProfesional` confirma que la clave foránea del historial es `RESTRICT`, no `CASCADE` (V5). `ProfessionalAdminIntegrationTest#deactivatesAndReactivatesKeepingAssignments` comprueba que especialidades y sedes sobreviven | Verificado por **lectura del código**, no por una prueba que desactive un profesional con citas y vuelva a consultarlas. Ver el ítem de DoD correspondiente |
+| CA-06 | Cumple | `infrastructure/rest/professional/AdminProfessionalController` publica `GET`, `POST`, `PUT` y `PATCH`, y **ningún** `@DeleteMapping`: no existe ruta de borrado de profesional ni de su usuario. `infrastructure/rest/AdminDecisionIntegrationTest#historyAndAppointmentsCannotBeDeletedThroughTheApi` muestra el patrón equivalente para citas (405 en un `DELETE` no declarado) | La desactivación es la única baja posible (decisión D11) |
+| CA-07 | Cumple | `SecurityConfig` (`/api/admin/**` → `hasRole("ADMIN")`); `infrastructure/rest/AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes` y `#onlyAdminReachesAdminRoutes` (USER y PROFESSIONAL → 403) | — |
+| DoD — CA-01 a CA-07 validados con evidencia concreta | Cumple | Filas CA-01 a CA-07 de esta tabla | — |
+| DoD — Activar y desactivar son operaciones explícitas del dominio, no una actualización genérica del campo `active` | No cumple | `domain/professional/Professional` **no** tiene ninguna operación de activación: no existen `activate()`, `deactivate()` ni `withActive(...)`. El cambio se hace con el puerto genérico `ProfessionalRepository#setActive(long, boolean)`, que `JpaProfessionalRepositoryAdapter#setActive` traduce a `entity.setActive(active)`; el caso de uso es `ManageProfessionalsUseCase#setActive(id, active)` y el contrato es `PATCH …/status` con un booleano | Es exactamente lo que la DoD descarta: una actualización genérica del campo. Contraste dentro del propio proyecto: `domain/catalog/Specialty#withActive` sí es una operación de dominio y por eso puede proteger Medicina General. **Acción pendiente de desarrollo:** llevar activar y desactivar al dominio (por ejemplo `Professional#activate()` / `#deactivate()`), de modo que futuras reglas —como impedir desactivar a un profesional con citas próximas, si el usuario lo decide— tengan dónde vivir. Bloquea el cierre |
+| DoD — La condición de profesional activo está centralizada y la reutilizan búsqueda y reserva | Cumple | Origen único: la columna `professionals.active` (`V2__configurable_catalogs_and_professionals.sql`). La búsqueda la lee en `JdbcAvailabilityQueries` (`JOIN professionals p … AND p.active`) y la reserva en `BookAppointmentUseCase#book` a través de `Professional#active()`; `BookingIntegrationTest#inactiveProfessionalIsNeitherOfferedNorBookable` comprueba los dos lados en la misma prueba | No hay regla derivada que pueda divergir: es el mismo indicador leído en los dos caminos, y la prueba fija su coherencia |
+| DoD — No se introduce borrado físico ni se alteran citas, reservas de slot ni historial | Cumple | Fila CA-06 (ninguna ruta de borrado) y fila CA-05 (la desactivación solo escribe `active`); `V5__audit_history_append_only.sql` quitó el borrado en cascada del historial | — |
+| DoD — Los endpoints exigen rol ADMIN aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | `SecurityConfig`; `AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` | — |
+| DoD — La acción de `citas-web` requiere confirmación explícita | Cumple | `citas-web/src/adminOperations.test.tsx`: «filtra por estado en el backend y busca por texto; desactivar pide confirmación»; `citas-web/src/components/ConfirmDialog.tsx` | — |
+| DoD — Pruebas de desactivación, reactivación, conservación de citas y rol | No cumple | Existen las de desactivación y reactivación (`ProfessionalAdminIntegrationTest#deactivatesAndReactivatesKeepingAssignments`), las de rol (`AuthorizationIntegrationTest`) y las de exclusión de la oferta y la reserva (`BookingIntegrationTest#inactiveProfessionalIsNeitherOfferedNorBookable`). **No existe** ninguna prueba de conservación de citas: ninguna desactiva a un profesional que ya tenga cita e historial para comprobar después que el estado, los slots retenidos y las filas de historial siguen igual | CA-05 se apoya hoy solo en lectura de código. **Acción pendiente de desarrollo:** prueba de integración que cree una cita `APPROVED` con su reserva, desactive al profesional y afirme estado, `COUNT(*)` de `slot_reservations` y `COUNT(*)` de `appointment_status_history` sin cambios. Bloquea el cierre |
+| DoD — Contrato de los endpoints de activación reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Profesionales — ADMIN (HU-013 a HU-016)» | — |
+| DoD — Trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `En validación` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia registrada. Los 7 criterios en `Cumple`, pero **no se cierra**: dos ítems de DoD quedan en `No cumple`. (1) Activar y desactivar no son operaciones del dominio: el cambio pasa por el puerto genérico `ProfessionalRepository#setActive(long, boolean)`. (2) No hay prueba de conservación de citas: CA-05 se sostiene hoy solo por lectura del código.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F3 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

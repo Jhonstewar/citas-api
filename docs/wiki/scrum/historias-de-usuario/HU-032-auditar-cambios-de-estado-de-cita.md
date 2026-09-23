@@ -2,7 +2,7 @@
 id: HU-032
 tipo: historia-de-usuario
 titulo: "Auditar los cambios de estado de cita"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-009-trazabilidad-y-contrato-rest]]"
 requisitos: [RF-19]
 esfuerzo: "Alto"
@@ -154,33 +154,46 @@ Se adelanta al Sprint 5, antes de [[HU-023-agendar-cita-de-medicina-general]] y 
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
-- [ ] Existe una única definición de transiciones permitidas y estados terminales en el dominio, sin dependencias de Spring ni de JPA, y las HU de transición la reutilizan.
-- [ ] El adaptador de historial no expone actualización ni borrado, verificable por inspección del código y por prueba.
-- [ ] El registro de historial se ejecuta dentro de la transacción del caso de uso, demostrado con una prueba de reversión conjunta.
-- [ ] Se usa `appointment_status_history` de V3; cualquier refuerzo de inmutabilidad en base de datos se añade con una migración Flyway posterior a V4.
-- [ ] El endpoint de consulta aplica [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
-- [ ] Ningún registro ni log de auditoría contiene contraseñas ni tokens.
-- [ ] Existen pruebas automatizadas de transiciones permitidas y prohibidas, actor por origen, motivo obligatorio, atomicidad y ausencia de edición, y pasan.
-- [ ] El contrato del endpoint de historial y el modelo de estados están reflejados en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-009-trazabilidad-y-contrato-rest]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [x] Existe una única definición de transiciones permitidas y estados terminales en el dominio, sin dependencias de Spring ni de JPA, y las HU de transición la reutilizan.
+- [x] El adaptador de historial no expone actualización ni borrado, verificable por inspección del código y por prueba.
+- [x] El registro de historial se ejecuta dentro de la transacción del caso de uso, demostrado con una prueba de reversión conjunta.
+- [x] Se usa `appointment_status_history` de V3; cualquier refuerzo de inmutabilidad en base de datos se añade con una migración Flyway posterior a V4.
+- [x] El endpoint de consulta aplica [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
+- [x] Ningún registro ni log de auditoría contiene contraseñas ni tokens.
+- [x] Existen pruebas automatizadas de transiciones permitidas y prohibidas, actor por origen, motivo obligatorio, atomicidad y ausencia de edición, y pasan.
+- [x] El contrato del endpoint de historial y el modelo de estados están reflejados en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-009-trazabilidad-y-contrato-rest]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/BookingIntegrationTest#generalAppointmentIsApprovedReservedAndAudited` y `#specializedRequestRetainsTwoConsecutiveSlots` (una fila por creación, con estado, actor, origen y fecha); `infrastructure/rest/AdminDecisionIntegrationTest#approvalKeepsReservationsAndLeavesTheInbox` y `#rejectionReleasesSlotsAndThePatientSeesTheReason` (una fila nueva por decisión, con motivo cuando lo hay) | Los tres flujos que producen transiciones en S3 dejan exactamente un registro cada uno |
+| CA-02 | Cumple | `domain/appointment/AppointmentTest#generalIsBornApprovedWithSystemHistoryWithoutActor`, `#specializedIsBornRequestedWithThePatientAsActor`, `#adminApprovesARequestedAppointment` y `#nonSystemChangesRequireAnActor`; `domain/appointment/StatusChange` (constructor compacto: un origen distinto de `SYSTEM` sin actor lanza excepción) | El rechazo de «origen `USER` o `ADMIN` sin actor» ocurre en el dominio, antes de tocar la base |
+| CA-03 | Cumple | `AppointmentTest#terminalStatesHaveNoWayOut` (parametrizada sobre `REJECTED`, `CANCELLED`, `COMPLETED` y `NO_SHOW`: `allowedNext()` vacío) y `#onlyRequestedCanBeDecided`; `domain/appointment/AppointmentStatus#allowedNext` (desde `APPROVED` solo `CANCELLED`, `COMPLETED` y `NO_SHOW`, nunca `REQUESTED` ni `REJECTED`); `AdminDecisionIntegrationTest#decidingANonRequestedAppointmentIs409` y `infrastructure/rest/VerificationGapsIntegrationTest#rejectingAnApprovedAppointmentIs409EvenWithoutReason` (409 `INVALID_TRANSITION`, sin cambios) | La tabla de transiciones se prueba en el dominio sobre todos los estados; la traducción a 409 se prueba en la API |
+| CA-04 | Cumple | `AdminDecisionIntegrationTest#rejectionWithoutReasonChangesNothing` (400 con `fieldErrors.reason`; la cita sigue `REQUESTED`, con sus dos slots y una sola fila de historial); `AppointmentTest#rejectionRequiresAReasonAndReleasesSlots` | — |
+| CA-05 | Cumple | `application/appointment/BookAppointmentUseCase#book` y `AdminAppointmentsUseCase#approve`/`#reject` escriben cita, historial y reservas dentro de un único `tx.inTransaction`; `domain/appointment/AppointmentRepository#create(Appointment, StatusChange)` y `#apply(Transition)` no permiten guardar el estado sin su fila de historial; `BookingIntegrationTest#doubleBookingIsRejectedWith409` y `#sixtyMinutesWithTakenSecondSlotRetainsNothing` (la transacción se deshace entera: ni cita, ni reserva, ni historial) | La atomicidad se demuestra en el sentido contrario al que enuncia el criterio: falla la reserva y se revierten también cita e historial. No hay inyección de fallo sobre el `INSERT` del historial; que estado e historial comparten transacción se comprueba por lectura de las dos únicas firmas del puerto |
+| CA-06 | Cumple | `infrastructure/persistence/appointment/SpringDataStatusHistoryRepository` extiende `Repository` (no `JpaRepository`) y solo declara `save`; `StatusHistoryJpaEntity` marca todas sus columnas `updatable = false`; `AdminDecisionIntegrationTest#historyAndAppointmentsCannotBeDeletedThroughTheApi` (`DELETE` → 405 y el historial intacto); `infrastructure/persistence/FlywayMigratesEmptySchemaTest#elHistorialEsAppendOnlyYAdmiteOrigenProfesional` (V5: la clave foránea deja de borrar en cascada) | Cuatro barreras: puerto sin métodos de escritura, entidad no actualizable, ausencia de rutas y `RESTRICT` en la base |
+| CA-07 | Cumple | `infrastructure/persistence/appointment/JdbcAppointmentQueries#history` (`ORDER BY h.changed_at ASC, h.id ASC`, con estado, nombre de estado, origen, nombre del actor, motivo y fecha); `AdminDecisionIntegrationTest#approvalKeepsReservationsAndLeavesTheInbox` (`history.length() = 2`, la segunda con `source = ADMIN`) y `#rejectionReleasesSlotsAndThePatientSeesTheReason` (`history[1].reason`) | Límite explícito: en S3 una cita solo puede acumular **dos** transiciones, porque `CANCELLED` no tiene productor hasta [[HU-026-cancelar-una-cita-futura]]. El orden y el juego completo de campos quedan verificados con esas dos; el tercer paso del ejemplo del criterio no añade mecanismo nuevo |
+| CA-08 | Cumple | `infrastructure/rest/AuthorizationIntegrationTest#onlyUserReachesPatientRoutes` y `#anonymousGets401AndWrongRoleGets403OnAdminRoutes` (sin token → 401); `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` (el detalle —y con él el historial— de una cita ajena responde 404 sin cuerpo) | El historial no tiene ruta propia: viaja dentro del detalle de la cita, que ya aplica rol y propiedad |
+| DoD — CA-01 a CA-08 validados con evidencia concreta | Cumple | Filas CA-01 a CA-08 de esta tabla | — |
+| DoD — Una única definición de transiciones y estados terminales en el dominio, reutilizada | Cumple | `domain/appointment/AppointmentStatus#allowedNext` y `#canTransitionTo`; `Appointment#transitionTo` es la única puerta, usada por `approve`, `reject` y las dos creaciones; `HexagonalArchitectureTest` garantiza que no arrastra Spring ni JPA | — |
+| DoD — El adaptador de historial no expone actualización ni borrado | Cumple | `SpringDataStatusHistoryRepository` (solo `save`); `StatusHistoryJpaEntity` (`updatable = false` en todas las columnas); `AdminDecisionIntegrationTest#historyAndAppointmentsCannotBeDeletedThroughTheApi` | — |
+| DoD — El registro de historial se ejecuta dentro de la transacción del caso de uso | Cumple | `BookAppointmentUseCase#book` y `AdminAppointmentsUseCase`; `BookingIntegrationTest#doubleBookingIsRejectedWith409` (una sola fila de historial tras el intento fallido) | — |
+| DoD — Se usa `appointment_status_history` de V3 y el refuerzo de inmutabilidad va en una migración posterior a V4 | Cumple | `V3__schedule_and_appointments.sql` (tabla) y `V5__audit_history_append_only.sql` (quita el borrado en cascada y añade el origen `PROFESSIONAL`, decisión D8); `FlywayMigratesEmptySchemaTest#elHistorialEsAppendOnlyYAdmiteOrigenProfesional` | Ninguna migración previa se editó |
+| DoD — El endpoint de consulta aplica [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | `SecurityConfig`; `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail`; `AuthorizationIntegrationTest` | — |
+| DoD — Ningún registro ni log de auditoría contiene contraseñas ni tokens | Cumple | `StatusHistoryJpaEntity` solo guarda cita, estado, actor, origen y motivo; `HexagonalArchitectureTest.nadieEscribeEnLaSalidaEstandar`; `AuthFlowIntegrationTest` comprueba con `CapturedOutput` que ni el registro ni el login vuelcan credenciales | — |
+| DoD — Pruebas de transiciones, actor por origen, motivo obligatorio, atomicidad y ausencia de edición | Cumple | `AppointmentTest` (8); `AdminDecisionIntegrationTest#rejectionWithoutReasonChangesNothing`, `#decidingANonRequestedAppointmentIs409`, `#historyAndAppointmentsCannotBeDeletedThroughTheApi`; `BookingIntegrationTest#doubleBookingIsRejectedWith409`; `FlywayMigratesEmptySchemaTest#elHistorialEsAppendOnlyYAdmiteOrigenProfesional` | — |
+| DoD — Contrato del historial y modelo de estados reflejados en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`: tipo `HistoryEntry`, enumeración de estados y la nota de que el historial no tiene rutas de escritura | — |
+| DoD — Trazabilidad de esta HU y de [[EP-009-trazabilidad-y-contrato-rest]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 8 criterios y los 10 ítems de DoD en `Cumple`. Dos límites quedan anotados en la matriz y en «Notas y decisiones»: en S3 una cita solo acumula dos transiciones (CA-07) y la atomicidad estado-historial se demuestra por reversión de la reserva, sin inyectar un fallo en el `INSERT` del historial (CA-05). Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F2 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

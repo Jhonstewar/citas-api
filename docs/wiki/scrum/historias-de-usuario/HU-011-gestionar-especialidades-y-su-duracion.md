@@ -2,7 +2,7 @@
 id: HU-011
 tipo: historia-de-usuario
 titulo: "Gestionar especialidades y su duración"
-estado: En desarrollo
+estado: En validación
 epica: "[[EP-003-catalogos-del-sistema]]"
 requisitos: [RF-06, RF-09]
 esfuerzo: "Medio"
@@ -168,35 +168,50 @@ Por último, RF-06 prohíbe el borrado físico de un catálogo referenciado por 
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
+- [x] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
 - [ ] Existe una migración Flyway versionada de la tabla de especialidades con nombre único y una restricción de base de datos que impide persistir duraciones distintas de 30 y 60 minutos.
-- [ ] La invariante de duración está expresada en el dominio y no solo en la validación del DTO ni solo en la base de datos.
-- [ ] El dominio de especialidad no depende de Spring ni de JPA, respetando la separación hexagonal.
-- [ ] No existe ninguna ruta ni caso de uso que elimine físicamente una especialidad referenciada por citas o por asignaciones de profesional.
-- [ ] Las rutas de escritura de especialidades exigen rol `ADMIN` en la configuración de Spring Security y están cubiertas por prueba.
-- [ ] La pantalla de CRUD de especialidades de `citas-web` solo es accesible para ADMIN y consume la API mediante la URL configurable por entorno.
-- [ ] Los nombres de especialidad cargados como ejemplo son sintéticos y no reproducen la oferta real de FCV.
-- [ ] Existen pruebas automatizadas del rechazo de duración inválida, de la desactivación con referencias y de la exclusión de inactivas en la oferta, y pasan.
-- [ ] El contrato del CRUD de especialidades está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-003-catalogos-del-sistema]] está actualizada en `docs/wiki/scrum/`.
+- [x] La invariante de duración está expresada en el dominio y no solo en la validación del DTO ni solo en la base de datos.
+- [x] El dominio de especialidad no depende de Spring ni de JPA, respetando la separación hexagonal.
+- [x] No existe ninguna ruta ni caso de uso que elimine físicamente una especialidad referenciada por citas o por asignaciones de profesional.
+- [x] Las rutas de escritura de especialidades exigen rol `ADMIN` en la configuración de Spring Security y están cubiertas por prueba.
+- [x] La pantalla de CRUD de especialidades de `citas-web` solo es accesible para ADMIN y consume la API mediante la URL configurable por entorno.
+- [x] Los nombres de especialidad cargados como ejemplo son sintéticos y no reproducen la oferta real de FCV.
+- [x] Existen pruebas automatizadas del rechazo de duración inválida, de la desactivación con referencias y de la exclusión de inactivas en la oferta, y pasan.
+- [x] El contrato del CRUD de especialidades está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-003-catalogos-del-sistema]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
+**La HU no se cierra.** Los nueve criterios están respaldados, pero un ítem de DoD no: falta la restricción de unicidad del **nombre** en la base de datos.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/SpecialtyAdminIntegrationTest#createsActiveSpecialtyWithApprovalPolicyFromType` | 201 con `active: true`, 60 minutos y `requiresAdminApproval: true`; el listado de ADMIN la devuelve |
+| CA-02 | Cumple | `SpecialtyAdminIntegrationTest#rejectsDurationOtherThan30Or60`, parametrizada con 0, 45 y 90 → 400 con `fieldErrors.durationMinutes = "Solo se admiten 30 o 60 minutos"` y cero filas persistidas; `domain/catalog/Specialty` (constructor compacto) | El caso negativo no se puede enviar como entero válido distinto de los probados sin recorrer la misma rama del constructor; los tres valores de la prueba cubren por debajo, por el medio y por encima. `EVIDENCIAS_S3.md` §8 lo repite contra la API real («45 min → 400») |
+| CA-03 | Cumple | `SpecialtyAdminIntegrationTest#createsActiveSpecialtyWithApprovalPolicyFromType` (`requiresAdminApproval: true` para una SPECIALIZED); `V4__seed_fixed_catalogs.sql` líneas 23-25 (`appointment_types.requires_admin_approval`: GENERAL `FALSE`, SPECIALIZED `TRUE`); `infrastructure/persistence/catalog/JpaSpecialtyRepositoryAdapter` deriva el dato del tipo, no de una columna propia de la especialidad | La política no se copia en `specialties`: es una clave foránea al tipo |
+| CA-04 | Cumple | `application/catalog/ManageSpecialtiesUseCase#delete` rechaza con 409 `SPECIALTY_REFERENCED` si `specialties.isReferenced(id)`; `JpaSpecialtyRepositoryAdapter#isReferenced` cuenta `professional_specialties` + `appointments`; `infrastructure/rest/VerificationGapsIntegrationTest#typeOfASpecialtyInUseCannotChange` ejercita ese mismo predicado con una especialidad en uso → 409 `SPECIALTY_REFERENCED`; `SpecialtyAdminIntegrationTest#deletesAnUnreferencedSpecialty` (el lado no referenciado, 204); `citas-web/src/adminOperations.test.tsx`: «una especialidad en uso no se borra: 409 SPECIALTY_REFERENCED sugiere desactivarla» | Matiz: **no** hay prueba de integración que haga `DELETE` sobre una especialidad referenciada. El predicado `isReferenced` sí está ejercitado (por la ruta de edición) y el guardia del borrado es el mismo, pero esa combinación concreta se verifica por lectura de código |
+| CA-05 | Cumple | `ManageSpecialtiesUseCase#setActive` solo escribe el indicador `active` (`Specialty#withActive`), sin tocar `appointments`; `infrastructure/persistence/appointment/JdbcAppointmentQueries.SELECT` une `specialties` por identificador y **sin** filtrar por `active`, así que una cita existente sigue mostrando su especialidad; `SpecialtyAdminIntegrationTest#deactivatedSpecialtyLeavesTheCatalogAndComesBackWhenReactivated` (la especialidad queda inactiva sin eliminarse) | La conservación del histórico se verifica por lectura de la consulta de lectura; no hay una prueba que desactive una especialidad con citas y vuelva a consultarlas |
+| CA-06 | Cumple | `SpecialtyAdminIntegrationTest#deactivatedSpecialtyLeavesTheCatalogAndComesBackWhenReactivated` (sale de `GET /api/catalogs/specialties`); `VerificationGapsIntegrationTest#deactivatedSpecialtyIsNoLongerOffered` (la búsqueda pasa de 3 franjas a 0); `#bookingWithAnInactiveSpecialtyIsRejected` (422 `SPECIALTY_INACTIVE`, cero citas) | Las tres caras de RN-08: catálogo, oferta y reserva |
+| CA-07 | Cumple | `SpecialtyAdminIntegrationTest#deactivatedSpecialtyLeavesTheCatalogAndComesBackWhenReactivated` | Al reactivarla vuelve a aparecer en el catálogo de especialidades ofrecibles |
+| CA-08 | Cumple | `SpecialtyAdminIntegrationTest#nonAdminCannotWrite` (USER → 403); `infrastructure/rest/AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` (PROFESSIONAL → 403, ADMIN → 200) | Toda la escritura está bajo `/api/admin/specialties` |
+| CA-09 | Cumple | `infrastructure/rest/appointment/PatientBookingController.BookingRequest` **no tiene** campo de duración (su comentario lo declara: «el cuerpo no lleva paciente ni duracion (RF-09)»); `application/appointment/BookAppointmentUseCase#book` calcula el fin con `specialty.durationMinutes()`; `infrastructure/rest/BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots` (`durationMinutes: 60` tomado de la especialidad) y `#onlyUsersBookAndAlwaysForThemselves` (un campo extra en el cuerpo se descarta sin error) | Un valor enviado de más se ignora, que es una de las dos salidas que admite el criterio. El profesional no tiene ninguna ruta para alterar la duración |
+| DoD — CA-01 a CA-09 validados con evidencia concreta | Cumple | Filas CA-01 a CA-09 de esta tabla | — |
+| DoD — Migración con nombre único y restricción de base de datos para 30/60 minutos | No cumple | `V2__configurable_catalogs_and_professionals.sql` líneas 63-65: existen `uq_specialties_code` y `ck_specialties_duration CHECK (duration_minutes IN (30, 60))`, pero **no** hay restricción única sobre `name`. La unicidad del nombre solo vive en la aplicación (`ManageSpecialtiesUseCase#requireUniqueName` sobre `SpecialtyRepository#existsByName`, probada por `VerificationGapsIntegrationTest#specialtyNameIsUniqueIgnoringCase`) | La mitad de duración sí cumple. Falta la barrera de base de datos para el nombre: dos altas simultáneas con el mismo nombre podrían colarse, igual que ocurría con el código antes de `uq_specialties_code`. **Acción pendiente de desarrollo:** migración posterior a V7 que añada un índice único sobre `name` (con el colado `utf8mb4_0900_ai_ci` la comparación ya ignora mayúsculas y acentos) y traducción de su violación a 409 `DUPLICATE` con `field = name`. Bloquea el cierre |
+| DoD — La invariante de duración está en el dominio, no solo en el DTO ni solo en la base | Cumple | `domain/catalog/Specialty` (constructor compacto: `durationMinutes != 30 && != 60` lanza `InvalidRequestException.field("durationMinutes", …)`) y `#slotsRequired`; `ck_specialties_duration` como segunda barrera | — |
+| DoD — Dominio de especialidad sin Spring ni JPA | Cumple | `HexagonalArchitectureTest` (`elNucleoNoDependeDeFrameworks`, `elNucleoNoDependeDeLaInfraestructura`) | — |
+| DoD — Ninguna ruta ni caso de uso elimina físicamente una especialidad referenciada | Cumple | `ManageSpecialtiesUseCase#delete` (único camino de borrado; guardia `isProtected() || isReferenced(id)`); `SpecialtyAdminIntegrationTest#generalMedicineCannotBeDeactivatedNorDeleted`; fila CA-04 | — |
+| DoD — Las rutas de escritura exigen rol ADMIN y están cubiertas por prueba | Cumple | `SecurityConfig`; `SpecialtyAdminIntegrationTest#nonAdminCannotWrite`; `AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` | — |
+| DoD — La pantalla de CRUD solo es accesible para ADMIN y usa la URL configurable | Cumple | `citas-web/src/auth/RequireRole.tsx` con `citas-web/src/roleNavigation.test.tsx`; `citas-web/src/pages/admin/SpecialtiesPage.tsx` sobre `src/api/adminApi.ts` y `API_ROUTES`; `citas-web/src/api/contracts.test.ts` | — |
+| DoD — Los nombres de especialidad de ejemplo son sintéticos | Cumple | `citas-api/src/test/java/com/fcv/citas/support/S3TestData` genera códigos con prefijo y sufijo aleatorio; las pruebas usan «Cardiología» y «Dermatología», nombres genéricos de la disciplina; `V6__seed_general_medicine.sql` solo siembra `MEDICINA_GENERAL` | No se reproduce la oferta real de FCV |
+| DoD — Pruebas de duración inválida, desactivación con referencias y exclusión de inactivas | Cumple | `SpecialtyAdminIntegrationTest#rejectsDurationOtherThan30Or60` (3 casos); `VerificationGapsIntegrationTest#typeOfASpecialtyInUseCannotChange` (predicado de referencia) y `#deactivatedSpecialtyIsNoLongerOffered`; `SpecialtyAdminIntegrationTest#deactivatedSpecialtyLeavesTheCatalogAndComesBackWhenReactivated` | Con el matiz de las filas CA-04 y CA-05: el borrado de una referenciada y la conservación del histórico se apoyan en lectura de código |
+| DoD — Contrato del CRUD reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Especialidades — ADMIN (HU-011)», con el tipo `Specialty` y los códigos `SPECIALTY_REFERENCED` y `PROTECTED_SPECIALTY` | — |
+| DoD — Trazabilidad de esta HU y de [[EP-003-catalogos-del-sistema]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `En validación` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia registrada. Los 9 criterios en `Cumple`, pero **no se cierra**: falta el ítem de DoD «migración con nombre único». `V2` trae `uq_specialties_code` y el `CHECK` de 30/60 minutos, pero la unicidad del **nombre** solo existe en la capa de aplicación. Acción pendiente de desarrollo: una migración posterior a V7 con índice único sobre `specialties.name` y su traducción a 409 `DUPLICATE` con `field = name`.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F2 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

@@ -2,7 +2,7 @@
 id: HU-013
 tipo: historia-de-usuario
 titulo: "Crear profesional con sus datos de registro"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-004-gestion-de-profesionales]]"
 requisitos: [RF-07]
 esfuerzo: "Medio"
@@ -154,33 +154,46 @@ Es la primera de cuatro HU de [[EP-004-gestion-de-profesionales]]: un profesiona
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
-- [ ] El alta reutiliza el esquema de V2 sin migración nueva; si se requiere algún cambio de esquema, existe una migración Flyway posterior a V4 y no se editan las migraciones existentes.
-- [ ] Usuario y perfil profesional se crean en una única transacción, demostrado con una prueba de atomicidad.
-- [ ] Las cuatro restricciones de unicidad producen errores de negocio distinguibles y no un error interno genérico.
-- [ ] Los endpoints de alta, listado y detalle exigen rol `ADMIN` aplicando el mecanismo de [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
-- [ ] Ninguna respuesta ni log expone contraseñas, hashes ni tokens.
-- [ ] La pantalla de gestión de profesionales de `citas-web` consume la API mediante la URL leída de la configuración de entorno.
-- [ ] Existen pruebas automatizadas de dominio, aplicación e integración REST para el alta válida, los duplicados y la restricción de rol, y pasan.
-- [ ] El contrato de los endpoints de profesionales está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [x] El alta reutiliza el esquema de V2 sin migración nueva; si se requiere algún cambio de esquema, existe una migración Flyway posterior a V4 y no se editan las migraciones existentes.
+- [x] Usuario y perfil profesional se crean en una única transacción, demostrado con una prueba de atomicidad.
+- [x] Las cuatro restricciones de unicidad producen errores de negocio distinguibles y no un error interno genérico.
+- [x] Los endpoints de alta, listado y detalle exigen rol `ADMIN` aplicando el mecanismo de [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
+- [x] Ninguna respuesta ni log expone contraseñas, hashes ni tokens.
+- [x] La pantalla de gestión de profesionales de `citas-web` consume la API mediante la URL leída de la configuración de entorno.
+- [x] Existen pruebas automatizadas de dominio, aplicación e integración REST para el alta válida, los duplicados y la restricción de rol, y pasan.
+- [x] El contrato de los endpoints de profesionales está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/ProfessionalAdminIntegrationTest#createsProfessionalWithUserRoleAndHashedPassword` | 201 con código, matrícula, `active: true`, 2 especialidades y la sede; el cuerpo no trae `password` ni `passwordHash` y la aserción comprueba que la respuesta completa no contiene la contraseña enviada. En base: rol `PROFESSIONAL` en `user_roles` |
+| CA-02 | Cumple | `ProfessionalAdminIntegrationTest#createdProfessionalCanLogInWithItsRole` | Login real por `POST /api/auth/login`; `GET /api/me` devuelve `roles[0] = PROFESSIONAL` y `GET /api/professional/me` responde 200 |
+| CA-03 | Cumple | `ProfessionalAdminIntegrationTest#duplicateCodeIsRejectedAtomically` (409 `DUPLICATE`, `field = professionalCode`); `infrastructure/rest/VerificationGapsIntegrationTest#duplicateLicenseAndDocumentIdentifyTheirField` (`field = licenseNumber`) | El campo duplicado viaja en el cuerpo del ProblemDetail; la primera prueba comprueba además que no queda el usuario del intento |
+| CA-04 | Cumple | `ProfessionalAdminIntegrationTest#duplicateEmailIsRejected` (`field = email`); `VerificationGapsIntegrationTest#duplicateLicenseAndDocumentIdentifyTheirField` (`field = documentNumber`) | La unicidad se comprueba contra `users`, sea cual sea el rol del titular previo |
+| CA-05 | Cumple | `ProfessionalAdminIntegrationTest#onlyAdminCreates` (USER → 403 y 0 usuarios creados); `infrastructure/rest/AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes` y `#onlyAdminReachesAdminRoutes` (anónimo → 401, PROFESSIONAL → 403) | `SecurityConfig` protege todo `/api/admin/**` con `hasRole("ADMIN")` |
+| CA-06 | Cumple | `ProfessionalAdminIntegrationTest#duplicateCodeIsRejectedAtomically` (0 filas en `users` para el email del intento fallido); `VerificationGapsIntegrationTest#concurrentProfessionalCreationsLeaveNoOrphanUsers` (4 altas simultáneas con el mismo código: 1 × 201, 3 × 409 y **un único** usuario creado) | El fallo al insertar el perfil deshace también el usuario: `ManageProfessionalsUseCase#create` envuelve las dos escrituras en un solo `tx.inTransaction` |
+| CA-07 | Cumple | `ProfessionalAdminIntegrationTest#createsProfessionalWithUserRoleAndHashedPassword` (`password_hash` empieza por `{bcrypt}`); `infrastructure/rest/professional/AdminProfessionalController.CreateProfessionalRequest#toString` enmascara la contraseña (`password=***`) | El `toString` enmascarado es lo que impide que la contraseña llegue al log si Spring registra el DTO ante un error de validación |
+| CA-08 | Cumple | `ProfessionalAdminIntegrationTest#listsProfessionalsWithoutCredentials` (la respuesta no contiene la cadena `password`); `#deactivatesAndReactivatesKeepingAssignments` (el listado filtra por `active`) | `ProfessionalResponse` expone nombres, código, matrícula, estado, especialidades y sedes; ningún campo de credencial |
+| DoD — CA-01 a CA-08 validados con evidencia concreta | Cumple | Filas CA-01 a CA-08 de esta tabla | — |
+| DoD — Reutiliza el esquema de V2 sin migración nueva | Cumple | `V2__configurable_catalogs_and_professionals.sql` (tablas `professionals`, `professional_specialties`, `professional_sites`); las migraciones posteriores son V5 (auditoría), V6 (Medicina General) y V7 (direcciones) | Ninguna migración existente se editó: `FlywayMigratesEmptySchemaTest#elEsquemaMigradoValidaContraLasMigraciones` detectaría un checksum alterado |
+| DoD — Usuario y perfil en una única transacción, con prueba de atomicidad | Cumple | `application/professional/ManageProfessionalsUseCase#create`; `ProfessionalAdminIntegrationTest#duplicateCodeIsRejectedAtomically`; `VerificationGapsIntegrationTest#concurrentProfessionalCreationsLeaveNoOrphanUsers` | — |
+| DoD — Las cuatro unicidades producen errores de negocio distinguibles | Cumple | `duplicateCodeIsRejectedAtomically`, `duplicateEmailIsRejected`, `duplicateLicenseAndDocumentIdentifyTheirField`; `domain/shared/DuplicateValueException` y `GlobalExceptionHandler#codedConflict` | 409 `DUPLICATE` con la extensión `field` en los cuatro casos, nunca un 500 genérico |
+| DoD — Alta, listado y detalle exigen rol ADMIN aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | `SecurityConfig` (`/api/admin/**` → `hasRole("ADMIN")`); `onlyAdminCreates`; `AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` | — |
+| DoD — Ninguna respuesta ni log expone contraseñas, hashes ni tokens | Cumple | `createsProfessionalWithUserRoleAndHashedPassword`; `listsProfessionalsWithoutCredentials`; `CreateProfessionalRequest#toString`; `HexagonalArchitectureTest.nadieEscribeEnLaSalidaEstandar` | — |
+| DoD — La pantalla de profesionales de `citas-web` usa la URL del backend del entorno | Cumple | `citas-web/src/api/adminApi.ts` sobre `API_ROUTES` de `contracts.ts`; `citas-web/src/api/contracts.test.ts` → «falla al cargar si VITE_API_URL está vacía, en vez de usar un valor por defecto»; `citas-web/src/adminOperations.test.tsx` → «alta: envía especialidades con principal y sedes; un 409 DUPLICATE marca el campo» | Ninguna URL escrita en el código |
+| DoD — Pruebas de dominio, aplicación e integración REST del alta, los duplicados y el rol | Cumple | Dominio: `domain/professional/ProfessionalTest`, `domain/professional/SpecialtyAssignmentTest`. Integración: `ProfessionalAdminIntegrationTest` (11), `VerificationGapsIntegrationTest#concurrentProfessionalCreationsLeaveNoOrphanUsers` y `#duplicateLicenseAndDocumentIdentifyTheirField` | — |
+| DoD — Contrato de los endpoints de profesionales reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Profesionales — ADMIN (HU-013 a HU-016)» | — |
+| DoD — Trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 8 criterios y los 10 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F3 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

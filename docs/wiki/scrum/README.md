@@ -45,7 +45,7 @@ Repositorios independientes con ramas `main` (estable) y `develop` (trabajo).
 
 ## Candidatas a aprobación para S2
 
-Estas cinco historias cubren RF-01 y RF-02. HU-001 a HU-004 están `Completada` (aprobación delegada, alcance de GOAL_01; cierre del 2026-09-17); HU-005 sigue en `Pendiente de aprobación`. El resto permanece en `Borrador`.
+Estas cinco historias cubren RF-01 y RF-02. HU-001 a HU-004 están `Completada` (aprobación delegada, alcance de GOAL_01; cierre del 2026-09-17). HU-005 se aprobó por delegación en S3, se implementó y quedó en `En validación` al cerrar S3: siete de sus nueve criterios cumplen, pero RF-16 depende de [[HU-020-consultar-agenda-de-citas-aprobadas]].
 
 | HU | Título | Esfuerzo | RF | Estado |
 |---|---|---|---|---|
@@ -53,9 +53,9 @@ Estas cinco historias cubren RF-01 y RF-02. HU-001 a HU-004 están `Completada` 
 | [[HU-002-iniciar-sesion-con-jwt]] | Iniciar sesión con JWT | Alto | RF-02 | `Completada` |
 | [[HU-003-renovar-sesion-con-refresh-token]] | Renovar sesión con refresh token | Medio | RF-02 | `Completada` |
 | [[HU-004-cerrar-sesion-revocando-refresh-token]] | Cerrar sesión revocando el refresh token | Bajo | RF-02 | `Completada` |
-| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Autorizar peticiones por rol y ownership | Alto | RF-02 | `Pendiente de aprobación` |
+| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Autorizar peticiones por rol y ownership | Alto | RF-02 | `En validación` |
 
-**INC-001** (política de complejidad de contraseña) e **INC-002** (vigencia de los tokens) siguen abiertas. HU-001 a HU-004 se cerraron con criterios definidos sobre el mecanismo y no sobre un umbral; HU-001, HU-002 y HU-003 registran en sus notas qué revisar cuando se decidan. Conviene resolverlas antes de aprobar HU-005.
+**INC-001** (política de complejidad de contraseña) e **INC-002** (vigencia de los tokens) siguen abiertas. HU-001 a HU-004 se cerraron con criterios definidos sobre el mecanismo y no sobre un umbral; HU-001, HU-002 y HU-003 registran en sus notas qué revisar cuando se decidan.
 
 ## Propuesta de sprints
 
@@ -74,8 +74,8 @@ Cada sprint es un incremento funcional comprobable, no una caja de tiempo. No se
 
 Notas de ordenación:
 
-- Sprint 1: [[HU-001-registrar-cuenta-de-usuario]] a [[HU-004-cerrar-sesion-revocando-refresh-token]] están `Completada`; faltan [[HU-005-autorizar-peticiones-por-rol-y-ownership]] (`Pendiente de aprobación`) y [[HU-033-publicar-contrato-rest-documentado]] (`Borrador`).
-- [[HU-033-publicar-contrato-rest-documentado]] se inaugura en el Sprint 1 pero es un artefacto vivo: crece con cada endpoint publicado en los sprints posteriores.
+- Sprint 1: [[HU-001-registrar-cuenta-de-usuario]] a [[HU-004-cerrar-sesion-revocando-refresh-token]] están `Completada`; [[HU-005-autorizar-peticiones-por-rol-y-ownership]] y [[HU-033-publicar-contrato-rest-documentado]] siguen abiertas tras el cierre de S3.
+- [[HU-033-publicar-contrato-rest-documentado]] se inaugura en el Sprint 1 pero es un artefacto vivo: crece con cada endpoint publicado en los sprints posteriores. Por eso **no se cierra al terminar un sprint**; su matriz de evidencia se rehace en cada corte y se mantiene en `En desarrollo`.
 - [[HU-032-auditar-cambios-de-estado-de-cita]] se adelanta al Sprint 5, antes de la primera creación de citas, para que ninguna transición nazca sin historial.
 - [[HU-022-buscar-disponibilidad-con-filtros]] pertenece a EP-006 pero se planifica en el Sprint 4 porque cierra el incremento de disponibilidad y no tiene sentido sin bloques publicados.
 - [[HU-020-consultar-agenda-de-citas-aprobadas]] y [[HU-021-registrar-cierre-de-atencion]] pertenecen a EP-005 pero se planifican al final porque requieren citas ya aprobadas.
@@ -144,4 +144,40 @@ Las automatizaciones n8n de S5 y S6 (recordatorios, notificación de cambio de e
 
 ## Alcance de S3 (aprobación delegada del 2026-09-18)
 
-El usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente. Pasan a `Aprobada` por **aprobación delegada**: HU-005, HU-010, HU-011, HU-013 a HU-019, HU-022 a HU-025, HU-029, HU-030, HU-032 y HU-033. Cada una lo registra en su historial. Plan y decisiones D5–D13: `PLAN_RETOMA_S3.md` (raíz) y `../llm-wiki/wiki/dec-004-decisiones-s3-reserva.md`.
+El usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente. Pasaron a `Aprobada` por **aprobación delegada**: HU-005, HU-010, HU-011, HU-013 a HU-019, HU-022 a HU-025, HU-029, HU-030, HU-032 y HU-033. Cada una lo registra en su historial. Plan y decisiones D5–D13: `PLAN_RETOMA_S3.md` (raíz) y `../llm-wiki/wiki/dec-004-decisiones-s3-reserva.md`.
+
+## Cierre de S3 (2026-09-23)
+
+Validación de las 18 HU en desarrollo, criterio por criterio, con la evidencia recolectada del repositorio: backend **242 pruebas en verde** en 22 clases, frontend **88 pruebas en verde** con typecheck, lint y build, verificación independiente y ejecución contra la API real (`EVIDENCIAS_S3.md` §8, §10 y §11). Cada HU tiene su matriz completa en su propia nota.
+
+**12 pasan a `Completada`:**
+
+| HU | Título |
+|---|---|
+| [[HU-010-consultar-catalogos-fijos-precargados]] | Consultar los catálogos fijos precargados |
+| [[HU-013-crear-profesional-con-datos-de-registro]] | Crear profesional con datos de registro |
+| [[HU-014-asignar-especialidades-y-especialidad-primaria]] | Asignar especialidades y especialidad primaria |
+| [[HU-015-asignar-sedes-al-profesional]] | Asignar sedes al profesional |
+| [[HU-017-crear-bloques-de-disponibilidad-con-slots]] | Crear bloques de disponibilidad con slots |
+| [[HU-018-editar-y-eliminar-bloques-futuros]] | Editar y eliminar bloques futuros |
+| [[HU-019-consultar-calendario-de-disponibilidad]] | Consultar calendario de disponibilidad |
+| [[HU-023-agendar-cita-de-medicina-general]] | Agendar cita de Medicina General |
+| [[HU-024-solicitar-cita-especializada]] | Solicitar cita especializada (**GOAL_02**) |
+| [[HU-025-consultar-mis-citas-y-detalle]] | Consultar mis citas y su detalle |
+| [[HU-030-aprobar-o-rechazar-cita-especializada]] | Aprobar o rechazar una cita especializada |
+| [[HU-032-auditar-cambios-de-estado-de-cita]] | Auditar cambios de estado de cita |
+
+**6 siguen abiertas**, con lo que falta a cada una:
+
+| HU | Estado | Qué falta |
+|---|---|---|
+| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | `En validación` | CA-06 / RF-16 (el profesional ve datos de sus pacientes) depende de [[HU-020-consultar-agenda-de-citas-aprobadas]]; la mitad de escritura de CA-05 necesita operaciones del paciente sobre citas existentes; falta el componente reutilizable de ownership que pide la DoD |
+| [[HU-011-gestionar-especialidades-y-su-duracion]] | `En validación` | Falta la restricción de base de datos de **nombre único**: la unicidad solo vive en la aplicación. Requiere una migración posterior a V7 |
+| [[HU-016-activar-o-desactivar-profesional]] | `En validación` | Activar y desactivar no son operaciones del dominio, sino una actualización genérica del campo `active`; y no hay prueba de conservación de citas al desactivar |
+| [[HU-022-buscar-disponibilidad-con-filtros]] | `En validación` | CA-03 exige excluir una franja retenida por una reprogramación `PENDING`, que no tiene productor; y la regla de consecutividad de 60 minutos está duplicada en el dominio y en SQL |
+| [[HU-029-consultar-bandeja-administrativa]] | `En validación` | La mitad de reprogramaciones de CA-01 y CA-04 no existe en S3; queda pendiente decidir a qué franja se refieren los filtros de una reprogramación |
+| [[HU-033-publicar-contrato-rest-documentado]] | `En desarrollo` | **Abierta por diseño:** artefacto vivo que crece con cada endpoint. Al corte de S3 cubre identidad y todo S3; le faltan recuperación de contraseña, perfil, EPS y planes, agenda de citas aprobadas, cierre de atención, cancelación y reprogramación. Además, INC-038 e INC-040 los decidió el agente y conviene que el usuario los confirme |
+
+[[HU-009-registrar-afiliacion-a-eps-y-plan]] no entró en esta validación: su primer corte (afiliación opcional al registrarse) se implementó el 2026-09-23, pero su alcance incluye consulta y edición desde el perfil, que todavía no existe.
+
+Ninguna de las seis abiertas bloquea el incremento funcional de S3: GOAL_02 (cita especializada que nace `REQUESTED` y retiene su franja) está cerrado con evidencia, y las carencias son de completitud de especificación o de alcance de S4.

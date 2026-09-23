@@ -2,7 +2,7 @@
 id: HU-005
 tipo: historia-de-usuario
 titulo: "Autorizar peticiones por rol y ownership"
-estado: En desarrollo
+estado: En validación
 epica: "[[EP-001-identidad-y-acceso-seguro]]"
 requisitos: [RF-02]
 esfuerzo: "Alto"
@@ -174,33 +174,47 @@ Pertenece al alcance de la sesión S2.
 ## Definition of Done
 
 - [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
-- [ ] Esta HU no altera el esquema de datos y por tanto no incorpora migración Flyway; se apoya en las tablas de usuarios y roles creadas en [[HU-001-registrar-cuenta-de-usuario]].
-- [ ] La cadena de seguridad aplica denegación por defecto: ninguna ruta queda accesible por omisión de regla.
+- [x] Esta HU no altera el esquema de datos y por tanto no incorpora migración Flyway; se apoya en las tablas de usuarios y roles creadas en [[HU-001-registrar-cuenta-de-usuario]].
+- [x] La cadena de seguridad aplica denegación por defecto: ninguna ruta queda accesible por omisión de regla.
 - [ ] Existe un componente reutilizable de verificación de ownership invocable desde cualquier caso de uso, documentado para que las HU funcionales posteriores lo usen en lugar de reimplementar la comprobación.
-- [ ] La regla de rol y la de ownership están expresadas en dominio y aplicación, sin que la lógica de propiedad quede únicamente en anotaciones del adaptador REST.
-- [ ] Las respuestas de no autenticado y de permiso insuficiente usan códigos distintos y un cuerpo de error uniforme que no expone detalles internos ni la existencia de recursos ajenos.
+- [x] La regla de rol y la de ownership están expresadas en dominio y aplicación, sin que la lógica de propiedad quede únicamente en anotaciones del adaptador REST.
+- [x] Las respuestas de no autenticado y de permiso insuficiente usan códigos distintos y un cuerpo de error uniforme que no expone detalles internos ni la existencia de recursos ajenos.
 - [ ] La restricción de RF-16 sobre los datos de usuarios visibles al PROFESSIONAL está implementada y probada.
-- [ ] El control de rutas y acciones por rol en `citas-web` es coherente con las reglas aplicadas por `citas-api`: ninguna acción visible en el cliente es rechazada por rol en el servidor y ninguna acción oculta es ejecutable saltándose el cliente.
-- [ ] Existen pruebas automatizadas de acceso permitido, no autenticado, rol insuficiente y recurso de otro usuario, y pasan.
-- [ ] La trazabilidad de esta HU y de [[EP-001-identidad-y-acceso-seguro]] está actualizada en `docs/wiki/scrum/`.
+- [x] El control de rutas y acciones por rol en `citas-web` es coherente con las reglas aplicadas por `citas-api`: ninguna acción visible en el cliente es rechazada por rol en el servidor y ninguna acción oculta es ejecutable saltándose el cliente.
+- [x] Existen pruebas automatizadas de acceso permitido, no autenticado, rol insuficiente y recurso de otro usuario, y pasan.
+- [x] La trazabilidad de esta HU y de [[EP-001-identidad-y-acceso-seguro]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
+**La HU no se cierra.** Dos elementos no están respaldados y ambos dependen de trabajo fuera del alcance de S3: RF-16 (CA-06) y la mitad de escritura de CA-05.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes` | Sin token → 401; con token de USER sobre una ruta de ADMIN → 403 con `title: "Acceso denegado"`. Códigos distintos y en ninguno de los dos casos se ejecuta la operación |
+| CA-02 | Cumple | `AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` (PROFESSIONAL → 403, ADMIN → 200); `infrastructure/rest/SpecialtyAdminIntegrationTest#nonAdminCannotWrite`; `infrastructure/rest/ProfessionalAdminIntegrationTest#onlyAdminCreates`; `infrastructure/rest/AdminDecisionIntegrationTest#onlyAdminDecides` | Las tres familias administrativas del criterio —catálogos, profesionales y decisión— tienen su propia prueba de rol |
+| CA-03 | Cumple | `AuthorizationIntegrationTest#onlyProfessionalReachesProfessionalRoutes` (USER y ADMIN → 403); `infrastructure/rest/ScheduleIntegrationTest#blockExpandsIntoEightSlotsStoredWithTheSameLocalTimes` (el PROFESSIONAL titular → 201) y `#professionalCannotTouchAnotherProfessionalsBlock` (otro profesional → 404) | — |
+| CA-04 | Cumple | `AuthorizationIntegrationTest#onlyUserReachesPatientRoutes` (PROFESSIONAL y ADMIN → 403, USER → 200); `infrastructure/rest/BookingIntegrationTest#onlyUsersBookAndAlwaysForThemselves` | — |
+| CA-05 | No verificable | Lectura: `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail` (el detalle de una cita ajena responde 404 sin devolver ningún dato) y `#onlyUsersBookAndAlwaysForThemselves` (el `patientUserId` del cuerpo se ignora). Modificación: **sin evidencia** | La mitad de lectura está cubierta. La mitad de **modificación** no es ejercitable en S3: el paciente no tiene ninguna operación de escritura sobre una cita ya existente. Llega con [[HU-026-cancelar-una-cita-futura]] y [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] (S4). Acción pendiente: al implementarlas, añadir la prueba de «un USER intenta modificar la cita de otro» |
+| CA-06 | No cumple | No existe ningún endpoint por el que un PROFESSIONAL consulte datos de un paciente; `EVIDENCIAS_S3.md` §10 lo declara abierto a propósito | RF-16 se materializa con [[HU-020-consultar-agenda-de-citas-aprobadas]], fuera de S3. Hoy el calendario del profesional (`JdbcScheduleQueries`) **no** consulta `appointments` ni `users`, así que no hay fuga, pero tampoco hay regla de vínculo implementada ni probada. Acción pendiente: implementar y probar el vínculo «paciente con cita propia» al desarrollar HU-020 |
+| CA-07 | Cumple | `AuthorizationIntegrationTest#undeclaredRoutesAreDeniedEvenWhenAuthenticated` (ruta no declarada con token de ADMIN → 403); `infrastructure/security/SecurityConfig` cierra la cadena con `anyRequest().denyAll()` | — |
+| CA-08 | Cumple | `citas-web/src/roleNavigation.test.tsx`: «el USER entra a /paciente y solo ve la navegación de paciente», «el ADMIN entra a /admin con su panel y su navegación», «el PROFESSIONAL entra a /profesional y ve solo su navegación», «una ruta de otro rol muestra "Sin permiso" sin pedir datos ni cerrar la sesión» y «"/" lleva al inicio del rol» | `citas-web/src/auth/RequireRole.tsx` y `src/app/navigation.ts` |
+| CA-09 | Cumple | `citas-web/src/roleNavigation.test.tsx`: «un 403 de la API muestra "Permiso insuficiente" y mantiene la sesión abierta» y «un 401 cuya renovación es rechazada lleva al login» | — |
+| DoD — CA-01 a CA-09 validados con evidencia concreta | No cumple | CA-05 `No verificable` y CA-06 `No cumple` | Bloquea el cierre |
+| DoD — No altera el esquema; se apoya en las tablas de [[HU-001-registrar-cuenta-de-usuario]] | Cumple | No hay migración asociada a esta HU; los roles salen de `users`, `roles` y `user_roles` de `V1__identity_and_fixed_catalogs.sql` | — |
+| DoD — Denegación por defecto: ninguna ruta accesible por omisión | Cumple | `SecurityConfig` (`anyRequest().denyAll()`); `AuthorizationIntegrationTest#undeclaredRoutesAreDeniedEvenWhenAuthenticated` | — |
+| DoD — Componente reutilizable de verificación de ownership, invocable desde cualquier caso de uso y documentado | No cumple | Cada caso de uso implementa su propia comprobación: `application/appointment/PatientAppointmentsUseCase#detail` filtra por `patient().id()`, `application/schedule/ManageScheduleUseCase#ownBlock` filtra por titular del bloque y `JdbcAppointmentQueries#findByPatient` filtra en SQL. Una búsqueda de `ownership` en `src/main` no devuelve ningún componente compartido | No hay divergencia observable hoy —las tres comprobaciones responden 404— pero tampoco existe la pieza reutilizable que la DoD exige, y cada HU nueva la reimplementa. Acción pendiente de desarrollo |
+| DoD — Rol y ownership expresados en dominio y aplicación, no solo en anotaciones REST | Cumple | Ownership en la capa de aplicación (`PatientAppointmentsUseCase`, `ManageScheduleUseCase#ownBlock`) y en la consulta (`JdbcAppointmentQueries#findByPatient`); rol en `domain/user/Role`, traducido a autoridades por `JwtConfig` y aplicado por `SecurityConfig` | Ningún controlador decide la propiedad con una anotación |
+| DoD — 401 y 403 con códigos distintos y cuerpo de error uniforme sin detalles internos | Cumple | `infrastructure/security/ProblemJsonSecurityHandlers` (punto de entrada y manejador de acceso denegado, ambos con `ProblemDetail`); `AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes`; `infrastructure/rest/error/GlobalExceptionHandler#unexpected` (solo el tipo de excepción al log, cuerpo genérico) | Las citas ajenas responden 404 y no 403, para no revelar su existencia |
+| DoD — La restricción de RF-16 está implementada y probada | No cumple | Fila CA-06 | Bloquea el cierre |
+| DoD — El control por rol de `citas-web` es coherente con el de `citas-api` | Cumple | `citas-web/src/roleNavigation.test.tsx` (5 pruebas de navegación y 2 de 401/403); `EVIDENCIAS_S3.md` §8, comprobación «USER en ruta ADMIN → 403» contra el backend real; `citas-web/src/api/contracts.ts` contrastado con los `@*Mapping` del backend | La prueba de humo recorre las mismas rutas que usa el cliente |
+| DoD — Pruebas de acceso permitido, no autenticado, rol insuficiente y recurso ajeno | Cumple | `AuthorizationIntegrationTest` (9 pruebas); `BookingIntegrationTest#patientSeesOnlyOwnAppointmentsWithDetail`; `ScheduleIntegrationTest#professionalCannotTouchAnotherProfessionalsBlock` | Falta el caso «PROFESSIONAL frente a un paciente sin cita propia», que depende de CA-06 |
+| DoD — Trazabilidad de esta HU y de [[EP-001-identidad-y-acceso-seguro]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `En validación` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia registrada. 7 de 9 criterios en `Cumple`; **no se cierra**. Falta: (1) CA-06 / RF-16, el vínculo que permite a un PROFESSIONAL ver datos de sus propios pacientes, que no existe hasta [[HU-020-consultar-agenda-de-citas-aprobadas]]; (2) la mitad de escritura de CA-05, no ejercitable hasta que el paciente tenga operaciones sobre citas existentes ([[HU-026-cancelar-una-cita-futura]], [[HU-027-solicitar-reprogramacion-de-cita-aprobada]]); (3) el componente reutilizable de ownership que pide la DoD, hoy reimplementado caso de uso por caso de uso.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F2 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada y dejada en estado `Pendiente de aprobación` como candidata al alcance de S2.
