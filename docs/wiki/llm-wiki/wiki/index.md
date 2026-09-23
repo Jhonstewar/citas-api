@@ -52,6 +52,7 @@ _(sin páginas todavía)_
 
 - [[riesgo-spring-security-65-trampas]] — cinco trampas de Spring Security 6.5.x: API del encoder, secreto HMAC (y placeholders), prefijo `ROLE_`, Bearer inválido frente a `permitAll`, y el truncado a 72 bytes de BCrypt en `checkpw`
 - [[riesgo-prueba-intermitente-flyway]] — `FlywayMigratesEmptySchemaTest` falló una vez sin relación con el cambio; hipótesis: `target/` en el montaje de Windows
+- [[riesgo-dos-copias-mismo-proyecto-docker]] — otra copia del laboratorio poseía los contenedores por compartir `COMPOSE_PROJECT_NAME`; mitigado con proyecto, nombres y puertos propios, y `strictPort` en Vite
 - [[riesgo-zona-horaria-columnas-time]] — mitigado: la zona del JVM se fijaba tarde (`@PostConstruct`) y las horas `TIME` se desplazaban 5 h según el orden de las pruebas
 
 ## Síntesis

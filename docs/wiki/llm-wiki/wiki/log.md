@@ -153,3 +153,11 @@ Formato fijo del encabezado, para que sea parseable:
 - DECISIÓN: `#0B5C8C` se conserva como `primary-container` y como primera parada del degradado del panel de marca, no como acción principal.
 - HECHO: con la paleta correcta desaparecen las tres desviaciones por contraste que se habían documentado; el esquema Material ya viene con los pares calculados.
 - PREFERENCIA del usuario: revisa la fidelidad visual contra los mockups y la reclama. Ante un export de diseño con varias fuentes de color, verificar primero cuál consume el código exportado.
+
+## [2026-09-23] learn | El backend que respondía era de otra copia del laboratorio
+
+- HECHO verificado con `docker inspect`: los contenedores en marcha montaban `Documents\FCV_DES_AND\citas`, no este workspace. Las dos copias compartían `COMPOSE_PROJECT_NAME` (`fcv-citas-training`) y los mismos `container_name`, así que Docker las trataba como el mismo proyecto y mandaba la última que hizo `up`. Página nueva [[riesgo-dos-copias-mismo-proyecto-docker]].
+- HECHO: `docker compose run --rm` crea un contenedor nuevo con el montaje de este repo; `docker compose exec` se engancha al existente. Por eso el hook pre-commit (que usa `run`) nunca delató el problema y el diagnóstico manual (con `exec`) sí se equivocó de carpeta.
+- DECISIÓN: este workspace pasa a proyecto `fcv-citas-v1`, contenedores `fcv-citas-v1-*` y puertos 3308 / 8081 / 5174 (host) / 5175 (contenedor web) / 4201. Las dos copias pueden convivir.
+- DECISIÓN: `vite.config.ts` fija el 5174 con `strictPort: true`. Si Vite salta de puerto, el origen deja de coincidir con `FRONTEND_ORIGIN` y el fallo de CORS se ve en la interfaz como "no pudimos contactar al servidor", que manda a depurar donde no es.
+- HECHO: con el stack propio, Flyway aplicó las 7 migraciones sobre base vacía, Spring encontró 14 repositorios, el humo E2E dio 29/29 y `POST /api/auth/register` devolvió 201 con `Access-Control-Allow-Origin: http://localhost:5174`.

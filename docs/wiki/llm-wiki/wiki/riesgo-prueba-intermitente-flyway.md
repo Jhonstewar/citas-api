@@ -41,6 +41,7 @@ reintentar o a saltarse el hook con `--no-verify`.
 
 ## Relacionado
 
+- [[riesgo-dos-copias-mismo-proyecto-docker]] — **no** es la causa de este fallo: aquel problema afecta a `docker compose exec`, y el hook usa `run --rm`, que siempre crea un contenedor con el montaje de este repo
 - [[datos-modelo-3fn]]
 - [[dec-004-decisiones-s3-reserva]]
 
