@@ -2,7 +2,7 @@
 id: HU-012
 tipo: historia-de-usuario
 titulo: "Gestionar EPS y planes"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-003-catalogos-del-sistema]]"
 requisitos: [RF-06]
 esfuerzo: "Medio"
@@ -155,9 +155,15 @@ Como el resto de catálogos configurables, una EPS o un plan ya referenciados po
 **Cuando** se revisan sus nombres y demás datos
 **Entonces** todos corresponden a entidades de demostración inventadas para el ejercicio y ninguno reproduce una EPS, un plan o un dato real vinculado a FCV (PRD §9).
 
+### CA-09 — Una EPS o un plan no referenciados se borran físicamente
+
+**Dado** un plan sin ninguna afiliación que lo referencie, y una EPS sin planes ni afiliaciones que la referencien
+**Cuando** ADMIN borra cada uno
+**Entonces** la API responde con éxito, el registro deja de existir en la base de datos y deja de aparecer en los listados; y si el mismo borrado se intenta sobre un registro referenciado, la API responde 409 y ofrece desactivarlo, como en CA-03 (D28).
+
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
 - [ ] Existe una migración Flyway versionada que crea las tablas de EPS y planes con la clave foránea del plan a su EPS y al régimen del catálogo fijo.
 - [ ] El nombre de la EPS es único y el nombre del plan es único dentro de su EPS, con restricción a nivel de base de datos.
 - [ ] El dominio de EPS y plan no depende de Spring ni de JPA, respetando la separación hexagonal.
@@ -182,15 +188,19 @@ Como el resto de catálogos configurables, una EPS o un plan ya referenciados po
 | CA-06 | Pendiente | — | — |
 | CA-07 | Pendiente | — | — |
 | CA-08 | Pendiente | — | — |
+| CA-09 | Pendiente | — | — |
 | DoD | Pendiente | — | — |
 
 ## Historial de validación
 
+- 2026-09-25 — Se añade CA-09 por D28 (borrado físico de lo no referenciado), que ningún criterio cubría; la DoD pasa a CA-01 a CA-09. CA-03 no cambia: ya exigía el rechazo del borrado referenciado.
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Catálogos», fase F6) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Incógnita abierta **INC-011** (ver [[EP-003-catalogos-del-sistema]]): RF-06 solo prohíbe el borrado físico del catálogo referenciado. No está decidido si una EPS o un plan nunca referenciados pueden eliminarse físicamente; CA-03 solo cubre el caso referenciado.
+- **Resuelta (D28, provisional bajo delegación):** INC-011 (ver [[EP-003-catalogos-del-sistema]]): una EPS o un plan que nada referencia se **borran físicamente**; si algo los referencia, 409 y se ofrece desactivar, igual que las especialidades de [[HU-011-gestionar-especialidades-y-su-duracion]] ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-03 y CA-09 lo cubren.
+- Esquema ya existente, con una divergencia respecto a la DoD: `eps` y `eps_plans` existen desde `V2__configurable_catalogs_and_professionals.sql`, así que T-02 no crea tablas. Pero la unicidad del esquema es sobre el **código** (`uq_eps_code`, `uq_eps_plans_eps_code (eps_id, code)`), no sobre el **nombre** que pide el ítem de DoD «nombre de la EPS único y nombre del plan único dentro de su EPS». No se reescribe la DoD en silencio: al implementar F6 hay que decidir si la unicidad por código satisface la intención (y ajustar la DoD con registro) o si hace falta una migración posterior a V7, como R1 hizo para las especialidades.
 - El PRD no define si desactivar una EPS debe desactivar en cascada sus planes o si los planes conservan su estado propio quedando inaccesibles por su EPS. CA-05 solo exige que dejen de ofrecerse, sin fijar el mecanismo; la decisión queda pendiente del usuario del proyecto.
 - El PRD no define qué ocurre con una afiliación ya declarada cuando su plan se desactiva: si sigue vigente o debe marcarse para actualización. CA-05 solo exige preservar el registro. Esta duda debe resolverse junto con [[HU-009-registrar-afiliacion-a-eps-y-plan]].
 - RF-04 exige evitar duplicar EPS, régimen y plan dentro del usuario; esa restricción pertenece a la afiliación y no a este catálogo, por lo que no se cubre aquí.

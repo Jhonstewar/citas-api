@@ -8,6 +8,7 @@ import com.fcv.citas.domain.affiliation.AffiliationRepository;
 import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
 import com.fcv.citas.domain.affiliation.InsurancePlanUnavailableException;
 import com.fcv.citas.domain.auth.PasswordHasher;
+import com.fcv.citas.domain.auth.PasswordPolicy;
 import com.fcv.citas.domain.shared.SystemZone;
 import com.fcv.citas.domain.user.DocumentAlreadyRegisteredException;
 import com.fcv.citas.domain.user.DocumentTypeCatalog;
@@ -44,6 +45,9 @@ public class RegisterUserUseCase {
     }
 
     public User register(RegisterUserCommand command) {
+        // D29: la entrada REST ya la valida; aqui se repite porque la regla es del dominio y no
+        // puede depender de que cada adaptador se acuerde de aplicarla.
+        PasswordPolicy.require(command.password(), "password");
         String documentTypeCode = User.normalizeCode(command.documentTypeCode());
         String email = User.normalizeEmail(command.email());
         String documentNumber = command.documentNumber().trim();

@@ -28,7 +28,19 @@ public enum AppointmentStatus {
         return allowedNext().contains(next);
     }
 
-    /** RN-09: rechazar o cancelar libera las reservas de slots. */
+    /**
+     * Terminal = sin salida en la tabla de transiciones (RF-14: "una cita cancelada no se reactiva").
+     * Se deriva de {@link #allowedNext()} para que no existan dos listas; {@code is_terminal} del
+     * catalogo (V4) debe coincidir, y {@code S3DebtIntegrationTest} lo comprueba (R5).
+     */
+    public boolean isTerminal() {
+        return allowedNext().isEmpty();
+    }
+
+    /**
+     * RN-09: rechazar o cancelar libera las reservas de slots. Debe coincidir con
+     * {@code appointment_statuses.releases_slots} (V4); {@code S3DebtIntegrationTest} lo comprueba (R5).
+     */
     public boolean releasesSlots() {
         return this == REJECTED || this == CANCELLED;
     }

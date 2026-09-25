@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.fcv.citas.application.catalog.CatalogQueries;
 import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
+import com.fcv.citas.domain.eps.RegimeCatalog;
 
 /**
  * Lectura de catalogos fijos con SQL plano: son tablas de solo lectura sin comportamiento y un
@@ -14,7 +15,7 @@ import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
  * de agregados siguen pasando por JPA.
  */
 @Component
-class JdbcCatalogQueries implements CatalogQueries, InsurancePlanCatalog {
+class JdbcCatalogQueries implements CatalogQueries, InsurancePlanCatalog, RegimeCatalog {
 
     /**
      * Un plan solo se ofrece y solo se acepta si esta activo y su EPS tambien (RF-06). El
@@ -92,6 +93,13 @@ class JdbcCatalogQueries implements CatalogQueries, InsurancePlanCatalog {
     public boolean isSelectable(int epsPlanId) {
         Integer found = jdbc.queryForObject("SELECT COUNT(*) " + SELECTABLE_PLAN + " AND p.id = ?",
                 Integer.class, epsPlanId);
+        return found != null && found > 0;
+    }
+
+    /** HU-012 CA-02: el regimen de un plan debe estar en el catalogo fijo (V4), el mismo que lista {@link #regimes}. */
+    @Override
+    public boolean exists(String code) {
+        Integer found = jdbc.queryForObject("SELECT COUNT(*) FROM regimes WHERE code = ?", Integer.class, code);
         return found != null && found > 0;
     }
 

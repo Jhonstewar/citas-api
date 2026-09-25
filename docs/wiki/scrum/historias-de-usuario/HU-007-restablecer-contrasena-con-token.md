@@ -2,7 +2,7 @@
 id: HU-007
 tipo: historia-de-usuario
 titulo: "Restablecer contraseña con token"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-001-identidad-y-acceso-seguro]]"
 requisitos: [RF-03]
 esfuerzo: "Medio"
@@ -50,7 +50,7 @@ Esta HU cubre la pantalla de cambio de contraseña, una de las pantallas obligat
 
 - Generación y entrega del token de recuperación, que se cubre en [[HU-006-solicitar-recuperacion-de-contrasena]].
 - Revocación de los refresh tokens vigentes al restablecer: no está definida en el PRD; se registra como decisión pendiente en las notas.
-- Política de complejidad de contraseña, no definida en el PRD (INC-001).
+- ~~Política de complejidad de contraseña, no definida en el PRD (INC-001).~~ Entra en alcance por D29 (ver notas y CA-08).
 - Cambio de contraseña por un usuario autenticado que recuerda la actual: no está descrito en el PRD.
 - Notificación al usuario de que su contraseña fue cambiada: el PRD no la exige.
 
@@ -64,6 +64,7 @@ Esta HU cubre la pantalla de cambio de contraseña, una de las pantallas obligat
 - Ni la contraseña nueva ni el token aparecen en logs (PRD §8).
 - La validación de los datos enviados se ejecuta también en el servidor (PRD §8).
 - Tras el cambio, la contraseña anterior deja de ser válida para iniciar sesión.
+- La contraseña nueva tiene al menos 8 caracteres, con al menos una letra y un número, validado en el servidor (D29).
 
 ## Dependencias y relaciones
 
@@ -151,11 +152,11 @@ Esta HU cubre la pantalla de cambio de contraseña, una de las pantallas obligat
 **Cuando** se consulta la credencial del usuario en la base de datos
 **Entonces** el valor almacenado no coincide con la contraseña enviada, corresponde a un hash adaptativo verificable por Spring Security y es distinto del hash que había antes del cambio.
 
-### CA-08 — Contraseña ausente o vacía rechazada en el servidor
+### CA-08 — Contraseña ausente, vacía o fuera de política rechazada en el servidor
 
-**Dado** una petición de restablecimiento enviada directamente a la API con un token válido y sin contraseña nueva o con ella vacía
-**Cuando** la API procesa la petición
-**Entonces** responde con un error de validación, no modifica la credencial y el token no queda consumido.
+**Dado** peticiones de restablecimiento enviadas directamente a la API con un token válido y, en cada una, sin contraseña nueva, con ella vacía, con menos de 8 caracteres (`abc123`), sin ningún número (`abcdefgh`) o sin ninguna letra (`12345678`)
+**Cuando** la API procesa cada petición
+**Entonces** responde con un error de validación sobre el campo de contraseña, no modifica la credencial y el token no queda consumido (D29).
 
 ### CA-09 — Ausencia de token y contraseña en logs
 
@@ -194,11 +195,13 @@ Esta HU cubre la pantalla de cambio de contraseña, una de las pantallas obligat
 
 ## Historial de validación
 
+- 2026-09-25 — CA-08 ajustado a D29: además de ausente o vacía, rechaza una contraseña con menos de 8 caracteres, sin letra o sin número. El punto de "Fuera de alcance" sobre la política de contraseña queda tachado por la misma decisión.
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Cuenta», fase F7) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Decisión pendiente: el PRD no define si restablecer la contraseña debe revocar los refresh tokens vigentes del usuario. Revocarlos expulsaría cualquier sesión abierta con la contraseña anterior, lo que es coherente con el propósito de recuperar el acceso tras un olvido o una sospecha de robo; no revocarlos evita cerrar sesiones legítimas del propio usuario. Requiere decisión humana; hasta entonces no se escribe ningún criterio que lo exija ni que lo prohíba.
-- Incógnita abierta **INC-001** (ver [[EP-001-identidad-y-acceso-seguro]]): no hay política de complejidad de contraseña definida. CA-08 solo exige obligatoriedad y no vacío, no fortaleza.
-- Incógnita abierta **INC-002** (ver [[EP-001-identidad-y-acceso-seguro]]): la vigencia concreta del token de recuperación sigue sin fijarse; CA-04 se apoya en la existencia de la fecha de expiración, no en un valor determinado.
+- Decisión pendiente, **no cubierta por D15–D30**: el PRD no define si restablecer la contraseña debe revocar los refresh tokens vigentes del usuario. `PLAN_RETOMA_S4.md` F7 lo incluye como tarea («refresh tokens del usuario revocados»), pero ninguna decisión de [[dec-006-decisiones-s4-ciclo-de-vida]] lo registra, y esta HU lo tiene en "Fuera de alcance". Revocarlos expulsaría cualquier sesión abierta con la contraseña anterior, lo que es coherente con el propósito de recuperar el acceso tras un olvido o una sospecha de robo; no revocarlos evita cerrar sesiones legítimas del propio usuario. Hasta que el usuario (o una decisión registrada) lo confirme, no se escribe ningún criterio que lo exija ni que lo prohíba, y la implementación de F7 que lo haga queda fuera de lo verificable por esta HU.
+- **Resuelta (D29, provisional bajo delegación):** INC-001 (ver [[EP-001-identidad-y-acceso-seguro]]): mínimo 8 caracteres con al menos una letra y un número, **también en el servidor**, igual que el cliente. Se aplica solo al fijar una contraseña; las cuentas existentes siguen entrando ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-08 lo refleja. La misma decisión obliga a revisar la matriz de [[HU-001-registrar-cuenta-de-usuario]] (`Completada`).
+- **Resuelta (D27, provisional bajo delegación):** INC-002 (ver [[EP-001-identidad-y-acceso-seguro]]) en lo que toca al token de recuperación: vigencia de 30 minutos, configurable por entorno ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-04 se sigue apoyando en la fecha de expiración almacenada, no en el valor.
 - El PRD no especifica cómo llega el token a la pantalla de cambio de contraseña (escrito por el usuario o transportado en el enlace). Mientras no exista envío real de correo (PRD §9), la pantalla debe admitir que el usuario lo introduzca manualmente.

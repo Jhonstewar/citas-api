@@ -31,6 +31,7 @@ import com.fcv.citas.domain.shared.NotFoundException;
 import com.fcv.citas.domain.auth.InvalidRefreshTokenException;
 import com.fcv.citas.domain.user.DocumentAlreadyRegisteredException;
 import com.fcv.citas.domain.user.EmailAlreadyRegisteredException;
+import com.fcv.citas.domain.user.FieldNotEditableException;
 import com.fcv.citas.domain.user.UnknownDocumentTypeException;
 import com.fcv.citas.domain.user.UserNotFoundException;
 
@@ -102,6 +103,10 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = coded(HttpStatus.BAD_REQUEST, "Datos inválidos", ex);
         if (ex.field() != null) {
             problem.setProperty("fieldErrors", Map.of(ex.field(), ex.getMessage()));
+        }
+        // HU-008 · D25: el cliente decide por `code` y `field`, como en DUPLICATE (contrato S4).
+        if (ex instanceof FieldNotEditableException) {
+            problem.setProperty("field", ex.field());
         }
         return problem;
     }

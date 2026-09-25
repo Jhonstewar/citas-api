@@ -2,7 +2,7 @@
 id: HU-026
 tipo: historia-de-usuario
 titulo: "Cancelar una cita futura"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]"
 requisitos: [RF-14, RF-19]
 esfuerzo: "Medio"
@@ -43,7 +43,7 @@ Esta HU es, junto a [[HU-030-aprobar-o-rechazar-cita-especializada]], una de las
 
 - Cancelación de citas por ADMIN o por PROFESSIONAL: RF-14 asigna la cancelación al usuario y el PRD no describe otra vía.
 - Reactivación de una cita cancelada: el PRD la prohíbe explícitamente (RF-14).
-- Cancelación de una solicitud de reprogramación, que se trata en [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] y en [[HU-028-decidir-sobre-cita-tras-rechazo-de-reprogramacion]].
+- Retirada de una solicitud de reprogramación por el paciente sin cancelar la cita: D20 la deja fuera de S4. Sí entra en alcance, por D18, el cierre de una solicitud `PENDING` como efecto de cancelar su cita (CA-09).
 - Penalizaciones, cupos de cancelación o listas de espera: no están en el PRD.
 - Notificación por correo de la cancelación: pertenece a la automatización posterior de PRD §10.
 
@@ -146,9 +146,15 @@ Esta HU es, junto a [[HU-030-aprobar-o-rechazar-cita-especializada]], una de las
 **Cuando** la transacción termina
 **Entonces** la cita conserva su estado anterior, sus slots siguen ocupados y no queda ningún registro de historial, es decir, no existe un resultado parcial.
 
+### CA-09 — Cancelar una cita con reprogramación PENDING cierra la solicitud y libera las dos franjas
+
+**Dado** una cita propia `APPROVED` y futura con una solicitud de reprogramación `PENDING` que retiene otra franja
+**Cuando** el usuario cancela la cita
+**Entonces** en la misma transacción la cita queda `CANCELLED`, la solicitud queda en estado `CANCELLED`, no queda ninguna fila de `slot_reservations` ni de la cita ni de la solicitud, y una búsqueda de disponibilidad vuelve a ofrecer tanto la franja original como la propuesta (D18).
+
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
 - [ ] La transición a `CANCELLED` está implementada como una operación explícita del dominio y no como una asignación directa del campo de estado (RN-11).
 - [ ] El cambio de estado, la liberación de slots y la escritura del historial ocurren en una única transacción.
 - [ ] Una búsqueda de disponibilidad posterior a la cancelación ofrece de nuevo la franja liberada, verificado contra [[HU-022-buscar-disponibilidad-con-filtros]].
@@ -170,14 +176,18 @@ Esta HU es, junto a [[HU-030-aprobar-o-rechazar-cita-especializada]], una de las
 | CA-06 | Pendiente | — | — |
 | CA-07 | Pendiente | — | — |
 | CA-08 | Pendiente | — | — |
+| CA-09 | Pendiente | — | — |
 | DoD | Pendiente | — | — |
 
 ## Historial de validación
 
+- 2026-09-25 — Se añade CA-09 por D18 (cancelar con reprogramación `PENDING`), y el punto de "Fuera de alcance" que excluía tocar la solicitud se ajusta a D18 y D20: ya no era cierto que la cancelación dejara la solicitud intacta. La DoD pasa a CA-01 a CA-09. CA-01 a CA-08 no cambian: ya eran coherentes con D16 y D17.
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Ciclo de vida del paciente», fase F3; CA-09 se ejercita cuando exista el productor de reprogramaciones, en F5) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Incógnita abierta **INC-027** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): el PRD no define una antelación mínima para cancelar; RF-14 solo exige que la cita sea futura. Hasta que se decida, CA-01 y CA-04 usan únicamente la condición "futura" y no una ventana de horas previas.
-- Incógnita abierta **INC-030** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): el PRD no dice explícitamente si una cita `REQUESTED` puede cancelarse. La redacción "futura no terminal" de RF-14 la incluiría, y esta HU asume que sí; debe confirmarse con el usuario del proyecto antes de implementar, porque cambia el conjunto de estados válidos de CA-01.
+- **Resuelta (D17, provisional bajo delegación):** INC-027 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): **no hay antelación mínima**; basta con que la cita no haya empezado ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-01 y CA-04 ya usaban solo la condición "futura" y no cambian.
+- **Resuelta (D16, provisional bajo delegación):** INC-030 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): una cita `REQUESTED` **sí se cancela** y libera su retención; `AppointmentStatus` ya admite `REQUESTED → CANCELLED` ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-01 la incluye al decir "estado no terminal": la validación debe ejercitar el caso `REQUESTED` además del `APPROVED`.
+- **Resuelta (D18, respondida por el usuario):** N1 — cancelar una cita con reprogramación `PENDING`: en la misma transacción la solicitud pasa a `CANCELLED` y se liberan **las dos** franjas, la original y la propuesta; no se impide cancelar hasta que el ADMIN decida ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-09 lo cubre. Cancelación, rechazo de cita y rechazo de reprogramación deben compartir un único camino de liberación de slots (`PLAN_RETOMA_S4.md` §5).
 - La lista concreta de estados terminales de CA-05 depende del modelo de estados de cita fijado en [[HU-032-auditar-cambios-de-estado-de-cita]]; ambas HU deben compartir la misma definición y no mantener dos listas distintas.

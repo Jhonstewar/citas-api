@@ -43,6 +43,26 @@ public record Professional(
         return Set.copyOf(siteIds);
     }
 
+    /**
+     * HU-016 CA-02: vuelve a ofrecerse con sus especialidades y sedes previas. Idempotente.
+     */
+    public Professional activate() {
+        return active ? this : withActive(true);
+    }
+
+    /**
+     * HU-016 CA-01 y CA-05: deja de ofrecerse para nuevas reservas (la busqueda y la reserva leen
+     * {@code active}), pero no toca nada mas: sus citas, reservas de slot e historial se conservan
+     * (D11). No existe borrado fisico (CA-06). Idempotente.
+     */
+    public Professional deactivate() {
+        return active ? withActive(false) : this;
+    }
+
+    private Professional withActive(boolean value) {
+        return new Professional(id, userId, professionalCode, licenseNumber, value, specialties, siteIds);
+    }
+
     public boolean worksAt(int siteId) {
         return siteIds.contains(siteId);
     }

@@ -72,6 +72,15 @@ app:
       access-secret: ${JWT_ACCESS_SECRET}
       access-ttl: ${JWT_ACCESS_MINUTES:15}m
       refresh-ttl: ${JWT_REFRESH_DAYS:7}d
+    # D36: el refresh token viaja en la cookie HttpOnly `fcv_refresh`. Secure por defecto; los
+    # navegadores la aceptan en http://localhost, asi que el laboratorio no necesita HTTPS.
+    refresh-cookie:
+      secure: ${REFRESH_COOKIE_SECURE:true}
+    # HU-006/HU-007 (D27). expose-token=true solo en laboratorio: añade `devToken` a la respuesta
+    # de un email existente. Apagado por defecto. El token nunca se escribe en el log.
+    password-reset:
+      ttl: ${PASSWORD_RESET_MINUTES:30}m
+      expose-token: ${PASSWORD_RESET_EXPOSE_TOKEN:false}
   # Primer ADMIN (decision D5): se crea al arrancar solo si no existe ninguno y ambas variables
   # tienen valor. Vacias por defecto: sin ellas no se crea nadie. Nunca un valor literal aqui.
   admin-bootstrap:

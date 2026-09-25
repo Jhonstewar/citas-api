@@ -211,6 +211,7 @@ Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm ci
 
 ## Historial de validación
 
+- 2026-09-25 — Estado sin cambios (`En validación`). Se retoma en S4 (`PLAN_RETOMA_S4.md` §1, «Qué hay que revisar de antes», R1): la fase **F2** añade `V8` con `UNIQUE(name)` tras comprobar que no hay duplicados en la base, y cierra con verificación independiente; pasa a `Completada` si la matriz queda completa.
 - 2026-09-23 — Estado `En validación` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia registrada. Los 9 criterios en `Cumple`, pero **no se cierra**: falta el ítem de DoD «migración con nombre único». `V2` trae `uq_specialties_code` y el `CHECK` de 30/60 minutos, pero la unicidad del **nombre** solo existe en la capa de aplicación. Acción pendiente de desarrollo: una migración posterior a V7 con índice único sobre `specialties.name` y su traducción a 409 `DUPLICATE` con `field = name`.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F2 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.

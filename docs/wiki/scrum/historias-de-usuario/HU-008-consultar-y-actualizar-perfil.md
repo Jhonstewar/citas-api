@@ -2,7 +2,7 @@
 id: HU-008
 tipo: historia-de-usuario
 titulo: "Consultar y actualizar el perfil"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-002-perfil-y-afiliacion-del-paciente]]"
 requisitos: [RF-04]
 esfuerzo: "Bajo"
@@ -182,11 +182,13 @@ El PRD no enumera qué campos son "datos permitidos", lo que está registrado co
 
 ## Historial de validación
 
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Cuenta», fase F6) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. Ningún criterio contradice D25: CA-02 y CA-03 se escribieron sobre el mecanismo, y CA-07 se resuelve por su propia rama "si el identificador no es editable" (CA-03). El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Incógnita abierta **INC-006** (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): RF-04 habla de "datos permitidos" sin enumerarlos. Esta HU no inventa la lista. Los criterios se escriben sobre el mecanismo —se actualiza lo declarado editable, no se modifica lo declarado fijo—, de modo que siguen siendo válidos sea cual sea la composición final. La lista exacta requiere decisión humana antes de implementar, y son especialmente discutibles el email por ser credencial de login y el tipo y número de documento por ser identificador de la persona.
+- **Resuelta (D25, provisional bajo delegación):** INC-006 (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): son **editables** nombres, apellidos y teléfono; quedan **fijos** el email (es la credencial de login) y el tipo y número de documento (identidad única de la tabla `users`, V1) ([[dec-006-decisiones-s4-ciclo-de-vida]]). En CA-02 el campo editable de la prueba es uno de esos tres; en CA-03 el no editable es el email o el documento; CA-07 queda cubierto por CA-03, porque ningún identificador único es editable. La nota sobre sesiones y tokens de recuperación ligados a un email cambiado deja de aplicar.
+- D29 (política de contraseña) figura en `PLAN_RETOMA_S4.md` §2 como decisión que afecta a esta HU, pero HU-008 no cambia contraseñas (el cambio vive en [[HU-007-restablecer-contrasena-con-token]], ver "Fuera de alcance"). No se añade ningún criterio de contraseña aquí; si el usuario quiere cambio de contraseña desde el perfil, es alcance nuevo y requiere su propia HU.
 - CA-03 admite dos comportamientos válidos ante un campo no editable —error explícito o ignorar el valor— porque el PRD no fija cuál. La opción elegida debe quedar documentada en [[HU-033-publicar-contrato-rest-documentado]] y ser la misma en toda la API.
 - Si la decisión sobre INC-006 deja el email como editable, habrá que definir qué ocurre con las sesiones abiertas y con los tokens de recuperación asociados al email anterior; el PRD no lo trata.
 - El PRD no exige auditoría de cambios sobre el perfil: RF-19 limita la auditoría a los cambios de estado de las citas.

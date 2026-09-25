@@ -173,6 +173,7 @@ Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm ci
 
 ## Historial de validación
 
+- 2026-09-25 — Estado sin cambios (`En validación`). Se retoma en S4 (`PLAN_RETOMA_S4.md` §1, «Qué hay que revisar de antes», R2): la fase **F2** convierte activar y desactivar en operaciones del dominio (`Professional#activate/deactivate`) y añade la prueba de integración de que las citas sobreviven a la desactivación; cierra con verificación independiente y pasa a `Completada` si la matriz queda completa.
 - 2026-09-23 — Estado `En validación` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia registrada. Los 7 criterios en `Cumple`, pero **no se cierra**: dos ítems de DoD quedan en `No cumple`. (1) Activar y desactivar no son operaciones del dominio: el cambio pasa por el puerto genérico `ProfessionalRepository#setActive(long, boolean)`. (2) No hay prueba de conservación de citas: CA-05 se sostiene hoy solo por lectura del código.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F3 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.

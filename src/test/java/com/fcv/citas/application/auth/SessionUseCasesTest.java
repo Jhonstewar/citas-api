@@ -42,14 +42,14 @@ class SessionUseCasesTest {
         logout = new LogoutUseCase(refreshTokens, Fakes.DIRECT_TX, clock);
         new RegisterUserUseCase(users, Fakes.DOCUMENT_TYPES, hasher, Fakes.plans(), new Fakes.InMemoryAffiliations(),
                 Fakes.DIRECT_TX, Fakes.FIXED_CLOCK)
-                .register(new RegisterUserCommand("Ana", "Pérez", "CC", "1", "ana@example.com", "300", "Clave#1",
+                .register(new RegisterUserCommand("Ana", "Pérez", "CC", "1", "ana@example.com", "300", "Clave#12",
                         null));
         user = users.findByEmail("ana@example.com").orElseThrow();
     }
 
     @Test
     void loginIssuesDistinctTokensAndStoresOnlyRefreshHash() {
-        AuthSession session = login.login("ANA@example.com", "Clave#1");
+        AuthSession session = login.login("ANA@example.com", "Clave#12");
 
         assertThat(session.accessToken()).isNotBlank().isNotEqualTo(session.refreshToken());
         assertThat(session.expiresInSeconds()).isEqualTo(900);
@@ -62,7 +62,7 @@ class SessionUseCasesTest {
 
     @Test
     void loginFailuresAreIndistinguishable() {
-        assertThatThrownBy(() -> login.login("nadie@example.com", "Clave#1"))
+        assertThatThrownBy(() -> login.login("nadie@example.com", "Clave#12"))
                 .isInstanceOf(InvalidCredentialsException.class).hasMessage("Credenciales inválidas");
         assertThatThrownBy(() -> login.login("ana@example.com", "incorrecta"))
                 .isInstanceOf(InvalidCredentialsException.class).hasMessage("Credenciales inválidas");
@@ -74,14 +74,14 @@ class SessionUseCasesTest {
         users.replace(new User(user.id(), user.documentTypeCode(), user.documentNumber(), user.firstNames(),
                 user.lastNames(), user.email(), user.phone(), user.passwordHash(), false, user.roles()));
 
-        assertThatThrownBy(() -> login.login("ana@example.com", "Clave#1"))
+        assertThatThrownBy(() -> login.login("ana@example.com", "Clave#12"))
                 .isInstanceOf(InvalidCredentialsException.class);
         assertThat(refreshTokens.tokens).isEmpty();
     }
 
     @Test
     void refreshRotatesTokenWithinSameFamily() {
-        AuthSession first = login.login("ana@example.com", "Clave#1");
+        AuthSession first = login.login("ana@example.com", "Clave#12");
         clock.advance(Duration.ofMinutes(5));
 
         AuthSession second = refresh.refresh(first.refreshToken());
@@ -98,7 +98,7 @@ class SessionUseCasesTest {
 
     @Test
     void reusingConsumedTokenRevokesWholeFamily() {
-        AuthSession first = login.login("ana@example.com", "Clave#1");
+        AuthSession first = login.login("ana@example.com", "Clave#12");
         AuthSession second = refresh.refresh(first.refreshToken());
 
         assertThatThrownBy(() -> refresh.refresh(first.refreshToken()))
@@ -115,8 +115,8 @@ class SessionUseCasesTest {
 
     @Test
     void loginsOpenIndependentFamilies() {
-        AuthSession a = login.login("ana@example.com", "Clave#1");
-        AuthSession b = login.login("ana@example.com", "Clave#1");
+        AuthSession a = login.login("ana@example.com", "Clave#12");
+        AuthSession b = login.login("ana@example.com", "Clave#12");
         logout.logout(a.refreshToken());
 
         assertThat(refresh.refresh(b.refreshToken())).isNotNull();
@@ -134,7 +134,7 @@ class SessionUseCasesTest {
 
     @Test
     void refreshStillWorksOneSecondBeforeExpiry() {
-        AuthSession session = login.login("ana@example.com", "Clave#1");
+        AuthSession session = login.login("ana@example.com", "Clave#12");
         clock.advance(Duration.ofDays(7).minusSeconds(1));
 
         assertThat(refresh.refresh(session.refreshToken())).isNotNull();
@@ -142,7 +142,7 @@ class SessionUseCasesTest {
 
     @Test
     void refreshIsRejectedExactlyAtExpiry() {
-        AuthSession session = login.login("ana@example.com", "Clave#1");
+        AuthSession session = login.login("ana@example.com", "Clave#12");
         clock.advance(Duration.ofDays(7));
 
         // El instante de expiracion ya NO es valido: la vigencia es un intervalo abierto al final.
@@ -152,7 +152,7 @@ class SessionUseCasesTest {
 
     @Test
     void refreshIsRejectedAfterExpiry() {
-        AuthSession session = login.login("ana@example.com", "Clave#1");
+        AuthSession session = login.login("ana@example.com", "Clave#12");
         clock.advance(Duration.ofDays(7).plusSeconds(1));
 
         assertThatThrownBy(() -> refresh.refresh(session.refreshToken()))
@@ -161,7 +161,7 @@ class SessionUseCasesTest {
 
     @Test
     void revokedRefreshIsRejected() {
-        AuthSession session = login.login("ana@example.com", "Clave#1");
+        AuthSession session = login.login("ana@example.com", "Clave#12");
         logout.logout(session.refreshToken());
 
         assertThatThrownBy(() -> refresh.refresh(session.refreshToken()))
@@ -170,7 +170,7 @@ class SessionUseCasesTest {
 
     @Test
     void inactiveUserCannotRefresh() {
-        AuthSession session = login.login("ana@example.com", "Clave#1");
+        AuthSession session = login.login("ana@example.com", "Clave#12");
         users.replace(new User(user.id(), user.documentTypeCode(), user.documentNumber(), user.firstNames(),
                 user.lastNames(), user.email(), user.phone(), user.passwordHash(), false, user.roles()));
 
@@ -180,7 +180,7 @@ class SessionUseCasesTest {
 
     @Test
     void logoutRevokesFamilyAndIsIdempotent() {
-        AuthSession first = login.login("ana@example.com", "Clave#1");
+        AuthSession first = login.login("ana@example.com", "Clave#12");
         AuthSession second = refresh.refresh(first.refreshToken());
 
         logout.logout(second.refreshToken());

@@ -20,6 +20,9 @@ import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
 import com.fcv.citas.domain.auth.AccessTokenIssuer;
 import com.fcv.citas.domain.auth.IssuedAccessToken;
 import com.fcv.citas.domain.auth.PasswordHasher;
+import com.fcv.citas.domain.auth.PasswordResetNotifier;
+import com.fcv.citas.domain.auth.PasswordResetToken;
+import com.fcv.citas.domain.auth.PasswordResetTokenRepository;
 import com.fcv.citas.domain.auth.RefreshToken;
 import com.fcv.citas.domain.auth.RefreshTokenRepository;
 import com.fcv.citas.domain.auth.SecureTokenGenerator;
@@ -103,6 +106,12 @@ final class Fakes {
                     firstNames, lastNames, u.email(), phone, u.passwordHash(), u.active(), u.roles()) : u);
         }
 
+        @Override
+        public void updatePasswordHash(long userId, String passwordHash) {
+            users.replaceAll(u -> u.id() == userId ? new User(u.id(), u.documentTypeCode(), u.documentNumber(),
+                    u.firstNames(), u.lastNames(), u.email(), u.phone(), passwordHash, u.active(), u.roles()) : u);
+        }
+
         void replace(User user) {
             users.replaceAll(u -> u.id().equals(user.id()) ? user : u);
         }
@@ -132,8 +141,51 @@ final class Fakes {
             tokens.replaceAll(t -> t.familyId().equals(familyId) ? t.revoke(now, reason) : t);
         }
 
+        @Override
+        public void revokeAllForUser(long userId, Instant now, String reason) {
+            tokens.replaceAll(t -> t.userId() == userId ? t.revoke(now, reason) : t);
+        }
+
         RefreshToken byId(long id) {
             return tokens.stream().filter(t -> t.id() == id).findFirst().orElseThrow();
+        }
+    }
+
+    static final class InMemoryPasswordResetTokens implements PasswordResetTokenRepository {
+        final List<PasswordResetToken> tokens = new ArrayList<>();
+
+        @Override
+        public PasswordResetToken save(PasswordResetToken token) {
+            if (token.id() == null) {
+                PasswordResetToken saved = token.withId((long) tokens.size() + 1);
+                tokens.add(saved);
+                return saved;
+            }
+            tokens.replaceAll(t -> t.id().equals(token.id()) ? token : t);
+            return token;
+        }
+
+        @Override
+        public Optional<PasswordResetToken> findByTokenHashForUpdate(String tokenHash) {
+            return tokens.stream().filter(t -> t.tokenHash().equals(tokenHash)).findFirst();
+        }
+
+        @Override
+        public void revokeUnusedForUser(long userId, Instant now, String reason) {
+            tokens.replaceAll(t -> t.userId() == userId && t.usedAt() == null && t.revokedAt() == null
+                    ? new PasswordResetToken(t.id(), t.userId(), t.tokenHash(), t.issuedAt(), t.expiresAt(), null, now,
+                            reason)
+                    : t);
+        }
+    }
+
+    /** Guarda lo que se le entrega, como haria un buzon de correo. */
+    static final class RecordingNotifier implements PasswordResetNotifier {
+        final List<String> delivered = new ArrayList<>();
+
+        @Override
+        public void deliver(User user, String rawToken, Instant expiresAt) {
+            delivered.add(rawToken);
         }
     }
 
@@ -173,6 +225,16 @@ final class Fakes {
             Affiliation saved = affiliation.withId(affiliations.size() + 1L);
             affiliations.add(saved);
             return saved;
+        }
+
+        @Override
+        public Optional<Affiliation> lockCurrent(long userId) {
+            return affiliations.stream().filter(a -> a.userId() == userId && a.current()).findFirst();
+        }
+
+        @Override
+        public void close(Affiliation closed) {
+            affiliations.replaceAll(a -> a.id().equals(closed.id()) ? closed : a);
         }
     }
 

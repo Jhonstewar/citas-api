@@ -88,4 +88,10 @@ class SpringPasswordHasherTest {
                 .hasMessageContaining("72 bytes")
                 .hasMessageNotContaining(password);
     }
+
+    /** La politica D29 del dominio y el tope tecnico de BCrypt no pueden divergir. */
+    @Test
+    void domainPolicyMaximumMatchesTheBcryptLimit() {
+        assertThat(com.fcv.citas.domain.auth.PasswordPolicy.MAX_UTF8_BYTES).isEqualTo(BcryptPasswordLimit.MAX_BYTES);
+    }
 }

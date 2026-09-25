@@ -2,12 +2,19 @@
 titulo: "Decisión 002 — Refresh tokens rotativos con familia y detección de reuso"
 tipo: decision
 estado: Provisional
-actualizado: 2026-09-17
+actualizado: 2026-09-25
 fuentes: ["[[RES-001-spring-security-jwt]]", "PRD.md §RF-02", "PRD.md §8", "citas-web/src/auth/sessionManager.ts"]
 tags: [decision, seguridad, jwt, backend, datos]
 ---
 
 # Decisión 002 — Rotación de refresh tokens
+
+> **Actualizada el 2026-09-25 (D36):** el **transporte** del refresh token cambió. Ya no viaja en
+> el cuerpo ni vive en la memoria de JavaScript: va en la cookie `fcv_refresh` (`HttpOnly; Secure;
+> SameSite=Strict; Path=/api/auth`), para que recargar la página no cierre la sesión. La rotación,
+> las familias y la detección de reuso descritas abajo **no cambian**. Donde esta página hable de
+> "memoria de JS" o de `{ refreshToken }` en el cuerpo, manda
+> [[dec-006-decisiones-s4-ciclo-de-vida]] D36 y [[contrato-rest-identidad]] §S4.
 
 ## Decisión
 

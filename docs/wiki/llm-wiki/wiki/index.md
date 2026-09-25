@@ -16,8 +16,9 @@ Historia cronológica: [[log]].
 
 ## Estado del proyecto
 
-- **Sesión en curso:** S3 — código completo (F1–F10); en F11 (cierre): LINT de wiki hecho el
-  2026-09-23, quedan las HU a `Completada` y el commit de cierre
+- **Sesión en curso:** S4 — plan en `PLAN_RETOMA_S4.md` (raíz), con las decisiones D15–D30
+  resueltas el 2026-09-25 y la aprobación delegada; siguiente paso, F0 (aprobar HU). S3 cerrada el
+  2026-09-23 con 12 HU `Completada` y 6 abiertas con su causa
 - **En paralelo:** rediseño del frontend con los mockups de Stitch, ya aplicado en código — ver [[dec-005-sistema-visual-stitch]]
 - **Sesión anterior:** S2 cerrada salvo la prueba manual en navegador
 - **Repos:** `Jhonstewar/citas-api`, `Jhonstewar/citas-web`, `Jhonstewar/FCV_Proyecto_Citas_v1` (origen histórico: `jhonnunez-svg`)
@@ -57,6 +58,7 @@ disponibilidad**, **estados de la cita y sus transiciones**, **afiliación**.
 - [[dec-002-rotacion-refresh-tokens]] — refresh opaco rotativo con familia y detección de reuso, persistido como SHA-256; qué obliga a hacer en el cliente (renovación única, épocas de sesión)
 - [[dec-003-libro-unico-slot-reservations]] — una sola tabla con PK `slot_id` hace imposible la doble reserva; el **código** `SLOT_TAKEN` del 409 depende además del `SELECT … FOR UPDATE`
 - [[dec-004-decisiones-s3-reserva]] — D5–D14, provisionales: primer ADMIN por variables de entorno, Medicina General precargada, V5 de auditoría, 60 min en un mismo bloque, lecturas por `JdbcTemplate`, hooks de git
+- [[dec-006-decisiones-s4-ciclo-de-vida]] — D15–D30 de S4: aprobación delegada, cancelar con reprogramación pendiente libera las dos franjas, cierre de atención desde la hora de inicio, una afiliación vigente, token de recuperación solo en laboratorio, y pantallas nuevas sin mockup de Stitch
 - [[dec-005-sistema-visual-stitch]] — el `DESIGN.md` de Stitch es la fuente de verdad visual; **manda el `colors:` del frontmatter, no la prosa**, y con esa paleta no hace falta ninguna desviación por contraste; fuentes autoalojadas sin CDN y lo que Stitch inventó se descarta
 
 ## Datos y modelo

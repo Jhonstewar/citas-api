@@ -10,10 +10,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Tabla {@code affiliations} (V2). Solo referencia al plan: ni la EPS ni el regimen se copian
- * aqui (3FN, HU-009). {@code membership_number} y {@code ended_on} quedan nulos en el registro y
- * no se mapean; {@code created_at}/{@code updated_at} los rellena MySQL, y {@code current_marker}
- * es una columna generada que sostiene la unicidad de la afiliacion vigente.
+ * Tabla {@code affiliations} (V2, V9). Solo referencia al plan: ni la EPS ni el regimen se copian
+ * aqui (3FN, HU-009). {@code membership_number} queda nulo y no se mapea;
+ * {@code created_at}/{@code updated_at} los rellena MySQL, y {@code current_marker} es una columna
+ * generada que sostiene la unicidad de la afiliacion vigente. {@code ended_on} lo fija el cierre de
+ * una afiliacion al cambiar de plan o quitarla (D26).
  *
  * <p>Las claves foraneas se mapean como columnas planas: la afiliacion no navega al usuario ni al
  * plan, asi que una asociacion solo traeria cargas innecesarias.</p>
@@ -38,6 +39,9 @@ public class AffiliationJpaEntity {
     @Column(name = "started_on", nullable = false)
     private LocalDate startedOn;
 
+    @Column(name = "ended_on")
+    private LocalDate endedOn;
+
     protected AffiliationJpaEntity() {
     }
 
@@ -46,6 +50,12 @@ public class AffiliationJpaEntity {
         this.epsPlanId = epsPlanId;
         this.current = current;
         this.startedOn = startedOn;
+    }
+
+    /** D26: deja de estar vigente desde {@code endedOn}. La regla la decide {@code Affiliation#close}. */
+    void close(LocalDate endedOn) {
+        this.current = false;
+        this.endedOn = endedOn;
     }
 
     public Long getId() {
@@ -66,5 +76,9 @@ public class AffiliationJpaEntity {
 
     public LocalDate getStartedOn() {
         return startedOn;
+    }
+
+    public LocalDate getEndedOn() {
+        return endedOn;
     }
 }

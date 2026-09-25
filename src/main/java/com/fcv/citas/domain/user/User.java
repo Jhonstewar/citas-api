@@ -4,6 +4,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+import com.fcv.citas.domain.shared.InvalidRequestException;
+
 /**
  * Identidad de una persona del sistema. {@code id} es nulo mientras no se ha persistido.
  * {@code passwordHash} nunca contiene la clave en claro y no forma parte de {@link #toString()}.
@@ -41,6 +43,33 @@ public record User(
     public User withId(Long newId) {
         return new User(newId, documentTypeCode, documentNumber, firstNames, lastNames, email, phone, passwordHash,
                 active, roles);
+    }
+
+    /** Limites de {@code users} (V1), los mismos que valida el registro. */
+    public static final int MAX_NAMES = 100;
+    public static final int MAX_PHONE = 30;
+
+    /**
+     * HU-008 · D25: cambia SOLO los datos editables del perfil ({@link ProfilePolicy#EDITABLE}).
+     * Email, documento, contraseña, roles y estado se conservan. Los tres son obligatorios, con los
+     * mismos limites que el registro (CA-06).
+     */
+    public User withContact(String newFirstNames, String newLastNames, String newPhone) {
+        return new User(id, documentTypeCode, documentNumber, editable(newFirstNames, "firstNames", MAX_NAMES),
+                editable(newLastNames, "lastNames", MAX_NAMES), email, editable(newPhone, "phone", MAX_PHONE),
+                passwordHash, active, roles);
+    }
+
+    /** Mensajes por campo, como los de Bean Validation del registro ({@code fieldErrors}). */
+    private static String editable(String value, String field, int max) {
+        if (value == null || value.isBlank()) {
+            throw InvalidRequestException.field(field, "no debe estar vacío");
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() > max) {
+            throw InvalidRequestException.field(field, "admite como máximo " + max + " caracteres");
+        }
+        return trimmed;
     }
 
     public static String normalizeEmail(String email) {

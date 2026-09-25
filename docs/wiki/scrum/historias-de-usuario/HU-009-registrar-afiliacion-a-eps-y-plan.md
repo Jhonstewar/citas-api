@@ -70,6 +70,15 @@ hace el ADMIN no lo lleva: un profesional se da de alta por su rol, no por su co
 La historia dependía de [[HU-012-gestionar-eps-y-planes]] para tener catálogo. El usuario decidió el
 2026-09-23 que los datos se crean **por script**, no por CRUD: `scripts/seed-eps-plans.ps1` en la
 raíz del workspace, con EPS y planes ficticios e idempotente. HU-012 sigue fuera de alcance.
+
+### Segundo corte (S4, aprobación delegada del 2026-09-25) — afiliación desde el perfil
+
+Amplía el alcance aprobado al resto de la historia: el USER autenticado **consulta, cambia y
+quita** su afiliación desde el perfil ([[HU-008-consultar-y-actualizar-perfil]]), con la regla de
+una sola afiliación vigente de D26 (CA-09 y CA-10). Fase F6 de `PLAN_RETOMA_S4.md`. En S4
+[[HU-012-gestionar-eps-y-planes]] también entra en alcance, así que la semilla por script pasa a
+ser un apoyo de laboratorio y no la única fuente del catálogo.
+
 ## Fuera de alcance
 
 - Creación, edición, activación y desactivación de EPS y planes, que corresponde a ADMIN en [[HU-012-gestionar-eps-y-planes]].
@@ -184,9 +193,21 @@ raíz del workspace, con EPS y planes ficticios e idempotente. HU-012 sigue fuer
 **Cuando** se arranca `citas-api`
 **Entonces** Flyway aplica la migración que crea la tabla de afiliaciones con sus claves foráneas hacia usuario y plan y la restricción de unicidad, y el arranque finaliza sin error.
 
+### CA-09 — Cambiar de plan cierra la afiliación vigente
+
+**Dado** un usuario `USER` autenticado con una afiliación vigente al plan A y un plan activo B distinto de A
+**Cuando** cambia su afiliación al plan B desde el perfil
+**Entonces** la afiliación al plan A deja de estar vigente y tiene `ended_on` con la fecha del cambio, el usuario tiene exactamente una afiliación vigente, la del plan B, y la consulta de su afiliación devuelve el plan B con su EPS y su régimen (D26).
+
+### CA-10 — Quitar la afiliación la cierra sin reemplazo
+
+**Dado** un usuario `USER` autenticado con una afiliación vigente
+**Cuando** la quita desde el perfil
+**Entonces** el registro de la afiliación sigue existiendo, deja de estar vigente y tiene `ended_on` con la fecha de la baja, el usuario no tiene ninguna afiliación vigente y la consulta de su afiliación indica que no hay ninguna (D26).
+
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [ ] Los criterios CA-01 a CA-10 están validados con evidencia concreta.
 - [ ] Existe una migración Flyway versionada que crea la tabla de afiliaciones y se aplica de forma incremental sobre el esquema existente.
 - [ ] La tabla de afiliaciones no contiene columnas que repliquen la EPS ni el régimen: ambos se obtienen navegando desde el plan, y esta decisión queda justificada en el análisis de normalización del proyecto.
 - [ ] La prevención de duplicados está garantizada en dos niveles: la validación del caso de uso y la restricción de unicidad del esquema.
@@ -209,16 +230,21 @@ raíz del workspace, con EPS y planes ficticios e idempotente. HU-012 sigue fuer
 | CA-06 | Pendiente | — | — |
 | CA-07 | Pendiente | — | — |
 | CA-08 | Pendiente | — | — |
+| CA-09 | Pendiente | — | — |
+| CA-10 | Pendiente | — | — |
 | DoD | Pendiente | — | — |
 
 ## Historial de validación
 
-- Sesión S2 — HU creada en estado `Borrador`.
+- 2026-09-25 — Se añaden CA-09 y CA-10 por D26 (cambio y baja de la afiliación), que no tenían ningún criterio que los hiciera verificables; la DoD pasa a CA-01 a CA-10. Ningún criterio existente se reescribe.
+- 2026-09-25 — Estado sin cambios (`Aprobada`). Alcance **ampliado** al segundo corte —consultar, cambiar y quitar la afiliación desde el perfil— por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Decisiones en [[dec-006-decisiones-s4-ciclo-de-vida]]; fase F6 del plan. El primer corte sigue siendo aprobación directa del usuario; solo la ampliación es delegada.
 - 2026-09-23 — **el usuario la aprueba** y la adelanta fuera del Sprint 2 para cubrir la afiliación opcional durante el registro. Aprobación directa del usuario, no delegada. Se recorta el alcance a ese primer corte y se sustituye la dependencia de [[HU-012-gestionar-eps-y-planes]] por una semilla por script.
+- Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Incógnita abierta **INC-007** (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): el PRD no define si un usuario puede mantener varias afiliaciones simultáneas o solo una vigente, ni cómo se marcaría la que se asocia a una cita. Esta HU escribe los criterios sobre la no duplicidad de la combinación EPS, régimen y plan, que es lo único que RF-04 exige, y no impone ni prohíbe la multiplicidad. Si se decide una sola afiliación vigente, habrá que añadir una restricción adicional y definir el reemplazo.
+- **Resuelta (D26, provisional bajo delegación):** INC-007 (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): **una sola afiliación vigente** por usuario, que el esquema ya impone con `uq_affiliations_user_current` (`V2__configurable_catalogs_and_professionals.sql:158`). Cambiar de plan cierra la anterior con `ended_on` y abre una nueva; quitarla la cierra sin reemplazo ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-09 y CA-10 lo cubren. La nota sobre modificación y baja "que requieren decisión humana previa" queda resuelta por esta decisión.
+- **Pregunta abierta que D26 no resuelve:** `V2` también declara `uq_affiliations_user_plan UNIQUE (user_id, eps_plan_id)` sin condición de vigencia (`V2:157`). Con el historial de D26, un usuario que pasa del plan A al B **no puede volver al plan A**: la fila cerrada de A choca con la nueva. Opciones: reactivar la fila cerrada de A (sin migración) o hacer la unicidad solo sobre la afiliación vigente (con migración). Hay que decidirlo antes de implementar F6; CA-03 tal como está es compatible con ambas si se lee sobre la afiliación vigente, pero no lo dice.
 - Incógnita abierta **INC-008** (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): el PRD no define si la afiliación es obligatoria para solicitar una cita. Ningún criterio de esta HU bloquea el agendamiento; si se decidiera que es obligatoria, la regla se escribiría en la épica de reserva y afectaría a [[HU-024-solicitar-cita-especializada]].
-- El PRD no indica si el usuario puede eliminar o cambiar una afiliación ya registrada. Esta HU solo cubre registrar y consultar; la modificación y la baja requieren decisión humana previa.
+- ~~El PRD no indica si el usuario puede eliminar o cambiar una afiliación ya registrada. Esta HU solo cubre registrar y consultar; la modificación y la baja requieren decisión humana previa.~~ Resuelta por D26 (ver arriba).
 - La decisión de no duplicar EPS ni régimen dentro de la afiliación se apoya en la exigencia de 3FN de las restricciones técnicas y debe quedar reflejada en la justificación de claves y dependencias funcionales del modelo de datos.

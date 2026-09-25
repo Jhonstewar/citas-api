@@ -25,4 +25,7 @@ public interface UserRepository {
 
     /** Actualiza los datos de contacto editables; email, documento y roles no cambian. */
     void updateContact(long userId, String firstNames, String lastNames, String phone);
+
+    /** Sustituye el hash de la contraseña (HU-007). Nunca recibe la contraseña en claro. */
+    void updatePasswordHash(long userId, String passwordHash);
 }

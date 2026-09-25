@@ -74,6 +74,10 @@ public class UserJpaEntity {
         this.roles = new HashSet<>(roles);
     }
 
+    public void changePasswordHash(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+    }
+
     public void updateContact(String newFirstNames, String newLastNames, String newPhone) {
         this.firstNames = newFirstNames;
         this.lastNames = newLastNames;

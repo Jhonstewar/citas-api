@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.fcv.citas.domain.affiliation.InsurancePlanUnavailableException;
+import com.fcv.citas.domain.shared.InvalidRequestException;
 import com.fcv.citas.domain.user.DocumentAlreadyRegisteredException;
 import com.fcv.citas.domain.user.EmailAlreadyRegisteredException;
 import com.fcv.citas.domain.user.Role;
@@ -72,9 +73,23 @@ class RegisterUserUseCaseTest {
         assertThat(users.users).hasSize(1);
     }
 
+    /** D29 en el caso de uso: la regla no depende de que el adaptador REST la aplique. */
+    @Test
+    void rejectsAPasswordOutsideThePolicyWithoutCreatingTheUser() {
+        RegisterUserCommand weak = new RegisterUserCommand("Ana", "Pérez", "CC", "1", "a@example.com", "300",
+                "abcdefgh", null);
+
+        assertThatThrownBy(() -> useCase.register(weak))
+                .isInstanceOfSatisfying(InvalidRequestException.class, e -> {
+                    assertThat(e.field()).isEqualTo("password");
+                    assertThat(e.getMessage()).doesNotContain("abcdefgh");
+                });
+        assertThat(users.users).isEmpty();
+    }
+
     @Test
     void rejectsUnknownDocumentType() {
-        RegisterUserCommand bad = new RegisterUserCommand("Ana", "Pérez", "XX", "1", "a@example.com", "300", "pw",
+        RegisterUserCommand bad = new RegisterUserCommand("Ana", "Pérez", "XX", "1", "a@example.com", "300", "Secreta#123",
                 null);
 
         assertThatThrownBy(() -> useCase.register(bad)).isInstanceOf(UnknownDocumentTypeException.class);

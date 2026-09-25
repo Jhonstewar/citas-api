@@ -94,9 +94,15 @@ BCrypt. La regla vive en infraestructura porque es un límite técnico de BCrypt
 negocio; la política de contraseña (INC-001) sigue sin decidir.
 
 **Regla para las HU futuras:** todo endpoint que reciba una contraseña nueva (cambio de
-contraseña, recuperación, alta por ADMIN) debe validarla con `@BcryptPasswordLength`. Si no,
+contraseña, recuperación, alta por ADMIN) debe validarla con `@PasswordPolicyCompliant`. Si no,
 `SpringPasswordHasher.hash` rechaza la contraseña larga con una excepción y el endpoint responde
 500.
+
+**Actualización 2026-09-25 (D29):** `@BcryptPasswordLength` se sustituyó por
+`@PasswordPolicyCompliant`, que delega en `domain/auth/PasswordPolicy`: mín. 8, letra Unicode y
+dígito, y el mismo máximo de 72 bytes UTF-8. `BcryptPasswordLimit` sigue siendo el tope técnico
+del hasher, y `SpringPasswordHasherTest#domainPolicyMaximumMatchesTheBcryptLimit` impide que los
+dos valores diverjan. La política ya no está sin decidir (ver [[contrato-rest-identidad]] §S4).
 
 **Pendiente:** BCrypt repite la clave con un terminador NUL, así que `P + "\0" + P` coincide
 con el hash de `P` si cabe en 72 bytes. Exige conocer `P`. Cerrarlo pasaría por rechazar el byte

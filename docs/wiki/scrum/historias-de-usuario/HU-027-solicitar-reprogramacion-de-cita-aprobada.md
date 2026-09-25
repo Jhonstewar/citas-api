@@ -2,7 +2,7 @@
 id: HU-027
 tipo: historia-de-usuario
 titulo: "Solicitar la reprogramación de una cita aprobada"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]"
 requisitos: [RF-15]
 esfuerzo: "Alto"
@@ -162,9 +162,15 @@ La consecuencia directa es que mientras la solicitud está `PENDING` el sistema 
 **Cuando** se arranca `citas-api`
 **Entonces** Flyway aplica la migración que crea la tabla de solicitudes de reprogramación con estado, fecha y hora anterior y fecha y hora propuesta, y el arranque finaliza sin error.
 
+### CA-10 — Una sola solicitud sin decidir por cita
+
+**Dado** una cita `APPROVED` y futura con una solicitud de reprogramación `PENDING`
+**Cuando** el usuario envía una segunda solicitud sobre la misma cita
+**Entonces** la API responde 409, no se crea la segunda solicitud y no se retiene ninguna franja nueva; y una vez que ADMIN decide la primera (aprobada o rechazada), una nueva solicitud sobre la misma cita, si sigue `APPROVED` y futura, sí se admite (D20).
+
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
+- [ ] Los criterios CA-01 a CA-10 están validados con evidencia concreta.
 - [ ] Existe una migración Flyway versionada para la tabla de solicitudes de reprogramación, aplicada sobre el esquema existente sin pérdida de datos.
 - [ ] Está demostrado con una prueba que, con la solicitud en `PENDING`, la cita original conserva su franja y la franja propuesta está retenida al mismo tiempo (RN-10).
 - [ ] La retención de la nueva franja usa el mismo mecanismo de reserva que la creación de citas, de modo que RN-01 se cumple frente a peticiones concurrentes.
@@ -188,15 +194,20 @@ La consecuencia directa es que mientras la solicitud está `PENDING` el sistema 
 | CA-07 | Pendiente | — | — |
 | CA-08 | Pendiente | — | — |
 | CA-09 | Pendiente | — | — |
+| CA-10 | Pendiente | — | — |
 | DoD | Pendiente | — | — |
 
 ## Historial de validación
 
+- 2026-09-25 — Se añade CA-10 por D20 (una solicitud sin decidir por cita; tras la decisión se admite otra), que ningún criterio cubría; la DoD pasa a CA-01 a CA-10. Ningún criterio existente se reescribe. Queda anotada en notas una divergencia entre CA-03 / CA-09 y el esquema V3 que no resuelve ninguna decisión.
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Ciclo de vida del paciente», fase F5 / LOOP_02) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Incógnita abierta **INC-028** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): el PRD no define cuántas solicitudes de reprogramación admite una misma cita ni si puede haber más de una `PENDING` a la vez. Esta HU asume como máximo una solicitud `PENDING` por cita, porque dos retenciones provisionales simultáneas sobre la misma cita multiplicarían el bloqueo de agenda sin respaldo en RF-15. Debe confirmarse antes de implementar.
-- Incógnita abierta **INC-029** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): el PRD no define si el usuario puede retirar su solicitud antes de que ADMIN decida. Esta HU no incluye esa capacidad; si se aprueba, requerirá una HU adicional con su propia liberación de la franja provisional.
-- Incógnita abierta **INC-031** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): el PRD solo obliga a conservar profesional y especialidad, por lo que no queda claro si la nueva franja puede estar en otra sede. Esta HU no restringe la sede más allá de RN-07, que exige que el profesional esté habilitado en ella; si la decisión es restringirla, CA-02 debe ampliarse.
+- **Resuelta (D20, provisional bajo delegación):** INC-028 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): **una** solicitud sin decidir por cita, que el esquema ya impone con `uq_reschedule_requests_active` (`V3__schedule_and_appointments.sql:162`); tras la decisión se puede pedir otra ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-10 lo cubre.
+- **Resuelta (D20, provisional bajo delegación):** INC-029 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): el paciente **no retira** su solicitud en S4; si ya no la quiere, puede cancelar la cita ([[HU-026-cancelar-una-cita-futura]], D18).
+- **Resuelta (D21, provisional bajo delegación):** INC-031 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): la nueva franja **puede estar en otra sede** si el profesional atiende en ella (RN-07); RF-15 solo obliga a conservar profesional y especialidad ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-02 no se amplía.
+- **Resuelta (D18, respondida por el usuario):** N1 — si el paciente cancela la cita mientras la solicitud está `PENDING`, la solicitud pasa a `CANCELLED` y se liberan las dos franjas en la misma transacción. Lo verifica CA-09 de [[HU-026-cancelar-una-cita-futura]].
+- **Divergencia con el esquema, sin decisión que la cubra:** `reschedule_requests` existe desde `V3__schedule_and_appointments.sql` (T-02 no crea tabla y CA-09 se valida con V3), pero solo guarda la franja **propuesta** (`proposed_date`, `proposed_start_time`, `proposed_end_time`); **no tiene columnas de fecha y hora anterior**. CA-03 y CA-09 piden la "fecha y hora anterior registradas" en la solicitud. Mientras la solicitud está `PENDING` la franja anterior es la de la cita, y tras aprobarla D22 la deja escrita en el motivo del historial; pero literalmente CA-03 y CA-09 no se cumplen con V3. No se reescriben en silencio: al implementar F5 hay que elegir entre ajustar ambos criterios a "la anterior se obtiene de la cita mientras está `PENDING` y queda en el historial al aprobar (D22)", o añadir columnas con una migración (el plan prevé escalamiento humano ante cualquier migración).
 - El estado `PENDING` proviene del catálogo fijo de estados de reprogramación de RF-05 y no se define aquí.

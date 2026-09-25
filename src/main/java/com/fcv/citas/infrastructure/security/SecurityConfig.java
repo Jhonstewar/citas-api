@@ -25,12 +25,17 @@ import org.springframework.web.cors.CorsConfigurationSource;
  */
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({ JwtProperties.class, RefreshCookieProperties.class,
+        PasswordResetProperties.class })
 public class SecurityConfig {
 
-    /** Rutas publicas del slice de autenticacion (HU-001..HU-004). */
+    /**
+     * Rutas publicas del slice de autenticacion: HU-001..HU-004 y la recuperacion de contraseña
+     * (HU-006/HU-007), que por definicion usa quien no puede autenticarse.
+     */
     static final String[] PUBLIC_AUTH_POST = {
-        "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout"
+        "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
+        "/api/auth/password-recovery", "/api/auth/password-reset"
     };
 
     /**
@@ -53,7 +58,14 @@ public class SecurityConfig {
             ProblemJsonSecurityHandlers problemHandlers)
             throws Exception {
         return http
-                // Valido solo mientras el token viaje en la cabecera Authorization (nunca en cookie).
+                // CSRF deshabilitado de forma consciente. El access token viaja solo en la cabecera
+                // Authorization, que un sitio ajeno no puede fijar. La UNICA cookie de la API es la
+                // del refresh token (D36), y esta acotada: SameSite=Strict —el navegador no la
+                // envia en ninguna peticion iniciada desde otro sitio—, Path=/api/auth —solo viaja
+                // a refresh y logout— y HttpOnly. Ademas CORS solo admite credenciales desde los
+                // origenes exactos de FRONTEND_ORIGIN, asi que otro origen no puede leer la
+                // respuesta de refresh. Si la cookie llegara a otras rutas o perdiera SameSite,
+                // esta decision debe revisarse.
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -71,14 +83,18 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")
                         .requestMatchers("/api/patient/**").hasRole("USER")
+                        // HU-009 (D26): solo el paciente declara afiliacion. Va ANTES de /api/me/**,
+                        // que la cubriria con un simple authenticated().
+                        .requestMatchers("/api/me/affiliation").hasRole("USER")
                         // Lecturas comunes a cualquier rol. Todos los metodos para que una escritura
-                        // sobre un catalogo fijo llegue a MVC y responda 405 (HU-010 CA-06).
-                        .requestMatchers("/api/catalogs/**", "/api/me").authenticated()
+                        // sobre un catalogo fijo llegue a MVC y responda 405 (HU-010 CA-06). El perfil
+                        // propio (HU-008) es de cualquier rol autenticado (contrato S4).
+                        .requestMatchers("/api/catalogs/**", "/api/me", "/api/me/**").authenticated()
                         // HU-005 CA-07: denegacion por defecto de toda ruta no declarada.
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         // Las rutas publicas de auth ignoran la cabecera Authorization: un Bearer
-                        // caducado no puede impedir renovar ni cerrar sesion.
+                        // caducado no puede impedir renovar, cerrar sesion ni recuperar la clave.
                         .bearerTokenResolver(new PublicEndpointsBearerTokenResolver(PUBLIC_AUTH_ENDPOINTS))
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                         .authenticationEntryPoint(problemHandlers)

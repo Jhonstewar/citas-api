@@ -15,24 +15,26 @@ import java.lang.annotation.Target;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
-import com.fcv.citas.infrastructure.security.BcryptPasswordLimit;
+import com.fcv.citas.domain.auth.PasswordPolicy;
 
 /**
- * La contraseña cabe en BCrypt: como maximo {@value BcryptPasswordLimit#MAX_BYTES} bytes en
- * UTF-8. Sustituye a {@code @Size(max = 72)}, que cuenta caracteres y dejaba pasar contraseñas
- * como 40 x ñ (80 bytes). {@code null} se considera valido: la obligatoriedad es cosa de
- * {@code @NotBlank}.
+ * La contraseña cumple la politica D29 de {@link PasswordPolicy}: minimo 8 caracteres, al menos
+ * una letra Unicode y un digito, y como maximo 72 bytes UTF-8. Se usa en TODA entrada que fija una
+ * contraseña —registro, restablecimiento y alta de profesional—, nunca en el login.
  *
- * <p>Solo es un tope tecnico, no una politica de complejidad (INC-001 sigue abierta).</p>
+ * <p>El mensaje del error es el del primer incumplimiento, en español y sin la contraseña.
+ * {@code null} y el texto en blanco se consideran validos: la obligatoriedad es cosa de
+ * {@code @NotBlank}, y asi el campo vacio da un unico error.</p>
+ *
+ * <p>Sustituye a {@code @BcryptPasswordLength}, que solo comprobaba el tope de 72 bytes.</p>
  */
 @Documented
-@Constraint(validatedBy = BcryptPasswordLengthValidator.class)
+@Constraint(validatedBy = PasswordPolicyValidator.class)
 @Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
 @Retention(RUNTIME)
-public @interface BcryptPasswordLength {
+public @interface PasswordPolicyCompliant {
 
-    String message() default "no debe superar " + BcryptPasswordLimit.MAX_BYTES
-            + " bytes en UTF-8 (la ñ y las vocales con tilde ocupan 2 bytes; los emojis, 4)";
+    String message() default "no cumple la política de contraseña";
 
     Class<?>[] groups() default {};
 

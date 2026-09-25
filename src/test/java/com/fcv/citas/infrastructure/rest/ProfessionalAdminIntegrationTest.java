@@ -179,6 +179,25 @@ class ProfessionalAdminIntegrationTest {
                 .andExpect(jsonPath("$.field").value("email"));
     }
 
+    /** D29: el ADMIN tambien fija una contraseña, asi que la politica aplica al alta. */
+    @Test
+    void initialPasswordMustMeetThePolicy() throws Exception {
+        for (Map.Entry<String, String> weak : Map.of(
+                "abc123", "debe tener al menos 8 caracteres",
+                "abcdefgh", "debe combinar al menos una letra y un número",
+                "12345678", "debe combinar al menos una letra y un número").entrySet()) {
+            String email = S3TestData.email("pro");
+            Map<String, Object> body = body(email, S3TestData.uniqueCode("P"));
+            body.put("password", weak.getKey());
+            String response = create(body)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors.password").value(weak.getValue()))
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(response).doesNotContain(weak.getKey());
+            assertThat(countUsers(email)).isZero();
+        }
+    }
+
     /** CA-05: solo ADMIN crea. */
     @Test
     void onlyAdminCreates() throws Exception {

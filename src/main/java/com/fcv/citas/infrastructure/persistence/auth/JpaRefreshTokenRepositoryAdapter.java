@@ -50,6 +50,11 @@ class JpaRefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         repository.revokeFamily(familyId, toLocal(now), reason);
     }
 
+    @Override
+    public void revokeAllForUser(long userId, Instant now, String reason) {
+        repository.revokeAllForUser(userId, toLocal(now), reason);
+    }
+
     private static RefreshToken toDomain(RefreshTokenJpaEntity e) {
         return new RefreshToken(e.getId(), e.getUserId(), e.getTokenHash(), e.getFamilyId(),
                 toInstant(e.getIssuedAt()), toInstant(e.getExpiresAt()), toInstant(e.getUsedAt()),

@@ -9,6 +9,7 @@ import java.util.List;
 
 import com.fcv.citas.application.TransactionRunner;
 import com.fcv.citas.application.schedule.ScheduleQueries.BlockView;
+import com.fcv.citas.application.shared.Ownership;
 import com.fcv.citas.domain.professional.Professional;
 import com.fcv.citas.domain.professional.ProfessionalRepository;
 import com.fcv.citas.domain.schedule.AvailabilityBlock;
@@ -127,8 +128,8 @@ public class ManageScheduleUseCase {
     }
 
     private AvailabilityBlock ownBlock(Professional professional, long blockId) {
-        return blocks.findById(blockId).filter(b -> b.professionalId() == professional.id())
-                .orElseThrow(() -> new NotFoundException("El bloque no existe"));
+        return Ownership.requireOwned(blocks.findById(blockId), AvailabilityBlock::professionalId,
+                professional.id(), "El bloque no existe");
     }
 
     private Professional professionalOf(long userId) {

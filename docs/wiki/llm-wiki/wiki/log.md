@@ -202,3 +202,32 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: la consecutividad de 60 minutos está implementada dos veces, en Java para la reserva y en SQL para la búsqueda. Hoy coinciden; nada impide que divierjan.
 - PREGUNTA ABIERTA: los tres anteriores quedan como S1–S3 en [[sintesis-preguntas-abiertas]], cada uno con la decisión que hace falta para cerrarlo.
 - HECHO: la causa de que HU-022 y HU-029 no cierren es que no existe productor de retenciones por reprogramación. El esquema las soporta desde `V3`, pero sin HU-027 ni HU-031 esos criterios son no verificables, no incumplidos.
+
+## [2026-09-25] learn | Plan de S4: inventario de ambos repos y decisiones pendientes
+
+- HECHO verificado contra las migraciones: el esquema de la reprogramación **ya existe** y no tiene código. `reschedule_requests` (`V3:145`) garantiza una sola solicitud sin decidir por cita con `active_marker` (`V3:160-162`), y `slot_reservations.reservation_type` admite `RESCHEDULE_REQUEST`. HU-027 y HU-031 no deberían necesitar migración.
+- HECHO: `password_reset_tokens` existe desde `V1:198` (hash único, `expires_at`, `used_at`) y ningún código Java la usa. El frontend llama a `/api/auth/password-recovery`, una ruta que el backend no tiene (`contracts.ts` la marca como "ruta supuesta").
+- HECHO: `appointment_status_history` guarda solo el estado nuevo (`status_id`), no el previo (`V3:115`). Registrar la decisión sobre una reprogramación, aunque la cita siga `APPROVED`, no exige migración.
+- HECHO: `AppointmentStatus` ya admite `REQUESTED → CANCELLED` y `APPROVED → {CANCELLED, COMPLETED, NO_SHOW}`, pero `Appointment` solo tiene `approve` y `reject`. Faltan los métodos de dominio de cancelar y cerrar la atención.
+- HECHO: `SecurityConfig` termina en `denyAll()`. Toda ruta de S4 fuera de los prefijos por rol y de `/api/me` (restablecer contraseña, `PUT /api/me`) obliga a tocarlo.
+- PREGUNTA ABIERTA: las decisiones D15–D30 de `PLAN_RETOMA_S4.md` §2 son propuestas del agente y **no** respuestas del usuario. Cubren INC-001, 002, 005, 006, 007, 011, 018, 027, 028, 029, 030, 031 y 036, y N1, N3 y N6 de [[sintesis-preguntas-abiertas]]. Se pasan a una página `dec-006` cuando el usuario las conteste.
+
+## [2026-09-25] learn | Decisiones de S4 resueltas y pantallas nuevas sin Stitch
+
+- DECISIÓN del usuario: aprobación **delegada** para todo el alcance de S4 (D15). Confirmó además D18 (cancelar una cita con reprogramación `PENDING` cancela la solicitud y libera las dos franjas) y D19 (el cierre como `COMPLETED`/`NO_SHOW` se admite desde la hora de inicio). Eligió el LOOP_03 propuesto: "una regla, un sitio".
+- DECISIÓN provisional bajo delegación: D16, D17 y D20–D30, registradas con alternativas en [[dec-006-decisiones-s4-ciclo-de-vida]]. Cierran N1, N3 y N6 de [[sintesis-preguntas-abiertas]].
+- HECHO: las decisiones se numeraron primero D14–D29 y chocaban con la D14 de [[dec-004-decisiones-s3-reserva]]. Se renumeraron a **D15–D30** en el plan y en la entrada de log anterior el mismo día, antes de ningún commit.
+- DECISIÓN (D30): las pantallas de S4 se construyen con el sistema visual y los componentes existentes, sin mockups nuevos. Se apoya en la auditoría del código: 9 de 13 pantallas protegidas ya se hicieron así en S3, `app.css` no tiene ningún color literal y `PANTALLAS_OBLIGATORIAS.md` especifica las pantallas nuevas. La excepción posible es la agenda del profesional con citas y cierre, el único patrón visual nuevo.
+- HECHO medido: `#717880` da 4,47:1 sobre blanco. El comentario de `tokens.css:27` dice 4,1:1 y está mal; como borde cumple igual (WCAG 1.4.11 exige 3:1).
+- HECHO: Edge headless no baja de 492 px de viewport aunque se pida `--window-size=390`. Una captura "móvil" hecha así sale recortada sin que la página tenga ningún defecto: no sirve como evidencia de diseño responsive.
+
+## [2026-09-25] learn | S4 en marcha: LOOP_01, F2–F4, F6, F7 y el F5 que ya no cierra la sesión
+
+- HECHO: **LOOP_01 PASS en 1 iteración** (`EVIDENCIAS_S4.md` §1). Hallazgo que nadie conocía: las dos pruebas **concurrentes** de doble reserva pasan aunque se meta el defecto `isNew() = slotId == null`, porque en una carrera ningún `merge` ve la fila y la PK choca igual. Solo las tres **secuenciales** lo detectan. Desde F2 hay una prueba unitaria que fija `isNew() == true`.
+- HECHO verificado con `mvn test`: backend **242 → 422** pruebas. V8 (nombre único de especialidad), V9 (nombres únicos de EPS y plan, y afiliación con historial, D32/D33). `Ownership` es la política única de ownership; `releaseReservations(ReservationHolder)` es el único camino para liberar franjas; D19 vive en `Appointment#isClosableAt`.
+- HECHO: **la numeración de migraciones la decide Flyway, no el plan.** `outOfOrder=false` y `validate-on-migrate: true` sobre bases persistentes: si V10 se aplicara antes que V9, el arranque fallaría. EPS y afiliación se quedaron con V9, así que la reprogramación usa **V10** (D31). [[dec-006-decisiones-s4-ciclo-de-vida]] y [[contrato-rest-citas]] ya están corregidos.
+- DECISIÓN D36 (pedida por el usuario): refresh token en cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`. **HECHO verificado contra la API real**: login 200 con `Set-Cookie` y sin `refreshToken` en el cuerpo, `Access-Control-Allow-Credentials: true`, refresh con cookie 200, sin cookie 401, logout 204, refresh tras logout 401. El frontend restaura la sesión al arrancar y serializa las renovaciones entre pestañas con Web Locks (`fcv-refresh`), para que dos pestañas no disparen la detección de reuso. [[dec-002-rotacion-refresh-tokens]] ya lo refleja.
+- HECHO: la hamburguesa y la "X" del menú no hacían nada por un **orden de cascada**: `.icon-button { display: inline-grid }` va después de la media query que ocultaba los botones y tiene la misma especificidad, así que ganaba. Ahora la hamburguesa oculta y muestra el menú, y la "X" se quitó a petición del usuario.
+- DECISIÓN D37: una reprogramación cancelada por D18 queda con decisor = paciente y motivo "Cita cancelada por el paciente".
+- PREGUNTA ABIERTA: HU-009 CA-03 pide 409 al repetir el plan vigente y el contrato acordado responde 200 sin cambios. Se implementó el contrato; hay que ajustar el criterio al cerrar.
+- PREFERENCIA del usuario: nada de commits hasta que lo diga.

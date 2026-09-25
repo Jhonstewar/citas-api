@@ -52,7 +52,7 @@ sigue `Provisional` hasta que el usuario la confirme.
 | S1 | ¿Se acepta que el access token no sea revocable durante sus 15 minutos? | [[dec-002-rotacion-refresh-tokens]] |
 | S2 | Documento único global o por tipo de documento | [[datos-modelo-3fn]] |
 | S3 | ¿Se precarga "Medicina General" (RF-11) con una migración de datos? **Cerrada**: sí, `V6__seed_general_medicine.sql:9-10`, y la aplicación la protege contra desactivación y contra cambio de tipo (D7) | [[datos-modelo-3fn]] |
-| S4 | El refresh token vive en memoria de JavaScript: un XSS en el mismo origen puede leerlo. ¿Se pasa a cookie `HttpOnly`? Cambiaría CSRF y CORS | [[dec-002-rotacion-refresh-tokens]] |
+| S4 | El refresh token vive en memoria de JavaScript: un XSS en el mismo origen puede leerlo. ¿Se pasa a cookie `HttpOnly`? Cambiaría CSRF y CORS. **Cerrada el 2026-09-25 (D36):** sí, porque el usuario pidió que el F5 no cierre la sesión; ver [[dec-006-decisiones-s4-ciclo-de-vida]] | [[dec-002-rotacion-refresh-tokens]] |
 
 ## Decisiones del agente bajo aprobación delegada, pendientes de confirmar
 
@@ -106,6 +106,15 @@ Las preguntas **E1, E2, N2, N5 y A3** (la A3 de *autenticación*: cómo nace el 
 incógnitas INC-009, INC-013, INC-014, INC-024 e INC-032, tienen una respuesta provisional (D5–D13)
 en [[dec-004-decisiones-s3-reserva]]. Siguen listadas arriba hasta que el usuario las confirme.
 E1, E2 y S3 ya tienen además la corrección **aplicada** en `V5` y `V6`.
+
+## Respondidas para S4 (2026-09-25)
+
+**N1, N3 y N6** de las reglas de negocio, **A1 y A4** de autenticación (política de contraseña y
+vigencia del token de recuperación), y las incógnitas INC-001, 002, 005, 006, 007, 011, 018, 027,
+028, 029, 030, 031 y 036 tienen respuesta en [[dec-006-decisiones-s4-ciclo-de-vida]] (D15–D30).
+El usuario respondió directamente **N1** (D18) e **INC-018** (D19); las demás son provisionales
+bajo aprobación delegada. **N4** no necesitaba decisión: HU-028 T-03 ya dice que "conservar" no
+hace ninguna llamada de escritura.
 
 ## Defectos de especificación que salieron al cerrar S3 (2026-09-23)
 

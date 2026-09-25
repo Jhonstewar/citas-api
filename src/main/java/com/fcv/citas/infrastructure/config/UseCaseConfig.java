@@ -18,9 +18,21 @@ import com.fcv.citas.application.appointment.AdminAppointmentsUseCase;
 import com.fcv.citas.application.appointment.AppointmentQueries;
 import com.fcv.citas.application.appointment.AvailabilityQueries;
 import com.fcv.citas.application.appointment.BookAppointmentUseCase;
+import com.fcv.citas.application.appointment.CancelAppointmentUseCase;
 import com.fcv.citas.application.appointment.SearchAvailabilityUseCase;
 import com.fcv.citas.domain.appointment.AppointmentRepository;
 import com.fcv.citas.application.appointment.PatientAppointmentsUseCase;
+import com.fcv.citas.application.appointment.RescheduleAppointmentUseCase;
+import com.fcv.citas.domain.appointment.RescheduleRequestRepository;
+import com.fcv.citas.application.appointment.ProfessionalAppointmentsUseCase;
+import com.fcv.citas.application.affiliation.AffiliationQueries;
+import com.fcv.citas.application.affiliation.ManageAffiliationUseCase;
+import com.fcv.citas.application.eps.EpsQueries;
+import com.fcv.citas.application.eps.ManageEpsUseCase;
+import com.fcv.citas.application.user.ProfileUseCase;
+import com.fcv.citas.domain.eps.EpsPlanRepository;
+import com.fcv.citas.domain.eps.EpsRepository;
+import com.fcv.citas.domain.eps.RegimeCatalog;
 import com.fcv.citas.application.catalog.ManageSpecialtiesUseCase;
 import com.fcv.citas.application.professional.ManageProfessionalsUseCase;
 import com.fcv.citas.application.professional.ProfessionalQueries;
@@ -37,7 +49,12 @@ import com.fcv.citas.domain.auth.RefreshTokenRepository;
 import com.fcv.citas.domain.auth.SecureTokenGenerator;
 import com.fcv.citas.domain.user.DocumentTypeCatalog;
 import com.fcv.citas.domain.user.UserRepository;
+import com.fcv.citas.application.auth.RequestPasswordRecoveryUseCase;
+import com.fcv.citas.application.auth.ResetPasswordUseCase;
+import com.fcv.citas.domain.auth.PasswordResetNotifier;
+import com.fcv.citas.domain.auth.PasswordResetTokenRepository;
 import com.fcv.citas.infrastructure.security.JwtProperties;
+import com.fcv.citas.infrastructure.security.PasswordResetProperties;
 
 /** Ensambla los casos de uso (clases Java puras) con los adaptadores de infraestructura. */
 @Configuration
@@ -126,8 +143,70 @@ public class UseCaseConfig {
     }
 
     @Bean
-    PatientAppointmentsUseCase patientAppointmentsUseCase(AppointmentQueries queries) {
-        return new PatientAppointmentsUseCase(queries);
+    PatientAppointmentsUseCase patientAppointmentsUseCase(AppointmentQueries queries, Clock clock) {
+        return new PatientAppointmentsUseCase(queries, clock);
+    }
+
+    // ------------------------------------------------------------------ S4
+
+    @Bean
+    CancelAppointmentUseCase cancelAppointmentUseCase(AppointmentRepository appointments,
+            RescheduleRequestRepository reschedules, PatientAppointmentsUseCase patientAppointments,
+            TransactionRunner tx, Clock clock) {
+        return new CancelAppointmentUseCase(appointments, reschedules, patientAppointments, tx, clock);
+    }
+
+    /** HU-027 y HU-031: pedir, aprobar y rechazar una reprogramacion. */
+    @Bean
+    RescheduleAppointmentUseCase rescheduleAppointmentUseCase(SpecialtyRepository specialties,
+            ProfessionalRepository professionals, BlockRepository blocks, AppointmentRepository appointments,
+            RescheduleRequestRepository reschedules, AppointmentQueries queries, AdminAppointmentsUseCase admin,
+            TransactionRunner tx, Clock clock) {
+        return new RescheduleAppointmentUseCase(specialties, professionals, blocks, appointments, reschedules,
+                queries, admin, tx, clock);
+    }
+
+    /** HU-020 y HU-021: agenda de citas aprobadas y cierre de atencion del profesional. */
+    @Bean
+    ProfessionalAppointmentsUseCase professionalAppointmentsUseCase(ProfessionalRepository professionals,
+            AppointmentRepository appointments, AppointmentQueries queries, TransactionRunner tx, Clock clock) {
+        return new ProfessionalAppointmentsUseCase(professionals, appointments, queries, tx, clock);
+    }
+
+    /** HU-012: CRUD de EPS y planes (D28, D33). */
+    @Bean
+    ManageEpsUseCase manageEpsUseCase(EpsRepository eps, EpsPlanRepository plans, RegimeCatalog regimes,
+            EpsQueries queries, TransactionRunner tx) {
+        return new ManageEpsUseCase(eps, plans, regimes, queries, tx);
+    }
+
+    /** HU-009 segundo corte (D26): afiliacion desde el perfil. */
+    @Bean
+    ManageAffiliationUseCase manageAffiliationUseCase(AffiliationRepository affiliations,
+            InsurancePlanCatalog insurancePlans, AffiliationQueries queries, TransactionRunner tx, Clock clock) {
+        return new ManageAffiliationUseCase(affiliations, insurancePlans, queries, tx, clock);
+    }
+
+    /** HU-008 (D25): perfil propio con la afiliacion vigente. */
+    @Bean
+    ProfileUseCase profileUseCase(UserRepository users, AffiliationQueries affiliations, TransactionRunner tx) {
+        return new ProfileUseCase(users, affiliations, tx);
+    }
+
+    /** HU-006 · D27: vigencia y exposicion de laboratorio salen de PasswordResetProperties. */
+    @Bean
+    RequestPasswordRecoveryUseCase requestPasswordRecoveryUseCase(UserRepository users,
+            PasswordResetTokenRepository resetTokens, SecureTokenGenerator tokenGenerator,
+            PasswordResetNotifier notifier, TransactionRunner tx, Clock clock, PasswordResetProperties properties) {
+        return new RequestPasswordRecoveryUseCase(users, resetTokens, tokenGenerator, notifier, tx, clock,
+                properties.ttl(), properties.exposeToken());
+    }
+
+    /** HU-007 · D34: restablecer revoca todas las familias de refresh del usuario. */
+    @Bean
+    ResetPasswordUseCase resetPasswordUseCase(PasswordResetTokenRepository resetTokens, UserRepository users,
+            RefreshTokenRepository refreshTokens, PasswordHasher passwordHasher, TransactionRunner tx, Clock clock) {
+        return new ResetPasswordUseCase(resetTokens, users, refreshTokens, passwordHasher, tx, clock);
     }
 
     @Bean

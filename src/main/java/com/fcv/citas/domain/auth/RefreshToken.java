@@ -20,6 +20,8 @@ public record RefreshToken(
 
     public static final String REASON_REUSE_DETECTED = "REUSE_DETECTED";
     public static final String REASON_LOGOUT = "LOGOUT";
+    /** Restablecer la contraseña cierra todas las sesiones abiertas del usuario (D34). */
+    public static final String REASON_PASSWORD_RESET = "PASSWORD_RESET"; // secret-scan:allow código de motivo de revocación, no una credencial
 
     public RefreshToken {
         Objects.requireNonNull(tokenHash, "tokenHash");

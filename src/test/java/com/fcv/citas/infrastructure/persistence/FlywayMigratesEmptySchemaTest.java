@@ -96,7 +96,7 @@ class FlywayMigratesEmptySchemaTest {
 
     @Test
     void aplicaTodasLasMigracionesEnOrden() throws SQLException {
-        assertThat(result.migrationsExecuted).isEqualTo(7);
+        assertThat(result.migrationsExecuted).isEqualTo(10);
 
         // Se lee el historial con SQL plano en vez de la API de Flyway: lo que importa es lo que
         // quedo registrado en la base, no lo que el objeto de resultado dice haber hecho.
@@ -113,7 +113,7 @@ class FlywayMigratesEmptySchemaTest {
                 versions.add(rows.getString("version"));
             }
         }
-        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7");
+        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
     }
 
     @Test
@@ -186,6 +186,106 @@ class FlywayMigratesEmptySchemaTest {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getString(1)).contains("'PROFESSIONAL'");
             }
+        }
+    }
+
+    /**
+     * V8 (R1, HU-011): el nombre de especialidad es unico en la BD, con una collation insensible a
+     * mayusculas y tildes, igual que la comprobacion del caso de uso.
+     */
+    @Test
+    void elNombreDeEspecialidadEsUnicoSinDistinguirMayusculasNiTildes() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement()) {
+            try (ResultSet rows = statement.executeQuery(
+                    "SELECT GROUP_CONCAT(COLUMN_NAME) FROM information_schema.KEY_COLUMN_USAGE "
+                            + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'specialties' "
+                            + "AND CONSTRAINT_NAME = 'uq_specialties_name'")) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).as("falta la unica uq_specialties_name").isEqualTo("name");
+            }
+            try (ResultSet rows = statement.executeQuery(
+                    "SELECT COLLATION_NAME FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' "
+                            + "AND TABLE_NAME = 'specialties' AND COLUMN_NAME = 'name'")) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).isEqualTo("utf8mb4_0900_ai_ci");
+            }
+        }
+    }
+
+    /**
+     * V9 (D33, HU-012 DoD): nombre de EPS unico y nombre de plan unico dentro de su EPS, con la
+     * collation insensible a mayusculas y tildes que usa la comprobacion del caso de uso.
+     */
+    @Test
+    void losNombresDeEpsYDePlanSonUnicos() throws SQLException {
+        assertThat(uniqueColumns("eps", "uq_eps_name")).isEqualTo("name");
+        assertThat(uniqueColumns("eps_plans", "uq_eps_plans_eps_name")).isEqualTo("eps_id,name");
+        assertThat(collation("eps", "name")).isEqualTo("utf8mb4_0900_ai_ci");
+        assertThat(collation("eps_plans", "name")).isEqualTo("utf8mb4_0900_ai_ci");
+    }
+
+    /**
+     * V9 (D32, HU-009 CA-04 y CA-09): la unica por usuario y plan pasa a incluir la vigencia, para
+     * poder volver a un plan ya usado; la de una sola afiliacion vigente por usuario sigue en pie.
+     */
+    @Test
+    void laUnicaDeAfiliacionPermiteVolverAUnPlanYaUsado() throws SQLException {
+        assertThat(uniqueColumns("affiliations", "uq_affiliations_user_plan")).isNull();
+        assertThat(uniqueColumns("affiliations", "uq_affiliations_user_plan_current"))
+                .isEqualTo("user_id,eps_plan_id,current_marker");
+        assertThat(uniqueColumns("affiliations", "uq_affiliations_user_current"))
+                .isEqualTo("user_id,current_marker");
+    }
+
+    /**
+     * V10 (D31, HU-027 CA-03/CA-09): la solicitud de reprogramacion guarda la franja ANTERIOR (fecha,
+     * horas y sede) y la sede propuesta, obligatorias, con FK a {@code sites}.
+     */
+    @Test
+    void laReprogramacionGuardaLaFranjaAnteriorYLaSedePropuesta() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement()) {
+            for (String column : List.of("previous_date", "previous_start_time", "previous_end_time",
+                    "previous_site_id", "proposed_site_id")) {
+                try (ResultSet rows = statement.executeQuery("SELECT IS_NULLABLE FROM information_schema.COLUMNS"
+                        + " WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'reschedule_requests'"
+                        + " AND COLUMN_NAME = '" + column + "'")) {
+                    assertThat(rows.next()).as("falta la columna %s", column).isTrue();
+                    assertThat(rows.getString(1)).as("%s obligatoria", column).isEqualTo("NO");
+                }
+            }
+            try (ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE"
+                    + " WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'reschedule_requests'"
+                    + " AND REFERENCED_TABLE_NAME = 'sites'"
+                    + " AND COLUMN_NAME IN ('previous_site_id', 'proposed_site_id')")) {
+                rows.next();
+                assertThat(rows.getInt(1)).isEqualTo(2);
+            }
+        }
+    }
+
+    private static String uniqueColumns(String table, String index) throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery(
+                        "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) FROM information_schema.STATISTICS "
+                                + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = '" + table + "' "
+                                + "AND INDEX_NAME = '" + index + "' AND NON_UNIQUE = 0")) {
+            rows.next();
+            return rows.getString(1);
+        }
+    }
+
+    private static String collation(String table, String column) throws SQLException {
+        try (Connection connection = DriverManager.getConnection(schemaUrl, user, password);
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery(
+                        "SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" + SCHEMA
+                                + "' AND TABLE_NAME = '" + table + "' AND COLUMN_NAME = '" + column + "'")) {
+            rows.next();
+            return rows.getString(1);
         }
     }
 
