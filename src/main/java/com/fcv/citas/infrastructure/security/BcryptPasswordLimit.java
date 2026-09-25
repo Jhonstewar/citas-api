@@ -17,9 +17,10 @@ import java.nio.charset.StandardCharsets;
  *       coincidiria con su hash.</li>
  * </ul>
  *
- * <p>Es la unica fuente del limite: la usan {@link SpringPasswordHasher} y la validacion de
- * entrada del adaptador REST. Si se cambia de algoritmo (Argon2 no tiene este tope), hay que
- * revisar esta clase.</p>
+ * <p>Es el tope TECNICO que protege a {@link SpringPasswordHasher}. La regla de negocio que ve el
+ * cliente es la politica D29 del dominio ({@code PasswordPolicy.MAX_UTF8_BYTES}), que usa el mismo
+ * valor; una prueba comprueba que no diverjan. Si se cambia de algoritmo (Argon2 no tiene este
+ * tope), hay que revisar las dos.</p>
  */
 public final class BcryptPasswordLimit {
 

@@ -157,9 +157,32 @@ class BookingIntegrationTest {
                 + " ON a.id = h.appointment_id WHERE a.professional_id = ?", gp.id())).isEqualTo(1);
     }
 
+    /** Resultado de un intento de reserva: estado HTTP y el {@code code} del ProblemDetail (null si gano). */
+    private record Attempt(int status, String code) {
+    }
+
+    /** Ejecuta un intento de reserva y devuelve estado y {@code code}, no solo el estado. */
+    private Attempt attempt(String flow, String token, String payload) throws Exception {
+        var response = mvc.perform(post("/api/patient/appointments/" + flow)
+                .header(HttpHeaders.AUTHORIZATION, token).contentType(MediaType.APPLICATION_JSON)
+                .content(payload)).andReturn().getResponse();
+        String content = response.getContentAsString();
+        String code = null;
+        if (!content.isBlank()) {
+            var node = json.readTree(content).get("code");
+            code = node == null || node.isNull() ? null : node.asText();
+        }
+        return new Attempt(response.getStatus(), code);
+    }
+
     /**
      * CA-04 (verificacion 5): 8 confirmaciones concurrentes del mismo slot → exactamente una gana.
      * La garantia la da la PK de {@code slot_reservations}, no una comprobacion previa.
+     *
+     * <p>Los 7 perdedores tienen que traer {@code code = SLOT_TAKEN} (lo traduce el adaptador de
+     * persistencia al fallar el INSERT), no {@code CONCURRENT_CHANGE} (la red de seguridad de
+     * {@code GlobalExceptionHandler} para violaciones de integridad que escapan al commit): afirmar
+     * solo el 409 dejaria pasar cualquiera de los dos caminos.</p>
      */
     @Test
     void concurrentBookingsOfTheSameSlotLetExactlyOneWin() throws Exception {
@@ -172,23 +195,22 @@ class BookingIntegrationTest {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(contenders);
         try {
-            List<Future<Integer>> results = new ArrayList<>();
+            List<Future<Attempt>> results = new ArrayList<>();
             for (String token : patients) {
-                Callable<Integer> attempt = () -> {
+                Callable<Attempt> race = () -> {
                     start.await();
-                    return mvc.perform(post("/api/patient/appointments/general")
-                            .header(HttpHeaders.AUTHORIZATION, token).contentType(MediaType.APPLICATION_JSON)
-                            .content(payload)).andReturn().getResponse().getStatus();
+                    return attempt("general", token, payload);
                 };
-                results.add(pool.submit(attempt));
+                results.add(pool.submit(race));
             }
             start.countDown();
-            List<Integer> statuses = new ArrayList<>();
-            for (Future<Integer> r : results) {
-                statuses.add(r.get());
+            List<Attempt> attempts = new ArrayList<>();
+            for (Future<Attempt> r : results) {
+                attempts.add(r.get());
             }
-            assertThat(statuses).filteredOn(s -> s == 201).hasSize(1);
-            assertThat(statuses).filteredOn(s -> s == 409).hasSize(contenders - 1);
+            assertThat(attempts).filteredOn(a -> a.status() == 201).hasSize(1);
+            assertThat(attempts).filteredOn(a -> a.status() == 409).hasSize(contenders - 1)
+                    .extracting(Attempt::code).containsOnly("SLOT_TAKEN");
         } finally {
             pool.shutdownNow();
         }
@@ -196,6 +218,72 @@ class BookingIntegrationTest {
         assertThat(data.count("SELECT COUNT(*) FROM slot_reservations r JOIN availability_slots s ON s.id = r.slot_id"
                 + " JOIN availability_blocks b ON b.id = s.availability_block_id WHERE b.professional_id = ?",
                 gp.id())).isEqualTo(1);
+    }
+
+    /**
+     * HU-024 DoD: la no-doble-reserva <b>entre flujo general y especializado</b> contra MySQL 8.4.
+     * El profesional atiende una especialidad general de 30 min y una especializada de 30 min, asi que
+     * ambos flujos compiten por el mismo unico slot. Dos pacientes distintos disparan a la vez
+     * {@code /general} y {@code /specialized}: gana uno solo y la carrera decide cual, por lo que la
+     * prueba acepta cualquiera de los dos ganadores y comprueba el estado e historial que le toca.
+     */
+    @Test
+    void concurrentGeneralAndSpecializedOnTheSameSlotLetExactlyOneWin() throws Exception {
+        int generalShort = data.specialty("GENERAL", 30);
+        int specializedShort = data.specialty("SPECIALIZED", 30);
+        S3TestData.Professional both = data.professional("both",
+                new int[] { generalShort, specializedShort }, hic);
+        long block = data.block(both.id(), hic, day, "11:00", "12:00");
+        long slot = data.slotId(block, "11:00:00");
+        long generalPatient = data.user("crossGeneral", "USER");
+        long specializedPatient = data.user("crossSpecialized", "USER");
+        String generalToken = tokens.bearer(generalPatient, Role.USER);
+        String specializedToken = tokens.bearer(specializedPatient, Role.USER);
+        String generalPayload = json.writeValueAsString(body(both, generalShort, day, "11:00"));
+        String specializedPayload = json.writeValueAsString(body(both, specializedShort, day, "11:00"));
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<Attempt> attempts = new ArrayList<>();
+        try {
+            Callable<Attempt> generalRace = () -> {
+                start.await();
+                return attempt("general", generalToken, generalPayload);
+            };
+            Callable<Attempt> specializedRace = () -> {
+                start.await();
+                return attempt("specialized", specializedToken, specializedPayload);
+            };
+            Future<Attempt> generalResult = pool.submit(generalRace);
+            Future<Attempt> specializedResult = pool.submit(specializedRace);
+            start.countDown();
+            attempts.add(generalResult.get());
+            attempts.add(specializedResult.get());
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(attempts).filteredOn(a -> a.status() == 201).hasSize(1);
+        assertThat(attempts).filteredOn(a -> a.status() == 409).hasSize(1)
+                .extracting(Attempt::code).containsOnly("SLOT_TAKEN");
+        // Libro unico de ocupacion (dec-003): una sola fila para el slot en disputa.
+        assertThat(data.count("SELECT COUNT(*) FROM slot_reservations WHERE slot_id = ?", slot)).isEqualTo(1);
+        assertThat(appointmentsOf(both)).isEqualTo(1);
+
+        Map<String, Object> winner = jdbc.queryForMap("SELECT a.specialty_id, a.patient_user_id, st.code AS status,"
+                + " h.source, h.actor_user_id FROM appointments a"
+                + " JOIN appointment_statuses st ON st.id = a.status_id"
+                + " JOIN appointment_status_history h ON h.appointment_id = a.id"
+                + " WHERE a.professional_id = ?", both.id());
+        if (((Number) winner.get("specialty_id")).intValue() == generalShort) {
+            assertThat(winner).containsEntry("status", "APPROVED").containsEntry("source", "SYSTEM")
+                    .containsEntry("actor_user_id", null);
+            assertThat(((Number) winner.get("patient_user_id")).longValue()).isEqualTo(generalPatient);
+        } else {
+            assertThat(winner).containsEntry("status", "REQUESTED").containsEntry("source", "USER");
+            assertThat(((Number) winner.get("actor_user_id")).longValue()).isEqualTo(specializedPatient);
+            assertThat(((Number) winner.get("patient_user_id")).longValue()).isEqualTo(specializedPatient);
+        }
     }
 
     /** CA-06 (RN-06): franja pasada → 422 PAST_TIME. */

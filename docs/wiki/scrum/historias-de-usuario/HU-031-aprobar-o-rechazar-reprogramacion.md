@@ -2,7 +2,7 @@
 id: HU-031
 tipo: historia-de-usuario
 titulo: "Aprobar o rechazar una reprogramación"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-008-operacion-administrativa-de-solicitudes]]"
 requisitos: [RF-15, RF-19]
 esfuerzo: "Alto"
@@ -141,13 +141,13 @@ La cita sigue en `APPROVED` en ambos casos. Aun así, la épica exige que cada d
 
 **Dado** una aprobación y un rechazo realizados correctamente  
 **Cuando** se consulta el historial de cada cita  
-**Entonces** cada cita tiene exactamente un registro nuevo con origen `ADMIN`, el identificador del administrador como actor, la fecha y hora, y en el rechazo el motivo enviado (RF-19).
+**Entonces** cada cita tiene exactamente un registro nuevo con estado `APPROVED`, origen `ADMIN`, el identificador del administrador como actor y la fecha y hora; en la aprobación el motivo nombra la franja anterior y la nueva, y en el rechazo contiene el motivo enviado (RF-19, D22).
 
 ### CA-07 — Decisiones concurrentes o cancelación simultánea
 
 **Dado** una solicitud `PENDING`  
 **Cuando** dos ADMIN deciden a la vez sobre ella, o ADMIN la aprueba mientras el paciente cancela la cita  
-**Entonces** exactamente una operación tiene éxito, la otra recibe 409, y el estado final es coherente: ningún slot queda con dos reservas, ninguna reserva queda huérfana y la cita no queda cancelada con la franja nueva ocupada.
+**Entonces** las operaciones se serializan y el estado final es coherente: entre dos decisiones, exactamente una tiene éxito y la otra recibe 409; entre aprobación y cancelación, si la cancelación se aplica primero la solicitud queda `CANCELLED` con las dos franjas libres (D18) y la aprobación recibe 409, y si la aprobación se aplica primero la cancelación posterior actúa sobre la cita ya movida y libera la franja nueva. En ningún caso un slot queda con dos reservas, queda una reserva huérfana o la cita queda `CANCELLED` con alguna franja ocupada.
 
 ### CA-08 — Solo ADMIN decide
 
@@ -155,9 +155,15 @@ La cita sigue en `APPROVED` en ambos casos. Aun así, la épica exige que cada d
 **Cuando** intenta aprobar o rechazar una reprogramación  
 **Entonces** la API responde con un error de autorización y nada cambia.
 
+### CA-09 — No se aprueba una reprogramación cuya franja propuesta ya pasó
+
+**Dado** una solicitud `PENDING` cuya franja propuesta tiene una hora de inicio anterior al instante actual  
+**Cuando** ADMIN intenta aprobarla  
+**Entonces** la API responde 409 y no cambia la solicitud, la cita, las reservas ni el historial; y cuando ADMIN la rechaza con motivo, el rechazo se aplica como en CA-03 (RN-06, D23).
+
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
 - [ ] La aprobación conserva el identificador de la cita y está demostrada con una prueba que verifica fila a fila `slot_reservations` antes y después.
 - [ ] Solicitud, cita, reservas e historial se modifican en una única transacción; ante cualquier fallo no hay resultados parciales.
 - [ ] La PK `slot_id` de `slot_reservations` se mantiene como garantía de no-doble-reserva durante la transferencia; no se desactivan restricciones.
@@ -183,16 +189,21 @@ La cita sigue en `APPROVED` en ambos casos. Aun así, la épica exige que cada d
 | CA-06 | Pendiente | — | — |
 | CA-07 | Pendiente | — | — |
 | CA-08 | Pendiente | — | — |
+| CA-09 | Pendiente | — | — |
 | DoD | Pendiente | — | — |
 
 ## Historial de validación
 
+- 2026-09-25 — CA-06 ajustado a D22: el registro de historial lleva estado `APPROVED` y, en la aprobación, un motivo que nombra la franja anterior y la nueva.
+- 2026-09-25 — CA-07 ajustado a D18: antes exigía que, entre aprobación y cancelación simultáneas, "la otra recibe 409" en cualquier orden. Con D18 y RF-14 eso solo vale si la cancelación va primero; si la aprobación va primero, la cancelación posterior es legítima sobre la cita ya movida. El criterio exige ahora serialización y estado final coherente en los dos órdenes.
+- 2026-09-25 — Se añade CA-09 por D23 (franja propuesta ya pasada → 409 al aprobar), que ningún criterio cubría; la DoD pasa a CA-01 a CA-09.
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Operación administrativa», fase F5 / LOOP_02) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- RF-19 audita cambios de estado de cita, pero aprobar o rechazar una reprogramación no cambia el estado de la cita (sigue `APPROVED`). CA-06 sigue el criterio de completitud de [[EP-008-operacion-administrativa-de-solicitudes]] y registra la decisión en `appointment_status_history` con el estado vigente `APPROVED`. Debe confirmarse si ese registro es deseado o si basta con la decisión en `reschedule_requests`, porque [[HU-032-auditar-cambios-de-estado-de-cita]] define el historial como registro de transiciones.
-- Incógnita abierta **INC-031** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): si la franja propuesta está en otra sede, la aprobación debe actualizar también `appointments.site_id`. La HU lo admite siempre que el profesional esté habilitado en esa sede (RN-07).
-- Incógnita abierta **INC-035** (ver [[EP-008-operacion-administrativa-de-solicitudes]]): no hay reversión de decisiones.
-- Incógnita abierta **INC-036** (ver [[EP-008-operacion-administrativa-de-solicitudes]]): no está definido qué hacer si la franja propuesta o la original ya pasaron mientras la solicitud esperaba. Esta HU no añade esa restricción hasta que se decida.
-- [[HU-026-cancelar-una-cita-futura]] no especifica qué ocurre con una solicitud `PENDING` y su retención cuando el paciente cancela la cita. El catálogo de V4 incluye el estado de reprogramación `CANCELLED`, lo que sugiere que la cancelación debería cerrar la solicitud y liberar su retención; debe decidirse y reflejarse en HU-026, porque CA-07 de esta HU depende de ello.
+- **Resuelta (D22, provisional bajo delegación):** N3 — la decisión sobre una reprogramación **sí escribe historial** aunque la cita siga `APPROVED`: una fila con estado `APPROVED`, origen `ADMIN` y un motivo que nombra la franja anterior y la nueva. RF-19 pide trazar el cambio, y el esquema lo admite sin migración porque `appointment_status_history` guarda solo el estado nuevo (`V3__schedule_and_appointments.sql:115`) ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-06 lo refleja. D22 no precisa si en el **rechazo** el motivo del historial debe nombrar también las franjas; CA-06 exige solo que contenga el motivo enviado por ADMIN. D22 afecta también a [[HU-032-auditar-cambios-de-estado-de-cita]] (`Completada`), que define el historial como registro de transiciones.
+- **Resuelta (D21, provisional bajo delegación):** INC-031 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): la franja propuesta puede estar en otra sede si el profesional atiende en ella; al aprobar, la cita actualiza también su sede ([[dec-006-decisiones-s4-ciclo-de-vida]]).
+- Incógnita abierta **INC-035** (ver [[EP-008-operacion-administrativa-de-solicitudes]]): no hay reversión de decisiones. No la resuelve ninguna decisión D15–D30.
+- **Resuelta (D23, provisional bajo delegación):** INC-036 (ver [[EP-008-operacion-administrativa-de-solicitudes]]): si la franja propuesta ya pasó, aprobar responde 409 y ADMIN debe rechazar con motivo, igual que D12 para las citas `REQUESTED` vencidas y RN-06 ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-09 lo cubre. D23 no trata el caso de que haya pasado solo la franja **original**; aprobar hacia una franja futura sigue siendo válido en ese caso.
+- **Resuelta (D18, respondida por el usuario):** cancelar una cita con solicitud `PENDING` pasa la solicitud a `CANCELLED` y libera las dos franjas en la misma transacción. Queda reflejado en CA-09 de [[HU-026-cancelar-una-cita-futura]] y en CA-07 de esta HU.

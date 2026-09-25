@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fcv.citas.application.appointment.AvailabilityQueries.Offer;
 import com.fcv.citas.application.appointment.BookAppointmentUseCase;
 import com.fcv.citas.application.appointment.BookAppointmentUseCase.BookingCommand;
+import com.fcv.citas.application.appointment.PatientAppointmentsUseCase;
 import com.fcv.citas.application.appointment.SearchAvailabilityUseCase;
 import com.fcv.citas.application.shared.Refs.PersonRef;
 import com.fcv.citas.application.shared.Refs.SiteRef;
@@ -63,10 +64,13 @@ class PatientBookingController {
 
     private final SearchAvailabilityUseCase availability;
     private final BookAppointmentUseCase booking;
+    private final PatientAppointmentsUseCase patientAppointments;
 
-    PatientBookingController(SearchAvailabilityUseCase availability, BookAppointmentUseCase booking) {
+    PatientBookingController(SearchAvailabilityUseCase availability, BookAppointmentUseCase booking,
+            PatientAppointmentsUseCase patientAppointments) {
         this.availability = availability;
         this.booking = booking;
+        this.patientAppointments = patientAppointments;
     }
 
     @GetMapping("/availability")
@@ -92,12 +96,14 @@ class PatientBookingController {
     @PostMapping("/appointments/general")
     @ResponseStatus(HttpStatus.CREATED)
     AppointmentResponse bookGeneral(JwtAuthenticationToken auth, @Valid @RequestBody BookingRequest request) {
-        return AppointmentResponse.from(booking.bookGeneral(CurrentUser.id(auth), request.toCommand()));
+        return AppointmentResponse.from(patientAppointments.present(
+                booking.bookGeneral(CurrentUser.id(auth), request.toCommand())));
     }
 
     @PostMapping("/appointments/specialized")
     @ResponseStatus(HttpStatus.CREATED)
     AppointmentResponse requestSpecialized(JwtAuthenticationToken auth, @Valid @RequestBody BookingRequest request) {
-        return AppointmentResponse.from(booking.requestSpecialized(CurrentUser.id(auth), request.toCommand()));
+        return AppointmentResponse.from(patientAppointments.present(
+                booking.requestSpecialized(CurrentUser.id(auth), request.toCommand())));
     }
 }

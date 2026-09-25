@@ -2,7 +2,7 @@
 id: HU-029
 tipo: historia-de-usuario
 titulo: "Consultar la bandeja administrativa"
-estado: En desarrollo
+estado: En validación
 epica: "[[EP-008-operacion-administrativa-de-solicitudes]]"
 requisitos: [RF-18]
 esfuerzo: "Medio"
@@ -137,29 +137,43 @@ Es una lectura. Las citas especializadas pendientes se obtienen de `appointments
 ## Definition of Done
 
 - [ ] Los criterios CA-01 a CA-06 están validados con evidencia concreta.
-- [ ] La bandeja es de solo lectura y no modifica citas, solicitudes ni reservas.
-- [ ] Los filtros se aplican en base de datos apoyándose en los índices de V3; cualquier índice adicional va en una migración Flyway posterior a V4.
+- [x] La bandeja es de solo lectura y no modifica citas, solicitudes ni reservas.
+- [x] Los filtros se aplican en base de datos apoyándose en los índices de V3; cualquier índice adicional va en una migración Flyway posterior a V4.
 - [ ] La semántica de los filtros de fecha y sede para reprogramaciones está documentada en el contrato.
-- [ ] El endpoint exige rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
+- [x] El endpoint exige rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
 - [ ] La vista de `citas-web` distingue los dos tipos de elemento y consume la API mediante la URL de entorno.
-- [ ] Existen pruebas automatizadas de inclusión/exclusión por estado y tipo, de cada filtro y del rol, y pasan.
-- [ ] El contrato del endpoint de bandeja está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-008-operacion-administrativa-de-solicitudes]] está actualizada en `docs/wiki/scrum/`.
+- [x] Existen pruebas automatizadas de inclusión/exclusión por estado y tipo, de cada filtro y del rol, y pasan.
+- [x] El contrato del endpoint de bandeja está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-008-operacion-administrativa-de-solicitudes]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
+**La HU no se cierra.** La bandeja está completa por el lado de las **citas especializadas**, pero la mitad de **reprogramaciones** que exigen CA-01 y CA-04 no existe en S3: no hay solicitudes de reprogramación que listar ([[HU-027-solicitar-reprogramacion-de-cita-aprobada]] y [[HU-031-aprobar-o-rechazar-reprogramacion]] quedaron para S4).
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | No verificable | Lado de las citas, cubierto: `infrastructure/rest/AdminDecisionIntegrationTest#inboxListsOnlyPendingSpecializedRequestsWithPatientData` —con una `REQUESTED` especializada y una general `APPROVED`, la bandeja devuelve solo la primera, con `type: "APPOINTMENT_REQUEST"`— y `#approvalKeepsReservationsAndLeavesTheInbox` (una cita decidida no vuelve a aparecer). `infrastructure/persistence/appointment/JdbcAppointmentQueries#findPendingRequests` filtra por `st.code = 'REQUESTED'`. Lado de las **reprogramaciones**: sin evidencia | No existe ninguna tabla poblada ni ningún caso de uso de solicitud de reprogramación, así que la bandeja no puede contener elementos `PENDING` de ese tipo. El contrato lo dice por escrito: «En S4 la bandeja incluirá `type: 'RESCHEDULE_REQUEST'`» (`contrato-rest-citas.md`). Mientras no exista el productor, la mitad de reprogramaciones del criterio **no es ejercitable** |
+| CA-02 | Cumple | `AdminDecisionIntegrationTest#inboxFiltersCombine` | Filtrando por ICV la solicitud de HIC no aparece; filtrando por HIC sí. Se aplica en SQL (`a.site_id = :site`) |
+| CA-03 | Cumple | `AdminDecisionIntegrationTest#inboxFiltersCombine` (sede + especialidad + fecha combinadas devuelven la solicitud; cambiar la fecha la deja fuera) y `#inboxListsOnlyPendingSpecializedRequestsWithPatientData` (filtro por profesional); `JdbcAppointmentQueries#findPendingRequests` compone los cuatro filtros con `AND` | Para las citas especializadas, que es lo único que la bandeja puede contener hoy |
+| CA-04 | No verificable | Lado de las citas, cubierto: `AdminDecisionIntegrationTest#inboxListsOnlyPendingSpecializedRequestsWithPatientData` afirma `site.code`, `durationMinutes`, el identificador de la cita y `patient.documentNumber`; el tipo `AdminAppointment` del contrato añade profesional, especialidad, fecha y horas. Lado de las **reprogramaciones** (franja actual frente a franja propuesta): sin evidencia | Misma causa que CA-01 |
+| CA-05 | Cumple | `AdminDecisionIntegrationTest#approvalKeepsReservationsAndLeavesTheInbox` (tras aprobar, la cita no está en la bandeja); `#rejectionReleasesSlotsAndThePatientSeesTheReason` deja la cita en `REJECTED`, estado que el filtro `st.code = 'REQUESTED'` excluye | — |
+| CA-06 | Cumple | `infrastructure/rest/AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes` (anónimo → 401, USER → 403) y `#onlyAdminReachesAdminRoutes` (PROFESSIONAL → 403); `SecurityConfig` (`/api/admin/**` → `hasRole("ADMIN")`); `EVIDENCIAS_S3.md` §8, comprobación «USER en ruta ADMIN → 403» contra el backend real | — |
+| DoD — CA-01 a CA-06 validados con evidencia concreta | No cumple | Filas CA-01 y CA-04, `No verificable` | Bloquea el cierre |
+| DoD — La bandeja es de solo lectura y no modifica citas, solicitudes ni reservas | Cumple | `application/appointment/AdminAppointmentsUseCase#inbox` delega en `AppointmentQueries#findPendingRequests`; `JdbcAppointmentQueries` solo emite `SELECT`; `AdminDecisionIntegrationTest#inboxFiltersCombine` consulta tres veces y después las pruebas de decisión siguen encontrando la cita en `REQUESTED` con sus dos reservas | — |
+| DoD — Los filtros se aplican en base de datos apoyándose en los índices de V3 | Cumple | `JdbcAppointmentQueries#findPendingRequests` construye el `WHERE` en SQL; `V3__schedule_and_appointments.sql` trae los índices de `appointments` por sede, profesional, especialidad y fecha; no se añadió ninguna migración de índices | Ningún filtrado en memoria |
+| DoD — La semántica de los filtros de fecha y sede para reprogramaciones está documentada en el contrato | No cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md` documenta los cuatro filtros para las citas especializadas y remite las reprogramaciones a S4 («En S4 la bandeja incluirá `type: 'RESCHEDULE_REQUEST'`»), sin decidir si `date` y `siteId` se refieren a la franja actual o a la propuesta | **Acción pendiente:** es una decisión de producto, no de código: hay que fijar con el usuario si los filtros de la bandeja aplican a la franja vigente de la cita o a la que se propone. Se resuelve al especificar HU-027 / HU-031. Bloquea el cierre |
+| DoD — El endpoint exige rol ADMIN aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | Fila CA-06 | — |
+| DoD — La vista de `citas-web` distingue los dos tipos de elemento y usa la URL de entorno | No cumple | La vista consume la API con la URL del entorno y muestra correctamente el único tipo existente: `citas-web/src/pages/admin/InboxPage.tsx`; `citas-web/src/adminOperations.test.tsx`: «muestra los datos para decidir y aprueba con confirmación; la solicitud sale de la lista» y «los filtros viajan como parámetros de consulta (HU-029 CA-02/CA-03)». **No** distingue dos tipos porque solo existe `APPOINTMENT_REQUEST` | **Acción pendiente de desarrollo:** al llegar `RESCHEDULE_REQUEST` en S4, la vista debe diferenciar los dos elementos y mostrar franja actual y propuesta. Bloquea el cierre |
+| DoD — Pruebas de inclusión y exclusión por estado y tipo, de cada filtro y del rol | Cumple | `AdminDecisionIntegrationTest#inboxListsOnlyPendingSpecializedRequestsWithPatientData` (excluye la general `APPROVED`), `#inboxFiltersCombine`, `#approvalKeepsReservationsAndLeavesTheInbox`; `AuthorizationIntegrationTest` | Cubre el estado y el tipo de cita; el tipo de **elemento** de bandeja solo tiene un valor posible hoy |
+| DoD — Contrato del endpoint de bandeja reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Operación — ADMIN (HU-029, HU-030, HU-032)»: `GET /api/admin/inbox`, sus cuatro filtros y la forma `{ type, appointment }` | El contrato refleja el estado real, incluida la ausencia de reprogramaciones |
+| DoD — Trazabilidad de esta HU y de [[EP-008-operacion-administrativa-de-solicitudes]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-25 — Estado sin cambios (`En validación`). Se retoma en S4 (`PLAN_RETOMA_S4.md` §1, «Qué hay que revisar de antes», R6): la mitad de reprogramaciones de CA-01 y CA-04 se construye en la fase **F5** (LOOP_02), con `type: 'RESCHEDULE_REQUEST'` y los filtros sobre la franja propuesta según **D24**. La verificación de cierre es de **F10**.
+- 2026-09-23 — Estado `En validación` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia registrada. 4 de 6 criterios en `Cumple`; **no se cierra**. Todo lo que falta es la mitad de **reprogramaciones**, que no existe en S3: (1) CA-01, la bandeja debe incluir las solicitudes de reprogramación `PENDING`, y no hay nada que las produzca; (2) CA-04, cada reprogramación debe mostrar su franja actual y la propuesta; (3) el ítem de DoD sobre la semántica de los filtros de fecha y sede para reprogramaciones, que es una decisión de producto pendiente del usuario; (4) el ítem de DoD sobre distinguir los dos tipos de elemento en `citas-web`. Se resuelven con [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] y [[HU-031-aprobar-o-rechazar-reprogramacion]] en S4.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F6 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
@@ -171,3 +185,7 @@ Es una lectura. Las citas especializadas pendientes se obtienen de `appointments
 - El PRD no define si el filtro de fecha de una reprogramación se aplica a la franja actual o a la propuesta, ni cómo se trata el filtro de sede si la franja propuesta está en otra sede (INC-031). Esta HU propone aplicar ambos filtros a la franja propuesta y mostrar las dos; debe confirmarse antes de aprobarla.
 - El PRD no define qué datos del paciente ve ADMIN en la bandeja (ver notas de [[HU-005-autorizar-peticiones-por-rol-y-ownership]]). CA-04 no exige datos personales del paciente.
 - El PRD no fija paginación ni orden; la HU solo exige un orden estable.
+- Hallazgo de la verificación independiente del 2026-09-23: la bandeja solo puede contener un tipo de elemento, `APPOINTMENT_REQUEST`. **No existe ningún productor de solicitudes de reprogramación** ni de retenciones `RESCHEDULE_REQUEST`, así que la mitad de CA-01 y de CA-04 no es ejercitable hasta [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] y [[HU-031-aprobar-o-rechazar-reprogramacion]]. El contrato lo declara explícitamente: «En S4 la bandeja incluirá `type: 'RESCHEDULE_REQUEST'`».
+- ~~Pregunta abierta que hay que resolver antes de cerrar esta HU: para una reprogramación, ¿los filtros `date` y `siteId` se refieren a la **franja actual** de la cita o a la **propuesta**? Es una decisión de producto y condiciona el contrato y la consulta.~~
+- **Resuelta (D24, provisional bajo delegación):** N6 — para una reprogramación, los filtros `date` y `siteId` se aplican a la **franja propuesta**, que es lo que el ADMIN decide; la bandeja muestra las dos franjas ([[dec-006-decisiones-s4-ciclo-de-vida]]). Coincide con la propuesta de la nota anterior sobre INC-031, así que ningún criterio cambia. `reschedule_requests` no guarda sede propia: la sede de la franja propuesta se obtiene de sus filas `RESCHEDULE_REQUEST` en `slot_reservations` (slot → bloque → sede).
+- **Relacionada (D23, provisional bajo delegación):** INC-036 — una reprogramación cuya franja propuesta ya pasó no puede aprobarse (409) y el ADMIN debe rechazarla con motivo ([[HU-031-aprobar-o-rechazar-reprogramacion]], CA-09). Es coherente con que esta HU la siga mostrando mientras esté pendiente.

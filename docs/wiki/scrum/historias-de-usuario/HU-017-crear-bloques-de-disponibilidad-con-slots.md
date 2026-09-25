@@ -2,7 +2,7 @@
 id: HU-017
 tipo: historia-de-usuario
 titulo: "Crear bloques de disponibilidad con slots de 30 minutos"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-005-agenda-del-profesional]]"
 requisitos: [RF-08, RF-09]
 esfuerzo: "Alto"
@@ -161,33 +161,46 @@ Esta HU inaugura el esquema de agenda del proyecto: tablas de bloques y de slots
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
-- [ ] Existe una migración Flyway versionada que crea las tablas de bloques de disponibilidad y de slots, y se aplica sobre una base sin ellas.
-- [ ] La expansión de un bloque en slots de 30 minutos está implementada en el dominio, sin dependencias de Spring ni de JPA.
-- [ ] Las reglas de franja no pasada, no solapamiento y sede asignada se evalúan en el servidor y no dependen de la validación del cliente.
-- [ ] La creación del bloque y de sus slots ocurre en una única transacción: no queda ningún bloque persistido sin sus slots.
-- [ ] El endpoint de creación de bloque exige rol `PROFESSIONAL` y atribuye el bloque al profesional autenticado, no al identificador recibido en el cuerpo.
-- [ ] La pantalla de gestión de bloques de `citas-web` consume la API mediante la URL del backend leída de la configuración de entorno.
-- [ ] Existen pruebas automatizadas que cubren la expansión en 8 slots de un bloque 08:00–12:00, el solapamiento, la franja pasada y la sede no asignada, y pasan.
-- [ ] El contrato del endpoint de creación de bloque está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [x] Existe una migración Flyway versionada que crea las tablas de bloques de disponibilidad y de slots, y se aplica sobre una base sin ellas.
+- [x] La expansión de un bloque en slots de 30 minutos está implementada en el dominio, sin dependencias de Spring ni de JPA.
+- [x] Las reglas de franja no pasada, no solapamiento y sede asignada se evalúan en el servidor y no dependen de la validación del cliente.
+- [x] La creación del bloque y de sus slots ocurre en una única transacción: no queda ningún bloque persistido sin sus slots.
+- [x] El endpoint de creación de bloque exige rol `PROFESSIONAL` y atribuye el bloque al profesional autenticado, no al identificador recibido en el cuerpo.
+- [x] La pantalla de gestión de bloques de `citas-web` consume la API mediante la URL del backend leída de la configuración de entorno.
+- [x] Existen pruebas automatizadas que cubren la expansión en 8 slots de un bloque 08:00–12:00, el solapamiento, la franja pasada y la sede no asignada, y pasan.
+- [x] El contrato del endpoint de creación de bloque está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/ScheduleIntegrationTest#aDayAcceptsSeveralBlocks` | 08:00–12:00 y 14:00–17:00 el mismo día en HIC; el calendario devuelve los dos, el segundo con 6 franjas |
+| CA-02 | Cumple | `domain/schedule/AvailabilityBlockTest#morningBlockExpandsIntoEightSlotsOf30Minutes`, `#afternoonBlockOfThreeHoursHasSixSlots`, `#minimalBlockHasOneSlot`; `ScheduleIntegrationTest#blockExpandsIntoEightSlotsStoredWithTheSameLocalTimes` | La prueba de integración lee los ocho `start_time` con SQL crudo y exige exactamente 08:00…11:30, con `slots[7].endTime = 12:00` y `available = true`. La lectura cruda existe para detectar un desfase de zona horaria ([[riesgo-zona-horaria-columnas-time]]) |
+| CA-03 | Cumple | `ScheduleIntegrationTest#pastBlockIsRejected` (400 `PAST_TIME`, 0 bloques); `AvailabilityBlockTest#isPastOnceItHasStarted` | El «ahora» se toma en `America/Bogota` (`domain/shared/SystemZone`) |
+| CA-04 | Cumple | `ScheduleIntegrationTest#overlappingBlockIsRejected` (11:30–13:00 sobre 08:00–12:00 → 409 `BLOCK_OVERLAP`; el contiguo 12:00–13:00 sí se acepta); `AvailabilityBlockTest#detectsOverlapButAllowsAdjacentBlocks` | El criterio pone 11:00–13:00 y la prueba 11:30–13:00: el mismo solape por el extremo, con la ventaja de comprobar además que el bloque contiguo no se considera solapado |
+| CA-05 | Cumple | `ScheduleIntegrationTest#blockAtUnassignedSiteIsRejected` (422 `SITE_NOT_ASSIGNED`, 0 bloques); `application/schedule/ManageScheduleUseCase#validated` sobre `Professional#worksAt` | — |
+| CA-06 | Cumple | `infrastructure/rest/schedule/ProfessionalScheduleController` y `ManageScheduleUseCase.BlockCommand`: el cuerpo solo lleva `siteId`, `date`, `startTime` y `endTime`, y el titular sale de `professionalOf(userId)` con el id del token; `ScheduleIntegrationTest#professionalCannotTouchAnotherProfessionalsBlock` | No existe forma de indicar un titular distinto: el campo no está en el contrato. El caso simétrico (operar el bloque de otro) responde 404 sin revelar que existe |
+| CA-07 | Cumple | `V3__schedule_and_appointments.sql` (`availability_blocks`, `availability_slots` con FK a bloque y `ON DELETE CASCADE`); `infrastructure/persistence/FlywayMigratesEmptySchemaTest#aplicaTodasLasMigracionesEnOrden` y `#dejaElModeloCompletoDe24Tablas` | Arranque sobre esquema vacío, siete migraciones aplicadas sin error |
+| CA-08 | Cumple | `ScheduleIntegrationTest#blockExpandsIntoEightSlotsStoredWithTheSameLocalTimes` (`slots[3].available = true`); `infrastructure/rest/BookingIntegrationTest#offersRespectDurationAndReservations` y `#searchingRetainsNothingAndSiteFilterNarrows` (las franjas publicadas se ofrecen, con su duración y en orden) | La oferta se calcula sobre `availability_slots` (`JdbcAvailabilityQueries`), así que lo publicado aquí es exactamente lo que se ofrece |
+| DoD — CA-01 a CA-08 validados con evidencia concreta | Cumple | Filas CA-01 a CA-08 de esta tabla | — |
+| DoD — Migración Flyway de bloques y slots, aplicada sobre una base sin ellas | Cumple | `V3__schedule_and_appointments.sql`; `FlywayMigratesEmptySchemaTest` | — |
+| DoD — Expansión en slots de 30 minutos en el dominio, sin Spring ni JPA | Cumple | `domain/schedule/AvailabilityBlock#slotStarts`; `AvailabilityBlockTest` (8 pruebas); `HexagonalArchitectureTest` | — |
+| DoD — Franja no pasada, no solapamiento y sede asignada se evalúan en el servidor | Cumple | `ManageScheduleUseCase#validated`; `ScheduleIntegrationTest#pastBlockIsRejected`, `#overlappingBlockIsRejected`, `#blockAtUnassignedSiteIsRejected`, `#offGridTimesAreRejected` | Las cuatro pruebas llaman a la API directamente, sin pasar por el formulario |
+| DoD — Bloque y slots en una única transacción | Cumple | `ManageScheduleUseCase#create` (`tx.inTransaction`) e `infrastructure/persistence/schedule/JpaBlockRepositoryAdapter#saveNew` (bloque + `insertSlots` dentro de la misma transacción) | Los rechazos comprueban 0 bloques, luego tampoco quedan slots sueltos |
+| DoD — El endpoint exige rol PROFESSIONAL y atribuye el bloque al autenticado | Cumple | `SecurityConfig` (`/api/professional/**` → `hasRole("PROFESSIONAL")`); `infrastructure/rest/AuthorizationIntegrationTest#onlyProfessionalReachesProfessionalRoutes` (USER y ADMIN → 403); `ManageScheduleUseCase#professionalOf(userId)` | — |
+| DoD — La pantalla de bloques de `citas-web` usa la URL del backend del entorno | Cumple | `citas-web/src/api/professionalApi.ts` sobre `API_ROUTES`; `citas-web/src/api/contracts.test.ts`; `citas-web/src/professionalAgenda.test.tsx` → «crea un bloque: solo sedes asignadas, cuenta las franjas y muestra el 409 en el formulario» | — |
+| DoD — Pruebas de los 8 slots, el solapamiento, la franja pasada y la sede no asignada | Cumple | `ScheduleIntegrationTest` (11 pruebas); `AvailabilityBlockTest` (8) | — |
+| DoD — Contrato del endpoint de creación reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Agenda — PROFESSIONAL (HU-017 a HU-019)» | — |
+| DoD — Trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 8 criterios y los 10 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F4 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

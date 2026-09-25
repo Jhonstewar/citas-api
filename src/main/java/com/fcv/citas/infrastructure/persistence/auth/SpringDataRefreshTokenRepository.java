@@ -25,4 +25,13 @@ public interface SpringDataRefreshTokenRepository extends JpaRepository<RefreshT
             """)
     int revokeFamily(@Param("familyId") String familyId, @Param("now") LocalDateTime now,
             @Param("reason") String reason);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update RefreshTokenJpaEntity t
+               set t.revokedAt = :now, t.revokedReason = :reason
+             where t.userId = :userId and t.revokedAt is null
+            """)
+    int revokeAllForUser(@Param("userId") Long userId, @Param("now") LocalDateTime now,
+            @Param("reason") String reason);
 }

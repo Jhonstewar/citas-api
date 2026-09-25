@@ -14,8 +14,9 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * que la regla {@code permitAll} llegue a evaluarse. Un cliente que conserva un access token
  * caducado y llama a {@code /api/auth/refresh} —justo cuando mas necesita renovar— o a
  * {@code /api/auth/logout} recibia un 401 y la peticion no se procesaba: la renovacion fallaba y
- * el logout no revocaba nada. Esas rutas se autentican con el CUERPO (credenciales o refresh
- * token), nunca con el access token, asi que la cabecera no aporta nada y solo estorba.</p>
+ * el logout no revocaba nada. Esas rutas se autentican con el cuerpo (credenciales, token de
+ * recuperacion) o con la cookie {@code fcv_refresh} (D36), nunca con el access token, asi que la
+ * cabecera no aporta nada y solo estorba.</p>
  *
  * <p>Fuera de esas rutas se delega sin cambios en {@link DefaultBearerTokenResolver}: el resto de
  * la API sigue exigiendo un access token valido exactamente igual que antes.</p>

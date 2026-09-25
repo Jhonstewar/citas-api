@@ -36,4 +36,29 @@ class ProfessionalTest {
         withNull.add(null);
         assertThatThrownBy(() -> Professional.requireSites(withNull)).isInstanceOf(InvalidRequestException.class);
     }
+
+    /**
+     * HU-016 (DoD, R2): activar y desactivar son operaciones explicitas del dominio. Solo cambian el
+     * estado; especialidades, sedes, codigo y matricula se conservan (CA-01, CA-02).
+     */
+    @Test
+    void deactivateAndActivateOnlyChangeTheActiveFlag() {
+        Professional active = new Professional(7L, 1, "P-1", "LIC-1", true, ONE, Set.of(1, 2));
+
+        Professional inactive = active.deactivate();
+        assertThat(inactive.active()).isFalse();
+        assertThat(inactive).usingRecursiveComparison().ignoringFields("active").isEqualTo(active);
+
+        Professional reactivated = inactive.activate();
+        assertThat(reactivated.active()).isTrue();
+        assertThat(reactivated).isEqualTo(active);
+    }
+
+    /** Idempotentes: repetir la operacion no es un error (PATCH /status responde 200 igual). */
+    @Test
+    void activationIsIdempotent() {
+        Professional active = new Professional(7L, 1, "P-1", "LIC-1", true, ONE, Set.of(1));
+        assertThat(active.activate()).isEqualTo(active);
+        assertThat(active.deactivate().deactivate().active()).isFalse();
+    }
 }

@@ -2,7 +2,7 @@
 id: HU-030
 tipo: historia-de-usuario
 titulo: "Aprobar o rechazar una cita especializada"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-008-operacion-administrativa-de-solicitudes]]"
 requisitos: [RF-12, RF-19]
 esfuerzo: "Alto"
@@ -154,35 +154,50 @@ Los efectos sobre agenda son asimétricos. Aprobar no toca `slot_reservations`: 
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
-- [ ] Aprobar y rechazar son operaciones explícitas del dominio con validación de estado origen; no existe una actualización genérica de estado expuesta.
-- [ ] Cambio de estado, liberación de reservas e historial ocurren en una única transacción, sin resultados parciales.
-- [ ] La liberación de reservas reutiliza la misma operación que la cancelación y no deja filas huérfanas en `slot_reservations`.
-- [ ] El motivo obligatorio se valida en el servidor y se persiste en `appointment_status_history.reason`.
-- [ ] Existe control de concurrencia demostrado con una prueba de dos decisiones simultáneas.
-- [ ] No se crean migraciones salvo cambio de esquema justificado (por ejemplo una columna de versión), en una migración Flyway posterior a V4.
-- [ ] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
-- [ ] La pantalla de `citas-web` no permite enviar un rechazo sin motivo y refresca la bandeja ante un 409.
-- [ ] Existen pruebas automatizadas de aprobación, rechazo con liberación, motivo vacío, transiciones inválidas, concurrencia y rol, y pasan.
-- [ ] El contrato de los endpoints de decisión está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-008-operacion-administrativa-de-solicitudes]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-08 están validados con evidencia concreta.
+- [x] Aprobar y rechazar son operaciones explícitas del dominio con validación de estado origen; no existe una actualización genérica de estado expuesta.
+- [x] Cambio de estado, liberación de reservas e historial ocurren en una única transacción, sin resultados parciales.
+- [x] La liberación de reservas reutiliza la misma operación que la cancelación y no deja filas huérfanas en `slot_reservations`.
+- [x] El motivo obligatorio se valida en el servidor y se persiste en `appointment_status_history.reason`.
+- [x] Existe control de concurrencia demostrado con una prueba de dos decisiones simultáneas.
+- [x] No se crean migraciones salvo cambio de esquema justificado (por ejemplo una columna de versión), en una migración Flyway posterior a V4.
+- [x] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
+- [x] La pantalla de `citas-web` no permite enviar un rechazo sin motivo y refresca la bandeja ante un 409.
+- [x] Existen pruebas automatizadas de aprobación, rechazo con liberación, motivo vacío, transiciones inválidas, concurrencia y rol, y pasan.
+- [x] El contrato de los endpoints de decisión está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-008-operacion-administrativa-de-solicitudes]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/AdminDecisionIntegrationTest#approvalKeepsReservationsAndLeavesTheInbox` | 200 con `status = APPROVED`; las dos filas de `slot_reservations` siguen existiendo y la cita ya no aparece en la bandeja |
+| CA-02 | Cumple | `AdminDecisionIntegrationTest#rejectionReleasesSlotsAndThePatientSeesTheReason` | Cita de 60 minutos con dos slots retenidos: tras el rechazo quedan cero filas en `slot_reservations` y la búsqueda de disponibilidad vuelve a ofrecer las 08:00 (RN-09). Confirmado también contra la API real en `EVIDENCIAS_S3.md` §11, donde la franja liberada por la cita 4 la vuelve a tomar la cita 9 |
+| CA-03 | Cumple | `AdminDecisionIntegrationTest#rejectionWithoutReasonChangesNothing`; `domain/appointment/AppointmentTest#rejectionRequiresAReasonAndReleasesSlots` | Motivo con solo espacios y cuerpo ausente → 400 con `fieldErrors.reason`; la cita sigue `REQUESTED`, con sus dos slots retenidos y una sola fila de historial |
+| CA-04 | Cumple | `domain/appointment/AppointmentTest#onlyRequestedCanBeDecided`, parametrizada sobre **todos** los estados distintos de `REQUESTED` (`APPROVED`, `REJECTED`, `CANCELLED`, `COMPLETED`, `NO_SHOW`), tanto para aprobar como para rechazar; `AdminDecisionIntegrationTest#decidingANonRequestedAppointmentIs409` (409 `INVALID_TRANSITION`, sin cambios en historial ni reservas); `infrastructure/rest/VerificationGapsIntegrationTest#rejectingAnApprovedAppointmentIs409EvenWithoutReason` (cita **general** `APPROVED` → 409 y no 400) | La última prueba fija el orden de comprobación: sobre una cita ya decidida el problema es la transición, no el motivo |
+| CA-05 | Cumple | `AdminDecisionIntegrationTest#approvalKeepsReservationsAndLeavesTheInbox` (`history.length() = 2`, la segunda con `source = ADMIN` y `actor_user_id` igual al ADMIN); `#rejectionReleasesSlotsAndThePatientSeesTheReason` (`history[1].reason` con el texto enviado) | Exactamente un registro nuevo por decisión |
+| CA-06 | Cumple | `AdminDecisionIntegrationTest#rejectionReleasesSlotsAndThePatientSeesTheReason` (el paciente consulta su detalle y ve `REJECTED` y el mismo motivo); `citas-web/src/patientBooking.test.tsx`: «una cita rechazada muestra el motivo y el historial (HU-030 CA-06)» | Verificado contra [[HU-025-consultar-mis-citas-y-detalle]]. `VerificationGapsIntegrationTest#patientSeesTheRoleNotTheNameOfTheAdmin` añade que el paciente ve «Administración» y no el nombre del empleado |
+| CA-07 | Cumple | `AdminDecisionIntegrationTest#concurrentDecisionsLetExactlyOneWin` (aprobar y rechazar a la vez: los estados devueltos son exactamente 200 y 409, y la cita queda con dos filas de historial, es decir una sola decisión) | El control lo da `AppointmentRepository#lockById` (`SELECT … FOR UPDATE`) en `AdminAppointmentsUseCase`: la segunda transacción ve el estado ya cambiado |
+| CA-08 | Cumple | `AdminDecisionIntegrationTest#onlyAdminDecides` (el paciente titular → 403 y el historial no cambia); `infrastructure/rest/AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` (PROFESSIONAL → 403 en todo `/api/admin/**`) | — |
+| DoD — CA-01 a CA-08 validados con evidencia concreta | Cumple | Filas CA-01 a CA-08 de esta tabla | — |
+| DoD — Aprobar y rechazar son operaciones explícitas del dominio con validación de estado origen | Cumple | `domain/appointment/Appointment#approve` y `#reject` (ambas pasan por `requireRequested()`); `Appointment#transitionTo` es la única puerta de cambio de estado y valida contra `AppointmentStatus#canTransitionTo`; `AppointmentTest` (8 pruebas) | No existe ningún endpoint ni caso de uso que fije el estado de una cita de forma genérica |
+| DoD — Estado, liberación de reservas e historial en una única transacción | Cumple | `application/appointment/AdminAppointmentsUseCase#approve` y `#reject` (`tx.inTransaction`); `AdminDecisionIntegrationTest#rejectionWithoutReasonChangesNothing` comprueba que un rechazo inválido no deja nada a medias | — |
+| DoD — La liberación de reservas no deja filas huérfanas y es una operación única | Cumple | `domain/appointment/AppointmentStatus#releasesSlots()` (única definición: `REJECTED` o `CANCELLED`) y `AppointmentRepository#releaseSlots`, único punto de liberación; `AdminDecisionIntegrationTest#rejectionReleasesSlotsAndThePatientSeesTheReason` (cero filas para la cita) | La cancelación aún no existe ([[HU-026-cancelar-una-cita-futura]], S4). Hoy no hay dos implementaciones que puedan divergir: el predicado ya contempla `CANCELLED` y la operación de liberación es una sola. Que la cancelación la reutilice se comprobará al cerrar HU-026 |
+| DoD — Motivo obligatorio validado en el servidor y persistido en `appointment_status_history.reason` | Cumple | `Appointment#reject` (rechaza nulo o en blanco) y `StatusChange` (recorta, rechaza vacío y limita a 500 caracteres); `AdminDecisionIntegrationTest#rejectionWithoutReasonChangesNothing` y `#rejectionReleasesSlotsAndThePatientSeesTheReason` | La validación no depende del formulario: la segunda petición de la prueba va sin cuerpo |
+| DoD — Control de concurrencia demostrado con dos decisiones simultáneas | Cumple | `AdminDecisionIntegrationTest#concurrentDecisionsLetExactlyOneWin`; `AppointmentRepository#lockById` | — |
+| DoD — Sin migraciones salvo cambio de esquema justificado | Cumple | La concurrencia se resuelve con bloqueo pesimista sobre la fila, sin columna de versión: no hubo cambio de esquema para esta HU | V5 (auditoría) pertenece a [[HU-032-auditar-cambios-de-estado-de-cita]] |
+| DoD — Los endpoints exigen rol ADMIN aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | `SecurityConfig` (`/api/admin/**` → `hasRole("ADMIN")`); `AdminDecisionIntegrationTest#onlyAdminDecides`; `AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes` | — |
+| DoD — `citas-web` no permite enviar un rechazo sin motivo y refresca la bandeja ante un 409 | Cumple | `citas-web/src/adminOperations.test.tsx`: «rechazar exige motivo (contador de 500) y lo envía recortado», «un 409 al aprobar informa y recarga la bandeja» y «M7: un 409 al rechazar cierra el modal, informa y recarga la bandeja» | La tercera prueba salió de la verificación independiente |
+| DoD — Pruebas de aprobación, rechazo con liberación, motivo vacío, transiciones inválidas, concurrencia y rol | Cumple | `AdminDecisionIntegrationTest` (13 pruebas); `AppointmentTest` (8); `VerificationGapsIntegrationTest#rejectingAnApprovedAppointmentIs409EvenWithoutReason` y `#patientSeesTheRoleNotTheNameOfTheAdmin` | — |
+| DoD — Contrato de los endpoints de decisión reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Operación — ADMIN (HU-029, HU-030, HU-032)»: `approve`, `reject`, sus códigos y la regla de liberación | — |
+| DoD — Trazabilidad de esta HU y de [[EP-008-operacion-administrativa-de-solicitudes]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 8 criterios y los 12 ítems de DoD en `Cumple`. Queda anotado que la reutilización de la liberación de slots por la cancelación solo podrá comprobarse al cerrar [[HU-026-cancelar-una-cita-futura]]; hoy el punto de liberación es único. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F6 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

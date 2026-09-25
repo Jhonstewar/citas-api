@@ -26,8 +26,8 @@ import com.fcv.citas.application.shared.Refs.SpecialtyRef;
 @Component
 class JdbcAppointmentQueries implements AppointmentQueries {
 
-    private static final String SELECT = """
-            SELECT a.id, st.code AS status, st.name AS status_name,
+    private static final String COLUMNS = """
+                   a.id, st.code AS status, st.name AS status_name,
                    a.scheduled_date, a.start_time, a.end_time,
                    TIME_TO_SEC(TIMEDIFF(a.end_time, a.start_time)) DIV 60 AS duration_minutes,
                    si.id AS site_id, si.code AS site_code, si.name AS site_name,
@@ -41,7 +41,12 @@ class JdbcAppointmentQueries implements AppointmentQueries {
                    CASE WHEN st.code = 'REJECTED' THEN (
                        SELECT h.reason FROM appointment_status_history h
                        WHERE h.appointment_id = a.id AND h.status_id = a.status_id
-                       ORDER BY h.id DESC LIMIT 1) END AS rejection_reason
+                       ORDER BY h.id DESC LIMIT 1) END AS rejection_reason,
+                   EXISTS (SELECT 1 FROM reschedule_requests rq
+                           WHERE rq.appointment_id = a.id AND rq.decided_at IS NULL) AS pending_reschedule
+            """;
+
+    private static final String FROM = """
             FROM appointments a
             JOIN appointment_statuses st ON st.id = a.status_id
             JOIN sites si ON si.id = a.site_id
@@ -51,6 +56,25 @@ class JdbcAppointmentQueries implements AppointmentQueries {
             JOIN appointment_types ty ON ty.id = sp.appointment_type_id
             JOIN users u ON u.id = a.patient_user_id
             JOIN document_types dt ON dt.id = u.document_type_id
+            """;
+
+    private static final String SELECT = "SELECT " + COLUMNS + FROM;
+
+    /** Columnas de una solicitud de reprogramacion ({@code RescheduleRequest}, V3 + V10). */
+    private static final String RESCHEDULE_COLUMNS = """
+                   rr.id AS rr_id, rr.appointment_id AS rr_appointment_id, rs.code AS rr_status,
+                   rs.name AS rr_status_name,
+                   rr.previous_date, rr.previous_start_time, rr.previous_end_time,
+                   ps.id AS previous_site_id, ps.code AS previous_site_code, ps.name AS previous_site_name,
+                   rr.proposed_date, rr.proposed_start_time, rr.proposed_end_time,
+                   qs.id AS proposed_site_id, qs.code AS proposed_site_code, qs.name AS proposed_site_name,
+                   rr.request_reason, rr.decision_reason, rr.created_at AS rr_created_at, rr.decided_at
+            """;
+
+    private static final String RESCHEDULE_JOINS = """
+             JOIN reschedule_statuses rs ON rs.id = rr.status_id
+             JOIN sites ps ON ps.id = rr.previous_site_id
+             JOIN sites qs ON qs.id = rr.proposed_site_id
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -102,6 +126,22 @@ class JdbcAppointmentQueries implements AppointmentQueries {
     }
 
     @Override
+    public List<AppointmentView> findApprovedByProfessional(long professionalId, LocalDate from, LocalDate to,
+            Integer siteId) {
+        MapSqlParameterSource params = new MapSqlParameterSource("professional", professionalId)
+                .addValue("from", from).addValue("to", to);
+        StringBuilder sql = new StringBuilder(SELECT).append("""
+                 WHERE a.professional_id = :professional AND st.code = 'APPROVED'
+                   AND a.scheduled_date BETWEEN :from AND :to""");
+        if (siteId != null) {
+            sql.append(" AND a.site_id = :site");
+            params.addValue("site", siteId);
+        }
+        sql.append(" ORDER BY a.scheduled_date, a.start_time, a.id");
+        return jdbc.query(sql.toString(), params, (rs, i) -> map(rs));
+    }
+
+    @Override
     public List<AppointmentView> findPendingRequests(InboxFilter filter) {
         MapSqlParameterSource params = new MapSqlParameterSource();
         List<String> where = new ArrayList<>(List.of("st.code = 'REQUESTED'"));
@@ -126,6 +166,49 @@ class JdbcAppointmentQueries implements AppointmentQueries {
     }
 
     @Override
+    public List<PendingRescheduleView> findPendingReschedules(InboxFilter filter) {
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        List<String> where = new ArrayList<>(List.of("rs.code = 'PENDING'"));
+        // D24: sede y fecha sobre la franja PROPUESTA, que es lo que el ADMIN decide.
+        if (filter.siteId() != null) {
+            where.add("rr.proposed_site_id = :site");
+            params.addValue("site", filter.siteId());
+        }
+        if (filter.date() != null) {
+            where.add("rr.proposed_date = :date");
+            params.addValue("date", filter.date());
+        }
+        // Profesional y especialidad: los de la cita, que la reprogramacion conserva (RF-15).
+        if (filter.professionalId() != null) {
+            where.add("a.professional_id = :professional");
+            params.addValue("professional", filter.professionalId());
+        }
+        if (filter.specialtyId() != null) {
+            where.add("a.specialty_id = :specialty");
+            params.addValue("specialty", filter.specialtyId());
+        }
+        String sql = "SELECT " + COLUMNS + ", " + RESCHEDULE_COLUMNS + FROM
+                + " JOIN reschedule_requests rr ON rr.appointment_id = a.id" + RESCHEDULE_JOINS
+                + " WHERE " + String.join(" AND ", where)
+                + " ORDER BY rr.proposed_date, rr.proposed_start_time, rr.id";
+        return jdbc.query(sql, params, (rs, i) -> new PendingRescheduleView(map(rs), mapReschedule(rs)));
+    }
+
+    @Override
+    public Optional<RescheduleView> findReschedule(long rescheduleRequestId) {
+        return jdbc.query("SELECT " + RESCHEDULE_COLUMNS + " FROM reschedule_requests rr" + RESCHEDULE_JOINS
+                + " WHERE rr.id = :id", new MapSqlParameterSource("id", rescheduleRequestId),
+                (rs, i) -> mapReschedule(rs)).stream().findFirst();
+    }
+
+    @Override
+    public Optional<RescheduleView> lastReschedule(long appointmentId) {
+        return jdbc.query("SELECT " + RESCHEDULE_COLUMNS + " FROM reschedule_requests rr" + RESCHEDULE_JOINS
+                + " WHERE rr.appointment_id = :id ORDER BY rr.created_at DESC, rr.id DESC LIMIT 1",
+                new MapSqlParameterSource("id", appointmentId), (rs, i) -> mapReschedule(rs)).stream().findFirst();
+    }
+
+    @Override
     public Summary summary(LocalDate today) {
         return jdbc.queryForObject("""
                 SELECT
@@ -137,9 +220,32 @@ class JdbcAppointmentQueries implements AppointmentQueries {
                   (SELECT COUNT(*) FROM appointments a
                      JOIN appointment_statuses st ON st.id = a.status_id
                      WHERE a.scheduled_date = :today AND st.code IN ('REQUESTED', 'APPROVED')) AS today
+                  , (SELECT COUNT(*) FROM reschedule_requests WHERE decided_at IS NULL) AS pending_reschedules
                 """, new MapSqlParameterSource("today", today),
                 (rs, i) -> new Summary(rs.getLong("pending"), rs.getLong("professionals"),
-                        rs.getLong("specialties"), rs.getLong("today")));
+                        rs.getLong("specialties"), rs.getLong("today"), rs.getLong("pending_reschedules")));
+    }
+
+    private static RescheduleView mapReschedule(ResultSet rs) throws SQLException {
+        return new RescheduleView(
+                rs.getLong("rr_id"),
+                rs.getLong("rr_appointment_id"),
+                rs.getString("rr_status"),
+                rs.getString("rr_status_name"),
+                new TimeSlotView(rs.getObject("previous_date", LocalDate.class),
+                        rs.getObject("previous_start_time", LocalTime.class),
+                        rs.getObject("previous_end_time", LocalTime.class),
+                        new SiteRef(rs.getInt("previous_site_id"), rs.getString("previous_site_code"),
+                                rs.getString("previous_site_name"))),
+                new TimeSlotView(rs.getObject("proposed_date", LocalDate.class),
+                        rs.getObject("proposed_start_time", LocalTime.class),
+                        rs.getObject("proposed_end_time", LocalTime.class),
+                        new SiteRef(rs.getInt("proposed_site_id"), rs.getString("proposed_site_code"),
+                                rs.getString("proposed_site_name"))),
+                rs.getString("request_reason"),
+                rs.getString("decision_reason"),
+                rs.getObject("rr_created_at", LocalDateTime.class),
+                rs.getObject("decided_at", LocalDateTime.class));
     }
 
     private static AppointmentView map(ResultSet rs) throws SQLException {
@@ -160,6 +266,7 @@ class JdbcAppointmentQueries implements AppointmentQueries {
                 rs.getObject("created_at", LocalDateTime.class),
                 new PatientRef(rs.getLong("patient_id"), rs.getString("patient_name"),
                         rs.getString("patient_document_type"), rs.getString("patient_document"),
-                        rs.getString("patient_email"), rs.getString("patient_phone")));
+                        rs.getString("patient_email"), rs.getString("patient_phone")),
+                rs.getBoolean("pending_reschedule"));
     }
 }

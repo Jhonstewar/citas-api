@@ -14,4 +14,7 @@ public interface RefreshTokenRepository {
 
     /** Revoca todos los tokens aun no revocados de la familia. */
     void revokeFamily(String familyId, Instant now, String reason);
+
+    /** Revoca todos los tokens aun no revocados del usuario, de todas sus familias (D34). */
+    void revokeAllForUser(long userId, Instant now, String reason);
 }

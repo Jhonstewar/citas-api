@@ -1,16 +1,28 @@
 package com.fcv.citas.application.auth;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import com.fcv.citas.application.TransactionRunner;
+import com.fcv.citas.domain.affiliation.Affiliation;
+import com.fcv.citas.domain.affiliation.AffiliationRepository;
+import com.fcv.citas.domain.affiliation.InsurancePlanCatalog;
 import com.fcv.citas.domain.auth.AccessTokenIssuer;
 import com.fcv.citas.domain.auth.IssuedAccessToken;
 import com.fcv.citas.domain.auth.PasswordHasher;
+import com.fcv.citas.domain.auth.PasswordResetNotifier;
+import com.fcv.citas.domain.auth.PasswordResetToken;
+import com.fcv.citas.domain.auth.PasswordResetTokenRepository;
 import com.fcv.citas.domain.auth.RefreshToken;
 import com.fcv.citas.domain.auth.RefreshTokenRepository;
 import com.fcv.citas.domain.auth.SecureTokenGenerator;
@@ -94,6 +106,12 @@ final class Fakes {
                     firstNames, lastNames, u.email(), phone, u.passwordHash(), u.active(), u.roles()) : u);
         }
 
+        @Override
+        public void updatePasswordHash(long userId, String passwordHash) {
+            users.replaceAll(u -> u.id() == userId ? new User(u.id(), u.documentTypeCode(), u.documentNumber(),
+                    u.firstNames(), u.lastNames(), u.email(), u.phone(), passwordHash, u.active(), u.roles()) : u);
+        }
+
         void replace(User user) {
             users.replaceAll(u -> u.id().equals(user.id()) ? user : u);
         }
@@ -123,8 +141,51 @@ final class Fakes {
             tokens.replaceAll(t -> t.familyId().equals(familyId) ? t.revoke(now, reason) : t);
         }
 
+        @Override
+        public void revokeAllForUser(long userId, Instant now, String reason) {
+            tokens.replaceAll(t -> t.userId() == userId ? t.revoke(now, reason) : t);
+        }
+
         RefreshToken byId(long id) {
             return tokens.stream().filter(t -> t.id() == id).findFirst().orElseThrow();
+        }
+    }
+
+    static final class InMemoryPasswordResetTokens implements PasswordResetTokenRepository {
+        final List<PasswordResetToken> tokens = new ArrayList<>();
+
+        @Override
+        public PasswordResetToken save(PasswordResetToken token) {
+            if (token.id() == null) {
+                PasswordResetToken saved = token.withId((long) tokens.size() + 1);
+                tokens.add(saved);
+                return saved;
+            }
+            tokens.replaceAll(t -> t.id().equals(token.id()) ? token : t);
+            return token;
+        }
+
+        @Override
+        public Optional<PasswordResetToken> findByTokenHashForUpdate(String tokenHash) {
+            return tokens.stream().filter(t -> t.tokenHash().equals(tokenHash)).findFirst();
+        }
+
+        @Override
+        public void revokeUnusedForUser(long userId, Instant now, String reason) {
+            tokens.replaceAll(t -> t.userId() == userId && t.usedAt() == null && t.revokedAt() == null
+                    ? new PasswordResetToken(t.id(), t.userId(), t.tokenHash(), t.issuedAt(), t.expiresAt(), null, now,
+                            reason)
+                    : t);
+        }
+    }
+
+    /** Guarda lo que se le entrega, como haria un buzon de correo. */
+    static final class RecordingNotifier implements PasswordResetNotifier {
+        final List<String> delivered = new ArrayList<>();
+
+        @Override
+        public void deliver(User user, String rawToken, Instant expiresAt) {
+            delivered.add(rawToken);
         }
     }
 
@@ -145,5 +206,41 @@ final class Fakes {
             return new IssuedAccessToken("access-" + user.id() + "-" + counter.incrementAndGet(),
                     issuedAt.plusSeconds(900));
         }
+    }
+
+    /**
+     * Reloj fijo en un instante cuya fecha en UTC (11 de marzo) NO coincide con la de Bogota (10
+     * de marzo): asi una afiliacion fechada en UTC se distingue de una fechada en la zona del
+     * sistema.
+     */
+    static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-11T02:00:00Z"), ZoneOffset.UTC);
+
+    static final LocalDate TODAY_IN_BOGOTA = LocalDate.of(2026, 3, 10);
+
+    static final class InMemoryAffiliations implements AffiliationRepository {
+        final List<Affiliation> affiliations = new ArrayList<>();
+
+        @Override
+        public Affiliation saveNew(Affiliation affiliation) {
+            Affiliation saved = affiliation.withId(affiliations.size() + 1L);
+            affiliations.add(saved);
+            return saved;
+        }
+
+        @Override
+        public Optional<Affiliation> lockCurrent(long userId) {
+            return affiliations.stream().filter(a -> a.userId() == userId && a.current()).findFirst();
+        }
+
+        @Override
+        public void close(Affiliation closed) {
+            affiliations.replaceAll(a -> a.id().equals(closed.id()) ? closed : a);
+        }
+    }
+
+    /** Solo son seleccionables los planes indicados; los demas no existen o estan inactivos. */
+    static InsurancePlanCatalog plans(int... selectable) {
+        Set<Integer> ids = Arrays.stream(selectable).boxed().collect(Collectors.toSet());
+        return ids::contains;
     }
 }

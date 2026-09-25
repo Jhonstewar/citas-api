@@ -2,7 +2,7 @@
 id: HU-024
 tipo: historia-de-usuario
 titulo: "Solicitar cita especializada"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-006-busqueda-de-disponibilidad-y-reserva]]"
 requisitos: [RF-12, RF-19]
 esfuerzo: "Alto"
@@ -155,35 +155,51 @@ Técnicamente es el mismo mecanismo que [[HU-023-agendar-cita-de-medicina-genera
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
-- [ ] La retención usa el mismo puerto y la misma tabla `slot_reservations` que [[HU-023-agendar-cita-de-medicina-general]]; no existe un segundo mecanismo de reserva.
-- [ ] La no-doble-reserva entre flujo general y especializado está demostrada con una prueba concurrente contra MySQL 8.4.
-- [ ] Cita, retención e historial se escriben en una única transacción; un 409 no deja filas parciales.
-- [ ] La política "especializada nace `REQUESTED`" se decide en el dominio a partir del tipo de especialidad y no en el adaptador REST.
-- [ ] El historial se escribe mediante el puerto de [[HU-032-auditar-cambios-de-estado-de-cita]] con origen `USER` y actor.
-- [ ] No se crean migraciones salvo cambio de esquema justificado, en una migración Flyway posterior a V4.
-- [ ] El flujo de `citas-web` informa que la cita está pendiente de aprobación y trata el 409.
-- [ ] Existen pruebas automatizadas de 30 y 60 minutos, concurrencia, pasado, especialidad incorrecta y rol, y pasan.
-- [ ] El contrato del endpoint de solicitud especializada está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
+- [x] La retención usa el mismo puerto y la misma tabla `slot_reservations` que [[HU-023-agendar-cita-de-medicina-general]]; no existe un segundo mecanismo de reserva.
+- [x] La no-doble-reserva entre flujo general y especializado está demostrada con una prueba concurrente contra MySQL 8.4.
+- [x] Cita, retención e historial se escriben en una única transacción; un 409 no deja filas parciales.
+- [x] La política "especializada nace `REQUESTED`" se decide en el dominio a partir del tipo de especialidad y no en el adaptador REST.
+- [x] El historial se escribe mediante el puerto de [[HU-032-auditar-cambios-de-estado-de-cita]] con origen `USER` y actor.
+- [x] No se crean migraciones salvo cambio de esquema justificado, en una migración Flyway posterior a V4.
+- [x] El flujo de `citas-web` informa que la cita está pendiente de aprobación y trata el 409.
+- [x] Existen pruebas automatizadas de 30 y 60 minutos, concurrencia, pasado, especialidad incorrecta y rol, y pasan.
+- [x] El contrato del endpoint de solicitud especializada está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
+Esta es la HU de **GOAL_02**. Además de las pruebas, la solicitud especializada y su retención se ejercitaron contra la API real el 2026-09-23: `EVIDENCIAS_S3.md` §11 caso 3 y §8 (prueba de humo de extremo a extremo, 29 de 29).
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots` | 201 con `status = REQUESTED`, fin a las 09:30 y 60 minutos; el titular es el usuario del token |
+| CA-02 | Cumple | `BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots` | Con la solicitud viva, la búsqueda deja de ofrecer las 08:30 y otro paciente que intenta la misma franja recibe 409 `SLOT_TAKEN`. La exclusión en la búsqueda la produce `JdbcAvailabilityQueries`, que descarta todo slot con fila en `slot_reservations` |
+| CA-03 | Cumple | `BookingIntegrationTest#concurrentGeneralAndSpecializedOnTheSameSlotLetExactlyOneWin` (un profesional con una especialidad general y otra especializada, ambas de 30 minutos; dos pacientes lanzan `/general` y `/specialized` a la vez: uno responde 201 y el otro 409 `SLOT_TAKEN`, una sola fila para ese slot y una sola cita); `#doubleBookingIsRejectedWith409`; `EVIDENCIAS_S3.md` §11 caso 3 | La prueba no asume quién gana: ramifica según el ganador leído de la base y exige `APPROVED` con historial `SYSTEM` sin actor, o `REQUESTED` con historial `USER` y el paciente como actor. En tres ejecuciones ganó el general dos veces y el especializado una |
+| CA-04 | Cumple | `BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots` (`slot_order` 1 y 2); `#sixtyMinutesWithTakenSecondSlotRetainsNothing` (con el consecutivo ocupado, el primer slot no queda retenido); `#sixtyMinutesMustFitInsideTheBlock` (422 `SLOT_NOT_AVAILABLE` si el consecutivo no existe dentro del bloque, decisión D9) | — |
+| CA-05 | Cumple | `BookingIntegrationTest#pastSlotCannotBeBooked` (422 `PAST_TIME`, cero citas) | La prueba usa el flujo general; la comprobación de pasado está en `BookAppointmentUseCase#book`, antes de bifurcar por flujo, así que es la misma para los dos. Equivalencia verificada por lectura del código |
+| CA-06 | Cumple | `BookingIntegrationTest#wrongFlowIsRejectedBothWays` (una especialidad general por la ruta especializada → 422 `WRONG_FLOW`, con `detail` que remite al flujo general); `infrastructure/rest/VerificationGapsIntegrationTest#bookingWithAnInactiveSpecialtyIsRejected` (especializada desactivada → 422 `SPECIALTY_INACTIVE`, cero citas); `BookingIntegrationTest#specialtyNotAssignedToTheProfessionalIsRejected` (422 `SPECIALTY_NOT_ASSIGNED`) | Los tres casos se ejercitan sobre la ruta especializada |
+| CA-07 | Cumple | `BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots` (una única fila con `source = USER` y `actor_user_id` igual al paciente); `domain/appointment/AppointmentTest#specializedIsBornRequestedWithThePatientAsActor` | La fecha y hora las pone MySQL al insertar |
+| CA-08 | Cumple | `BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots`: tras la petición completa, cero filas de historial con estado `APPROVED` para esa cita | Ninguna aprobación automática (RN-03) |
+| CA-09 | Cumple | `BookingIntegrationTest#onlyUsersBookAndAlwaysForThemselves`; `infrastructure/rest/AuthorizationIntegrationTest#onlyUserReachesPatientRoutes` (PROFESSIONAL y ADMIN → 403) | La prueba ejercita el flujo general; las dos rutas están bajo el mismo prefijo `/api/patient/**` y `PatientBookingController#requestSpecialized` toma el paciente de `CurrentUser.id(auth)`, no del cuerpo, que no tiene ese campo |
+| DoD — CA-01 a CA-09 validados con evidencia concreta | Cumple | Filas CA-01 a CA-09 de esta tabla | — |
+| DoD — La retención usa el mismo puerto y la misma tabla que [[HU-023-agendar-cita-de-medicina-general]] | Cumple | `domain/appointment/AppointmentRepository#reserveSlots`, único método de retención, invocado por `BookAppointmentUseCase#book` para los dos flujos; `infrastructure/persistence/appointment/SlotReservationJpaEntity` | No hay un segundo mecanismo de reserva: [[dec-003-libro-unico-slot-reservations]] |
+| DoD — No-doble-reserva entre flujo general y especializado, demostrada contra MySQL 8.4 | Cumple | `BookingIntegrationTest#concurrentGeneralAndSpecializedOnTheSameSlotLetExactlyOneWin`; `EVIDENCIAS_S3.md` §11, apartado «Huecos de evidencia cerrados el 2026-09-23» | Este hueco lo señaló la verificación independiente y se cerró el 2026-09-23 sin tocar `src/main`: faltaba la prueba, no el comportamiento |
+| DoD — Cita, retención e historial en una única transacción; un 409 no deja filas parciales | Cumple | `BookAppointmentUseCase#book` (`tx.inTransaction`); `BookingIntegrationTest#sixtyMinutesWithTakenSecondSlotRetainsNothing` y `#doubleBookingIsRejectedWith409` | — |
+| DoD — «Especializada nace REQUESTED» se decide en el dominio, no en el adaptador REST | Cumple | `domain/appointment/Appointment#requestSpecialized`; la bifurcación se hace por `Specialty#appointmentType` en `BookAppointmentUseCase#book`; `AppointmentTest#specializedIsBornRequestedWithThePatientAsActor` | El controlador no asigna estados |
+| DoD — El historial se escribe por el puerto de [[HU-032-auditar-cambios-de-estado-de-cita]] con origen `USER` y actor | Cumple | `AppointmentRepository#create(Appointment, StatusChange)`; `domain/appointment/StatusChange` rechaza un origen distinto de `SYSTEM` sin actor (`AppointmentTest#nonSystemChangesRequireAnActor`) | — |
+| DoD — Sin migraciones salvo cambio de esquema justificado | Cumple | Se usan `appointments`, `slot_reservations` y `appointment_status_history` de V3 | — |
+| DoD — `citas-web` informa de que la cita queda pendiente de aprobación y trata el 409 | Cumple | `citas-web/src/patientBooking.test.tsx`: «409 SLOT_TAKEN: avisa, recarga las franjas y deja elegir otra hasta enviar la solicitud» y «422: muestra el detail del servidor y se queda en la confirmación»; `citas-web/src/pages/patient/booking/BookingPage.tsx`; `EVIDENCIAS_S3.md` §9, paso 10 de la guía manual | La insignia de estado usa `statusName` del backend («Solicitada») |
+| DoD — Pruebas de 30 y 60 minutos, concurrencia, pasado, especialidad incorrecta y rol | Cumple | `BookingIntegrationTest` (17 pruebas); `VerificationGapsIntegrationTest#bookingWithAnInactiveSpecialtyIsRejected`; `AppointmentTest` (8); `AvailabilityBlockTest` (8) | — |
+| DoD — Contrato del endpoint especializado reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Reserva — USER (HU-022 a HU-025)» | — |
+| DoD — Trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 9 criterios y los 11 ítems de DoD en `Cumple`, incluida la concurrencia cruzada general ↔ especializada que faltaba. Se deja anotado en «Notas y decisiones» un riesgo no bloqueante sobre `slot_reservations`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD, incluida la ejecución contra la API real de `EVIDENCIAS_S3.md` §11.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F5 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
@@ -194,3 +210,5 @@ Técnicamente es el mismo mecanismo que [[HU-023-agendar-cita-de-medicina-genera
 - Incógnita abierta **INC-025** (ver [[EP-006-busqueda-de-disponibilidad-y-reserva]]): no hay límite de solicitudes `REQUESTED` simultáneas por usuario ni prohibición de solapes entre citas propias.
 - Incógnita abierta **INC-008** (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): la afiliación no se exige ni se asocia obligatoriamente; si se decidiera obligatoria para citas especializadas, se añadiría un criterio de bloqueo aquí.
 - Incógnita abierta **INC-036** (ver [[EP-008-operacion-administrativa-de-solicitudes]]): una solicitud cuya fecha pasa sin decisión conserva su retención; el tratamiento corresponde a la operación administrativa.
+- Riesgo no bloqueante detectado en la verificación independiente del 2026-09-23 (registrado también en `wiki/log.md` y en [[dec-003-libro-unico-slot-reservations]]): **`appointments` no tiene ninguna restricción que obligue a una cita a tener filas en `slot_reservations`.** La clave primaria `slot_id` garantiza que una franja no se ocupe dos veces, pero que toda solicitud retenga la suya lo garantiza hoy el código, porque `BookAppointmentUseCase#book` es el único camino de creación. No afecta a ningún criterio de esta HU; queda como deuda de esquema a evaluar con el usuario.
+- La retención de una solicitud especializada usa `reservation_type = 'APPOINTMENT'`. El otro valor previsto por V3, `RESCHEDULE_REQUEST`, **no tiene productor** en S3: llega con [[HU-027-solicitar-reprogramacion-de-cita-aprobada]].

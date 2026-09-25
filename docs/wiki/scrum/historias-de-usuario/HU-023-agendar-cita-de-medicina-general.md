@@ -2,7 +2,7 @@
 id: HU-023
 tipo: historia-de-usuario
 titulo: "Agendar cita de Medicina General"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-006-busqueda-de-disponibilidad-y-reserva]]"
 requisitos: [RF-11, RF-19]
 esfuerzo: "Alto"
@@ -164,36 +164,53 @@ La cita nace con historial: [[HU-032-auditar-cambios-de-estado-de-cita]] se plan
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
-- [ ] La no-doble-reserva descansa en la PK `slot_id` de `slot_reservations` y está demostrada con una prueba concurrente contra MySQL 8.4, no solo con un mock.
-- [ ] La violación de la PK se traduce a 409 y la transacción revierte cita, reservas e historial: no quedan filas parciales.
-- [ ] La creación de la cita general es una operación explícita del dominio que produce `APPROVED`; el estado no se asigna desde el adaptador REST.
-- [ ] El historial se escribe mediante el puerto de [[HU-032-auditar-cambios-de-estado-de-cita]] en la misma transacción.
-- [ ] Se reutiliza la regla de franja ofrecible de [[HU-022-buscar-disponibilidad-con-filtros]] para validar consecutividad y futuro.
-- [ ] No se crean migraciones salvo cambio de esquema justificado, en una migración Flyway posterior a V4.
-- [ ] El endpoint exige rol `USER` y toma al paciente del contexto de autenticación.
-- [ ] El flujo de `citas-web` muestra la cita aprobada y trata el 409 con un mensaje comprensible y la opción de volver a buscar.
-- [ ] Existen pruebas automatizadas de 30 y 60 minutos, concurrencia, pasado, especialidad no general, inactiva o no asociada y rol, y pasan.
-- [ ] El contrato del endpoint de cita general está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
+- [x] La no-doble-reserva descansa en la PK `slot_id` de `slot_reservations` y está demostrada con una prueba concurrente contra MySQL 8.4, no solo con un mock.
+- [x] La violación de la PK se traduce a 409 y la transacción revierte cita, reservas e historial: no quedan filas parciales.
+- [x] La creación de la cita general es una operación explícita del dominio que produce `APPROVED`; el estado no se asigna desde el adaptador REST.
+- [x] El historial se escribe mediante el puerto de [[HU-032-auditar-cambios-de-estado-de-cita]] en la misma transacción.
+- [x] Se reutiliza la regla de franja ofrecible de [[HU-022-buscar-disponibilidad-con-filtros]] para validar consecutividad y futuro.
+- [x] No se crean migraciones salvo cambio de esquema justificado, en una migración Flyway posterior a V4.
+- [x] El endpoint exige rol `USER` y toma al paciente del contexto de autenticación.
+- [x] El flujo de `citas-web` muestra la cita aprobada y trata el 409 con un mensaje comprensible y la opción de volver a buscar.
+- [x] Existen pruebas automatizadas de 30 y 60 minutos, concurrencia, pasado, especialidad no general, inactiva o no asociada y rol, y pasan.
+- [x] El contrato del endpoint de cita general está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
+Además de las pruebas, la no-doble-reserva se ejercitó **contra la API real** el 2026-09-23, con dos clientes HTTP compitiendo por la misma franja sobre un Tomcat y una MySQL reales: `EVIDENCIAS_S3.md` §11.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/BookingIntegrationTest#generalAppointmentIsApprovedReservedAndAudited` | 201 con `status = APPROVED`, 08:30–09:00, 30 minutos, sede y especialidad; en base, `patient_user_id` es el del token. Ninguna acción de ADMIN interviene |
+| CA-02 | Cumple | `BookingIntegrationTest#generalAppointmentIsApprovedReservedAndAudited` | Una fila en `slot_reservations` para la cita, y la búsqueda deja de ofrecer las 08:30 mientras sigue ofreciendo las 09:00 |
+| CA-03 | Cumple | `BookingIntegrationTest#doubleBookingIsRejectedWith409` (409 `SLOT_TAKEN`; una sola cita y una sola fila de historial); `EVIDENCIAS_S3.md` §11 caso 2, reintento secuencial contra la API real | La rama del slot retenido por una **reprogramación** pendiente no es ejercitable en S3: no existe productor de retenciones de tipo `RESCHEDULE_REQUEST` (llega con [[HU-027-solicitar-reprogramacion-de-cita-aprobada]]). El criterio queda cubierto por su otra rama y el mecanismo es común: la clave primaria `slot_id` de `slot_reservations` no mira el motivo de la retención |
+| CA-04 | Cumple | `BookingIntegrationTest#concurrentBookingsOfTheSameSlotLetExactlyOneWin` (8 hilos: uno responde 201 y siete responden 409 con `code = SLOT_TAKEN`; una cita y una fila en `slot_reservations`); `EVIDENCIAS_S3.md` §11 caso 1, dos pacientes reales lanzados a la vez | La prueba afirma el `code` y no solo el estado HTTP, para que quitar el bloqueo pesimista rompa una prueba en vez de degradar el contrato a `CONCURRENT_CHANGE` ([[dec-003-libro-unico-slot-reservations]]) |
+| CA-05 | Cumple | `infrastructure/rest/VerificationGapsIntegrationTest#generalSixtyMinutesReservesTwoConsecutiveSlots` (especialidad GENERAL de 60 minutos: fin a las 09:30 y `slot_order` 1 y 2); `BookingIntegrationTest#sixtyMinutesWithTakenSecondSlotRetainsNothing` y `#sixtyMinutesMustFitInsideTheBlock` (422 `SLOT_NOT_AVAILABLE`) | Las dos últimas corren sobre el flujo especializado; ambos flujos entran por el mismo `BookAppointmentUseCase#book`, que resuelve los slots antes de distinguir el flujo |
+| CA-06 | Cumple | `BookingIntegrationTest#pastSlotCannotBeBooked` (422 `PAST_TIME`, cero citas del profesional) | El instante de comparación se toma en `America/Bogota` (`domain/shared/SystemZone`) |
+| CA-07 | Cumple | `BookingIntegrationTest#wrongFlowIsRejectedBothWays` (422 `WRONG_FLOW`, con un `detail` que remite al flujo especializado); `VerificationGapsIntegrationTest#bookingWithAnInactiveSpecialtyIsRejected` (422 `SPECIALTY_INACTIVE`, cero citas); `BookingIntegrationTest#specialtyNotAssignedToTheProfessionalIsRejected` (422 `SPECIALTY_NOT_ASSIGNED`) | Los tres casos del criterio, cada uno con su código propio |
+| CA-08 | Cumple | `BookingIntegrationTest#generalAppointmentIsApprovedReservedAndAudited` (una única fila de historial, con `source = SYSTEM`, `actor_user_id` nulo y estado `APPROVED`); `domain/appointment/AppointmentTest#generalIsBornApprovedWithSystemHistoryWithoutActor` | La fecha y hora del cambio las pone MySQL al insertar (`StatusHistoryJpaEntity`) |
+| CA-09 | Cumple | `BookingIntegrationTest#onlyUsersBookAndAlwaysForThemselves` | Un PROFESSIONAL recibe 403. Un USER que manda `patientUserId` en el cuerpo crea la cita **a su propio nombre**: ese campo no existe en `BookingRequest` y se descarta |
+| DoD — CA-01 a CA-09 validados con evidencia concreta | Cumple | Filas CA-01 a CA-09 de esta tabla | — |
+| DoD — La no-doble-reserva descansa en la PK `slot_id`, con prueba concurrente contra MySQL 8.4 | Cumple | `V3__schedule_and_appointments.sql` (clave primaria sobre `slot_id` en `slot_reservations`); `BookingIntegrationTest#concurrentBookingsOfTheSameSlotLetExactlyOneWin`; prueba de mutación de `SlotReservationJpaEntity#isNew()` en `EVIDENCIAS_S3.md` §7; `EVIDENCIAS_S3.md` §11 | No es un mock: las pruebas de integración corren contra MySQL 8.4. En el camino de escritura no hay ninguna comprobación previa de «slot libre»: la única barrera es la clave primaria |
+| DoD — La violación de la PK se traduce a 409 y la transacción revierte cita, reservas e historial | Cumple | `BookingIntegrationTest#doubleBookingIsRejectedWith409` (tras el intento fallido siguen existiendo una cita y una fila de historial); `#sixtyMinutesWithTakenSecondSlotRetainsNothing` (el primer slot no queda retenido) | — |
+| DoD — La creación de la cita general es una operación explícita del dominio | Cumple | `domain/appointment/Appointment#bookGeneral` devuelve la cita ya `APPROVED` junto con su `StatusChange`; `AppointmentTest#generalIsBornApprovedWithSystemHistoryWithoutActor`; `infrastructure/rest/appointment/PatientBookingController` no asigna estado | — |
+| DoD — El historial se escribe por el puerto de [[HU-032-auditar-cambios-de-estado-de-cita]] en la misma transacción | Cumple | `domain/appointment/AppointmentRepository#create(Appointment, StatusChange)`, invocado dentro del `tx.inTransaction` de `BookAppointmentUseCase#book` | — |
+| DoD — Se reutiliza la regla de franja ofrecible de [[HU-022-buscar-disponibilidad-con-filtros]] para consecutividad y futuro | Cumple | `domain/schedule/AvailabilityBlock#canHost`, invocada por `BookAppointmentUseCase#book`; `domain/schedule/AvailabilityBlockTest#sixtyMinutesNeedsTheNextSlotInsideTheSameBlock` | El camino de escritura sí usa la regla del dominio. La búsqueda la reimplementa en SQL, lo que se registra como defecto en la matriz de HU-022, no aquí |
+| DoD — Sin migraciones salvo cambio de esquema justificado | Cumple | Se usan `appointments`, `slot_reservations` y `appointment_status_history` de V3; las migraciones posteriores (V5 a V7) son de otras HU | — |
+| DoD — El endpoint exige rol USER y toma al paciente del contexto de autenticación | Cumple | `SecurityConfig` (prefijo `/api/patient/**` con `hasRole("USER")`); `infrastructure/rest/AuthorizationIntegrationTest#onlyUserReachesPatientRoutes`; `PatientBookingController#bookGeneral` con `CurrentUser.id(auth)`; `BookingIntegrationTest#onlyUsersBookAndAlwaysForThemselves` | — |
+| DoD — `citas-web` muestra la cita aprobada y trata el 409 con mensaje comprensible y reintento | Cumple | `citas-web/src/patientBooking.test.tsx`: «cita general: preselecciona Medicina General, resalta los días con cupo y confirma al instante», «409 SLOT_TAKEN: avisa, recarga las franjas y deja elegir otra hasta enviar la solicitud» y «F4: tras un 409 con filtro de profesional, el filtro se reinicia y no queda una lista vacía» | — |
+| DoD — Pruebas de 30 y 60 minutos, concurrencia, pasado, especialidad y rol | Cumple | `BookingIntegrationTest` (17 pruebas); `VerificationGapsIntegrationTest#generalSixtyMinutesReservesTwoConsecutiveSlots` y `#bookingWithAnInactiveSpecialtyIsRejected`; `AppointmentTest` (8); `AvailabilityBlockTest` (8) | — |
+| DoD — Contrato del endpoint de cita general reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Reserva — USER (HU-022 a HU-025)»: ruta, cuerpo, 201 y catálogo de errores | — |
+| DoD — Trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 9 criterios y los 12 ítems de DoD en `Cumple`. Se deja anotado en «Notas y decisiones» un riesgo no bloqueante de la verificación independiente sobre `slot_reservations`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD, incluida la ejecución contra la API real de `EVIDENCIAS_S3.md` §11.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F5 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
@@ -206,3 +223,4 @@ La cita nace con historial: [[HU-032-auditar-cambios-de-estado-de-cita]] se plan
 - Incógnita abierta **INC-026** (ver [[EP-006-busqueda-de-disponibilidad-y-reserva]]): no hay asignación automática de profesional general.
 - El registro de historial con origen `SYSTEM` no identifica actor (`actor_user_id` nulo, permitido por la restricción de V3). No está definido si además debe conservarse qué USER originó la reserva; el titular ya consta en `appointments.patient_user_id`.
 - El PRD no define si dos slots consecutivos pueden pertenecer a bloques contiguos; se sigue la misma suposición que [[HU-022-buscar-disponibilidad-con-filtros]] (mismo bloque).
+- Riesgo no bloqueante detectado en la verificación independiente del 2026-09-23 (registrado también en `wiki/log.md` y en [[dec-003-libro-unico-slot-reservations]]): **`appointments` no tiene ninguna restricción que obligue a una cita a tener filas en `slot_reservations`.** La clave primaria `slot_id` garantiza que una franja no se ocupe dos veces, pero que **toda cita ocupe la suya** lo garantiza hoy el código, porque `BookAppointmentUseCase#book` es el único camino de creación y escribe cita y reservas en la misma transacción. Si apareciera un segundo camino de alta, la base no lo impediría. No afecta a ningún criterio de esta HU; queda como deuda de esquema a evaluar con el usuario.

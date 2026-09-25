@@ -1,6 +1,7 @@
 package com.fcv.citas.domain.shared;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -17,5 +18,10 @@ public final class SystemZone {
 
     public static LocalDateTime now(Clock clock) {
         return LocalDateTime.now(clock.withZone(ZONE));
+    }
+
+    /** "Hoy" segun la zona del sistema, no la del servidor ni la de UTC. */
+    public static LocalDate today(Clock clock) {
+        return LocalDate.now(clock.withZone(ZONE));
     }
 }

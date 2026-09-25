@@ -2,7 +2,7 @@
 id: HU-028
 tipo: historia-de-usuario
 titulo: "Decidir sobre la cita tras el rechazo de una reprogramación"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]"
 requisitos: [RF-15, RF-14]
 esfuerzo: "Medio"
@@ -41,7 +41,7 @@ El valor propio de esta HU es cerrar el ciclo de información: el paciente debe 
 ## Fuera de alcance
 
 - La decisión administrativa, que se cubre en [[HU-031-aprobar-o-rechazar-reprogramacion]].
-- Nueva solicitud de reprogramación tras el rechazo: se realiza por [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] y su número máximo está pendiente de INC-028.
+- Nueva solicitud de reprogramación tras el rechazo: se realiza por [[HU-027-solicitar-reprogramacion-de-cita-aprobada]], que la admite una vez decidida la anterior (D20, CA-10 de HU-027).
 - Persistencia de la elección "conservar": el PRD no la exige (ver notas).
 - Notificación por correo del rechazo: pertenece a la automatización posterior de PRD §10.
 
@@ -147,10 +147,11 @@ El valor propio de esta HU es cerrar el ciclo de información: el paciente debe 
 
 ## Historial de validación
 
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Ciclo de vida del paciente», fase F5 / LOOP_02) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. Ningún criterio contradice D15–D30. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- El PRD no define si la elección "conservar" debe quedar registrada. Sin persistencia, el aviso de rechazo reaparecerá en cada consulta del detalle mientras esa sea la última solicitud; esta HU lo acepta como comportamiento informativo. Si se decide persistir la elección, requiere una migración nueva y un criterio adicional.
-- Incógnita abierta **INC-028** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): no está definido si tras un rechazo el paciente puede volver a solicitar reprogramación ni cuántas veces. Esta HU no lo impide ni lo ofrece explícitamente.
-- Incógnita abierta **INC-027** (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): la cancelación hereda la ausencia de antelación mínima de HU-026.
+- El PRD no define si la elección "conservar" debe quedar registrada. Sin persistencia, el aviso de rechazo reaparecerá en cada consulta del detalle mientras esa sea la última solicitud; esta HU lo acepta como comportamiento informativo. Si se decide persistir la elección, requiere una migración nueva y un criterio adicional. `PLAN_RETOMA_S4.md` F5 confirma «conservar (sin escritura)».
+- **Resuelta (D20, provisional bajo delegación):** INC-028 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): tras un rechazo el paciente **puede** volver a solicitar reprogramación, con una sola solicitud sin decidir a la vez ([[dec-006-decisiones-s4-ciclo-de-vida]]). Esta HU no añade un botón propio para ello; la vía es [[HU-027-solicitar-reprogramacion-de-cita-aprobada]].
+- **Resuelta (D17, provisional bajo delegación):** INC-027 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): la cancelación no tiene antelación mínima; basta con que la cita no haya empezado. CA-05 hereda esa regla de [[HU-026-cancelar-una-cita-futura]].

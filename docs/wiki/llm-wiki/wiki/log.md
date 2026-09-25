@@ -2,7 +2,7 @@
 titulo: "Log de la LLM Wiki"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-16
+actualizado: 2026-09-23
 tags: [log]
 ---
 
@@ -137,3 +137,97 @@ Formato fijo del encabezado, para que sea parseable:
 - HECHO: Claude Code carga `CLAUDE.md`, no `AGENTS.md`. `citas-api/CLAUDE.md` y `citas-web/CLAUDE.md` (nuevos) importan su `AGENTS.md` con `@AGENTS.md`; el `CLAUDE.md` raíz ahora importa el `AGENTS.md` raíz en vez de solo enlazarlo.
 - HECHO: los agentes `backend-*` y `frontend-*` leen el `AGENTS.md` de su repo antes de actuar (sección "Contexto obligatorio").
 - HECHO: un subagente no puede lanzar subagentes; `s2-orchestrator` solo delega si corre como hilo principal (`claude --agent s2-orchestrator`).
+
+## [2026-09-23] learn | Rediseño: el DESIGN.md de Stitch aplicado en código
+
+- DECISIÓN del usuario: aplicar ya el diseño en código con los cuatro mockups disponibles, sin volver a Stitch por las pantallas que faltaban. Página nueva [[dec-005-sistema-visual-stitch]]; índice actualizado.
+- HECHO verificado: las fuentes del diseño estaban declaradas en `tokens.css` pero nadie las cargaba, así que el navegador usaba la pila del sistema. Ahora se autoalojan con `@fontsource` (npm, sin CDN).
+- DECISIÓN: donde el diseño de Stitch no alcanza el contraste de WCAG gana la accesibilidad; tres desviaciones (borde de campo, color de foco, franja elegida) quedan documentadas en la página y en `citas-web/docs/diseno/stitch/RETOMA_REDISENO.md`.
+- HECHO: todo el contenido que Stitch inventó (EPS, historia clínica, SSL, JCI, SMS, sedes mal nombradas) se descartó. Commit `08cbe02` de `citas-web`; typecheck, lint, 83 pruebas y build en verde.
+- PREGUNTA ABIERTA: el gráfico "Citas por sede esta semana" del panel admin no tiene endpoint; `GET /api/admin/summary` solo devuelve contadores.
+
+## [2026-09-23] learn | Corrección: `DESIGN.md` lleva dos paletas y manda la del frontmatter
+
+- HECHO verificado contra el `code.html` de los mockups: la prosa de `DESIGN.md` (primario `#0B5C8C`, aqua `#14B8A6`, fondo `#F4F7FA`) **no** es la paleta que los mockups pintan. La buena es el bloque `colors:` del frontmatter, que el `code.html` carga como configuración de Tailwind: primario `#00446A`, acento `#006B5F`, fondo `#F6F9FF`, texto `#101D27` / `#41474F`, bordes `#C1C7D0` / `#717880`.
+- HECHO: el primer intento usó la paleta de la prosa; **el usuario detectó que los colores no coincidían**. Corregido en `tokens.css` y en [[dec-005-sistema-visual-stitch]] el mismo día.
+- DECISIÓN: `#0B5C8C` se conserva como `primary-container` y como primera parada del degradado del panel de marca, no como acción principal.
+- HECHO: con la paleta correcta desaparecen las tres desviaciones por contraste que se habían documentado; el esquema Material ya viene con los pares calculados.
+- PREFERENCIA del usuario: revisa la fidelidad visual contra los mockups y la reclama. Ante un export de diseño con varias fuentes de color, verificar primero cuál consume el código exportado.
+
+## [2026-09-23] learn | El backend que respondía era de otra copia del laboratorio
+
+- HECHO verificado con `docker inspect`: los contenedores en marcha montaban `Documents\FCV_DES_AND\citas`, no este workspace. Las dos copias compartían `COMPOSE_PROJECT_NAME` (`fcv-citas-training`) y los mismos `container_name`, así que Docker las trataba como el mismo proyecto y mandaba la última que hizo `up`. Página nueva [[riesgo-dos-copias-mismo-proyecto-docker]].
+- HECHO: `docker compose run --rm` crea un contenedor nuevo con el montaje de este repo; `docker compose exec` se engancha al existente. Por eso el hook pre-commit (que usa `run`) nunca delató el problema y el diagnóstico manual (con `exec`) sí se equivocó de carpeta.
+- DECISIÓN: este workspace pasa a proyecto `fcv-citas-v1`, contenedores `fcv-citas-v1-*` y puertos 3308 / 8081 / 5174 (host) / 5175 (contenedor web) / 4201. Las dos copias pueden convivir.
+- DECISIÓN: `vite.config.ts` fija el 5174 con `strictPort: true`. Si Vite salta de puerto, el origen deja de coincidir con `FRONTEND_ORIGIN` y el fallo de CORS se ve en la interfaz como "no pudimos contactar al servidor", que manda a depurar donde no es.
+- HECHO: con el stack propio, Flyway aplicó las 7 migraciones sobre base vacía, Spring encontró 14 repositorios, el humo E2E dio 29/29 y `POST /api/auth/register` devolvió 201 con `Access-Control-Allow-Origin: http://localhost:5174`.
+
+## [2026-09-23] learn | El plan de S3 que trajo el usuario apunta a la otra copia del repo
+
+- HECHO verificado: el plan da por existente la migración `V1__identity.sql`, propone rutas `/api/v1/...` y pide "cerrar S2 marcando HU-001 y HU-002 como completadas". Nada de eso encaja aquí: el V1 real es `V1__identity_and_fixed_catalogs.sql` (vamos por V7), el prefijo es `/api/...` sin `v1`, y HU-001 a HU-004 están `Completada` desde S2. Encaja en cambio con `Documents\FCV_DES_AND\citas` — ver [[riesgo-dos-copias-mismo-proyecto-docker]].
+- HECHO: su numeración de HU tampoco coincide con la de `docs/wiki/scrum/`. Su "HU-011 = afiliación opcional" es nuestra HU-009; nuestra HU-011 es gestionar especialidades. Su "HU-025 aún no existe" es nuestra HU-025, ya implementada.
+- HECHO verificado por cobertura: de los cinco bloques del plan, lo único que no existe es la afiliación opcional. Backend con 185 pruebas y frontend con 83 cubren catálogos, especialidades, profesionales, bloques y slots, búsqueda, reserva general/especializada, bandeja, decisión e historial; el frontend no tiene ningún dato simulado ni `localStorage`.
+- PREGUNTA ABIERTA: la afiliación opcional exige tres decisiones del usuario (A1–A3 en [[sintesis-preguntas-abiertas]]), incluida la de que `eps` y `eps_plans` están vacías y `V4` no las siembra. No se implementó nada.
+
+## [2026-09-23] learn | HU-009 primer corte: afiliación opcional al registrarse
+
+- DECISIÓN del usuario (A1–A3, resueltas en [[sintesis-preguntas-abiertas]]): se amplía el registro con un campo opcional; HU-001 **sigue `Completada`** porque el cambio es aditivo; HU-009 aprobada por él directamente y acotada a la ruta de registro; y el catálogo de EPS se crea **por script**, no por migración ni por CRUD de HU-012.
+- DECISIÓN de contrato: `GET /api/catalogs/insurance-plans` es la **única lectura de catálogo pública**. Quien se registra no tiene sesión, así que exigir token haría el campo inutilizable. Declarada sin método en `SecurityConfig` para que un POST responda 405 y no 401. Documentada en [[contrato-rest-identidad]].
+- DECISIÓN: plan inexistente, inactivo o de EPS inactiva comparten el mismo `422 INSURANCE_PLAN_UNAVAILABLE` para no revelar si el plan existe. El predicado "plan ofrecible" se escribe una sola vez y lo comparten el listado y la validación, así que no pueden divergir.
+- HECHO verificado contra la API real, no solo con pruebas: 7 planes ofrecibles de 9 sembrados, 405 en métodos no-GET, 401 en los demás catálogos, afiliación por FK con `is_current = 1` y `started_on` de hoy en Bogotá, y **cero usuarios creados** en los tres 422 — la transacción revierte el INSERT del usuario.
+- HECHO: la suite del backend pasa de 227 a **241** y la del frontend de 83 a **88**. Corrige de paso una cifra que circulaba mal: el baseline eran 227 pruebas, no 185.
+- HECHO: matar el `docker compose exec` del host **no** mata el JVM del contenedor; hay que `pkill` dentro. Registrado en [[riesgo-dos-copias-mismo-proyecto-docker]] porque durante esta verificación hizo parecer roto un endpoint que funcionaba.
+
+## [2026-09-23] learn | El código del 409 de doble reserva depende del bloqueo, no solo de la PK
+
+- HECHO verificado con 24 perdedores en tres ejecuciones: ante una doble reserva salen siempre `409 SLOT_TAKEN`, nunca `CONCURRENT_CHANGE`. No es mérito solo de la PK de `slot_reservations`: el `SELECT … FOR UPDATE` sobre la fila del profesional serializa a los contendientes, así que el INSERT duplicado falla **dentro** de la transacción y el adaptador puede traducirlo. Sin ese bloqueo la doble reserva seguiría siendo imposible, pero parte de los 409 cambiarían de código. Registrado en [[dec-003-libro-unico-slot-reservations]].
+- DECISIÓN: la prueba concurrente pasa a afirmar el `code` y no solo el status, precisamente para que quitar el bloqueo pesimista rompa una prueba en vez de degradar el contrato en silencio.
+- HECHO: existe ya la carrera cruzada general ↔ especializada que exigía la DoD de HU-024 y que no tenía evidencia. La prueba ramifica según el ganador real; en tres ejecuciones ganó el general dos veces y el especializado una, así que asumir ganador la habría hecho intermitente.
+- HECHO: la garantía última sigue siendo del motor. En el camino de escritura **no hay ningún pre-chequeo de "slot libre"** en la aplicación, y `SlotReservationJpaEntity` implementa `Persistable` con `isNew() = true` para que Spring Data haga `persist` y no `merge`: con `merge` actualizaría la fila ajena en vez de fallar y la doble reserva pasaría inadvertida.
+- PREGUNTA ABIERTA: `appointments` no tiene restricción que obligue a una cita a tener filas en `slot_reservations`. Que toda cita ocupe su franja lo garantiza hoy el código, porque existe un único camino de creación; la base no lo impediría si apareciera otro.
+- HECHO: suite del backend en **242** pruebas. Evidencia en `EVIDENCIAS_S3.md` §11.
+
+## [2026-09-23] lint | Cierre de F11 de S3: saneado completo de `wiki/`
+
+- Contradicciones resueltas: `/api/catalogs/**` (en [[contrato-rest-citas]] decía que **todo** exigía rol autenticado, cuando `insurance-plans` es público desde HU-009, `SecurityConfig.java:69`) y el "plan de EPS" que [[dec-005-sistema-visual-stitch]] listaba como invento de Stitch descartado. La paleta de `DESIGN.md` ya estaba bien resuelta en la página (manda el frontmatter); el rastro desfasado estaba en `index.md`, que aún hablaba de "tres desviaciones por contraste".
+- Claims obsoletos corregidos con verificación: [[datos-modelo-3fn]] decía **cuatro** migraciones y `flyway_schema_history` en v4 → son **siete** (V1..V7, 24 tablas, `FlywayMigratesEmptySchemaTest.java:37,118`), `affiliations` existe desde `V2:145`, y E1/E2/S3 pasan de abiertas a cerradas por `V5` y `V6`. Las cifras de pruebas quedan fechadas (210 = 2026-09-18) frente a las vigentes: **242** backend (`EVIDENCIAS_S3.md` §11) y **88** frontend (`npm test` ejecutado). Puertos y contenedores del proyecto `fcv-citas-v1` verificados contra `docker-compose.yml`; el CORS de [[contrato-rest-identidad]] pasa de "5173" a 5174 con el matiz del fallback.
+- Salud: cero enlaces rotos y cero secretos. Dos huérfanas adoptadas ([[dec-005-sistema-visual-stitch]] y [[riesgo-zona-horaria-columnas-time]], que solo enlazaban `index` y `log`). Colisión de identificadores `A1–A3` deshecha en [[sintesis-preguntas-abiertas]] → `AF1–AF3`. Dos bytes NUL literales retirados de [[riesgo-spring-security-65-trampas]]. `fuentes: []` de [[contrato-rest-identidad]] rellenado.
+- Queda abierto: los dos `.env.example` divergen (raíz 5174/8081 frente a `citas-api/` 5173/8080) — anotado en [[riesgo-dos-copias-mismo-proyecto-docker]], sin tocar código; la comparación del esquema contra `database/reference/` sigue pendiente y el `db.sql` que se citaba **no existe**; y `dominio-` sigue sin ninguna página (candidatas: slot/disponibilidad, estados de la cita, afiliación).
+
+## [2026-09-23] learn | Cierre de S3: 12 HU completadas y tres defectos de especificación
+
+- HECHO: de las 18 HU del alcance de S3, **12 quedan `Completada`** con matriz de evidencia llena. Las 6 restantes siguen abiertas a propósito y con su causa escrita en `docs/wiki/scrum/README.md`: HU-005, HU-011, HU-016, HU-022, HU-029 y HU-033 (esta por diseño, es artefacto vivo).
+- HECHO verificado contra el esquema: `specialties` no tiene restricción única sobre `name`, solo sobre `code`. La unicidad del nombre vive únicamente en el caso de uso.
+- HECHO verificado contra el código: `Professional` no tiene `activate()` ni `deactivate()`; la transición pasa por el puerto genérico `setActive`, que es lo que la DoD de HU-016 descarta.
+- HECHO: la consecutividad de 60 minutos está implementada dos veces, en Java para la reserva y en SQL para la búsqueda. Hoy coinciden; nada impide que divierjan.
+- PREGUNTA ABIERTA: los tres anteriores quedan como S1–S3 en [[sintesis-preguntas-abiertas]], cada uno con la decisión que hace falta para cerrarlo.
+- HECHO: la causa de que HU-022 y HU-029 no cierren es que no existe productor de retenciones por reprogramación. El esquema las soporta desde `V3`, pero sin HU-027 ni HU-031 esos criterios son no verificables, no incumplidos.
+
+## [2026-09-25] learn | Plan de S4: inventario de ambos repos y decisiones pendientes
+
+- HECHO verificado contra las migraciones: el esquema de la reprogramación **ya existe** y no tiene código. `reschedule_requests` (`V3:145`) garantiza una sola solicitud sin decidir por cita con `active_marker` (`V3:160-162`), y `slot_reservations.reservation_type` admite `RESCHEDULE_REQUEST`. HU-027 y HU-031 no deberían necesitar migración.
+- HECHO: `password_reset_tokens` existe desde `V1:198` (hash único, `expires_at`, `used_at`) y ningún código Java la usa. El frontend llama a `/api/auth/password-recovery`, una ruta que el backend no tiene (`contracts.ts` la marca como "ruta supuesta").
+- HECHO: `appointment_status_history` guarda solo el estado nuevo (`status_id`), no el previo (`V3:115`). Registrar la decisión sobre una reprogramación, aunque la cita siga `APPROVED`, no exige migración.
+- HECHO: `AppointmentStatus` ya admite `REQUESTED → CANCELLED` y `APPROVED → {CANCELLED, COMPLETED, NO_SHOW}`, pero `Appointment` solo tiene `approve` y `reject`. Faltan los métodos de dominio de cancelar y cerrar la atención.
+- HECHO: `SecurityConfig` termina en `denyAll()`. Toda ruta de S4 fuera de los prefijos por rol y de `/api/me` (restablecer contraseña, `PUT /api/me`) obliga a tocarlo.
+- PREGUNTA ABIERTA: las decisiones D15–D30 de `PLAN_RETOMA_S4.md` §2 son propuestas del agente y **no** respuestas del usuario. Cubren INC-001, 002, 005, 006, 007, 011, 018, 027, 028, 029, 030, 031 y 036, y N1, N3 y N6 de [[sintesis-preguntas-abiertas]]. Se pasan a una página `dec-006` cuando el usuario las conteste.
+
+## [2026-09-25] learn | Decisiones de S4 resueltas y pantallas nuevas sin Stitch
+
+- DECISIÓN del usuario: aprobación **delegada** para todo el alcance de S4 (D15). Confirmó además D18 (cancelar una cita con reprogramación `PENDING` cancela la solicitud y libera las dos franjas) y D19 (el cierre como `COMPLETED`/`NO_SHOW` se admite desde la hora de inicio). Eligió el LOOP_03 propuesto: "una regla, un sitio".
+- DECISIÓN provisional bajo delegación: D16, D17 y D20–D30, registradas con alternativas en [[dec-006-decisiones-s4-ciclo-de-vida]]. Cierran N1, N3 y N6 de [[sintesis-preguntas-abiertas]].
+- HECHO: las decisiones se numeraron primero D14–D29 y chocaban con la D14 de [[dec-004-decisiones-s3-reserva]]. Se renumeraron a **D15–D30** en el plan y en la entrada de log anterior el mismo día, antes de ningún commit.
+- DECISIÓN (D30): las pantallas de S4 se construyen con el sistema visual y los componentes existentes, sin mockups nuevos. Se apoya en la auditoría del código: 9 de 13 pantallas protegidas ya se hicieron así en S3, `app.css` no tiene ningún color literal y `PANTALLAS_OBLIGATORIAS.md` especifica las pantallas nuevas. La excepción posible es la agenda del profesional con citas y cierre, el único patrón visual nuevo.
+- HECHO medido: `#717880` da 4,47:1 sobre blanco. El comentario de `tokens.css:27` dice 4,1:1 y está mal; como borde cumple igual (WCAG 1.4.11 exige 3:1).
+- HECHO: Edge headless no baja de 492 px de viewport aunque se pida `--window-size=390`. Una captura "móvil" hecha así sale recortada sin que la página tenga ningún defecto: no sirve como evidencia de diseño responsive.
+
+## [2026-09-25] learn | S4 en marcha: LOOP_01, F2–F4, F6, F7 y el F5 que ya no cierra la sesión
+
+- HECHO: **LOOP_01 PASS en 1 iteración** (`EVIDENCIAS_S4.md` §1). Hallazgo que nadie conocía: las dos pruebas **concurrentes** de doble reserva pasan aunque se meta el defecto `isNew() = slotId == null`, porque en una carrera ningún `merge` ve la fila y la PK choca igual. Solo las tres **secuenciales** lo detectan. Desde F2 hay una prueba unitaria que fija `isNew() == true`.
+- HECHO verificado con `mvn test`: backend **242 → 422** pruebas. V8 (nombre único de especialidad), V9 (nombres únicos de EPS y plan, y afiliación con historial, D32/D33). `Ownership` es la política única de ownership; `releaseReservations(ReservationHolder)` es el único camino para liberar franjas; D19 vive en `Appointment#isClosableAt`.
+- HECHO: **la numeración de migraciones la decide Flyway, no el plan.** `outOfOrder=false` y `validate-on-migrate: true` sobre bases persistentes: si V10 se aplicara antes que V9, el arranque fallaría. EPS y afiliación se quedaron con V9, así que la reprogramación usa **V10** (D31). [[dec-006-decisiones-s4-ciclo-de-vida]] y [[contrato-rest-citas]] ya están corregidos.
+- DECISIÓN D36 (pedida por el usuario): refresh token en cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`. **HECHO verificado contra la API real**: login 200 con `Set-Cookie` y sin `refreshToken` en el cuerpo, `Access-Control-Allow-Credentials: true`, refresh con cookie 200, sin cookie 401, logout 204, refresh tras logout 401. El frontend restaura la sesión al arrancar y serializa las renovaciones entre pestañas con Web Locks (`fcv-refresh`), para que dos pestañas no disparen la detección de reuso. [[dec-002-rotacion-refresh-tokens]] ya lo refleja.
+- HECHO: la hamburguesa y la "X" del menú no hacían nada por un **orden de cascada**: `.icon-button { display: inline-grid }` va después de la media query que ocultaba los botones y tiene la misma especificidad, así que ganaba. Ahora la hamburguesa oculta y muestra el menú, y la "X" se quitó a petición del usuario.
+- DECISIÓN D37: una reprogramación cancelada por D18 queda con decisor = paciente y motivo "Cita cancelada por el paciente".
+- PREGUNTA ABIERTA: HU-009 CA-03 pide 409 al repetir el plan vigente y el contrato acordado responde 200 sin cambios. Se implementó el contrato; hay que ajustar el criterio al cerrar.
+- PREFERENCIA del usuario: nada de commits hasta que lo diga.

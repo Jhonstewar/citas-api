@@ -75,9 +75,9 @@ Sin identidad no existe ninguna otra capacidad del producto: las citas, la agend
 | [[HU-002-iniciar-sesion-con-jwt]] | `Completada` |
 | [[HU-003-renovar-sesion-con-refresh-token]] | `Completada` |
 | [[HU-004-cerrar-sesion-revocando-refresh-token]] | `Completada` |
-| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | `Pendiente de aprobación` |
-| [[HU-006-solicitar-recuperacion-de-contrasena]] | `Borrador` |
-| [[HU-007-restablecer-contrasena-con-token]] | `Borrador` |
+| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | `En validación` |
+| [[HU-006-solicitar-recuperacion-de-contrasena]] | `Aprobada` |
+| [[HU-007-restablecer-contrasena-con-token]] | `Aprobada` |
 
 Avance: 4 de 7 HU `Completada` (cierre del 2026-09-17, con verificación independiente de backend y frontend).
 

@@ -29,6 +29,9 @@ public class SlotReservationJpaEntity implements Persistable<Long> {
     @Column(name = "appointment_id")
     private Long appointmentId;
 
+    @Column(name = "reschedule_request_id")
+    private Long rescheduleRequestId;
+
     @Column(name = "slot_order", nullable = false)
     private short slotOrder;
 
@@ -40,6 +43,16 @@ public class SlotReservationJpaEntity implements Persistable<Long> {
         e.slotId = slotId;
         e.reservationType = "APPOINTMENT";
         e.appointmentId = appointmentId;
+        e.slotOrder = (short) order;
+        return e;
+    }
+
+    /** HU-027: retencion de la franja propuesta por una solicitud de reprogramacion PENDING. */
+    public static SlotReservationJpaEntity forRescheduleRequest(long slotId, long rescheduleRequestId, int order) {
+        SlotReservationJpaEntity e = new SlotReservationJpaEntity();
+        e.slotId = slotId;
+        e.reservationType = "RESCHEDULE_REQUEST";
+        e.rescheduleRequestId = rescheduleRequestId;
         e.slotOrder = (short) order;
         return e;
     }

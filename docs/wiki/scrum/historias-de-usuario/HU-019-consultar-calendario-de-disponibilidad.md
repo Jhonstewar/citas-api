@@ -2,7 +2,7 @@
 id: HU-019
 tipo: historia-de-usuario
 titulo: "Consultar el calendario de disponibilidad propio"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-005-agenda-del-profesional]]"
 requisitos: [RF-08]
 esfuerzo: "Bajo"
@@ -121,29 +121,41 @@ El calendario no muestra solo las franjas publicadas: debe distinguir qué slots
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-05 están validados con evidencia concreta.
-- [ ] El endpoint de calendario exige rol `PROFESSIONAL` y resuelve el titular desde el contexto de autenticación, ignorando cualquier identificador recibido por parámetro.
-- [ ] La respuesta incluye el estado de cada slot y no expone datos de pacientes ni de citas ajenas.
-- [ ] El filtro por rango de fechas se valida en el servidor y se aplica en la consulta a la base de datos, no en memoria sobre el conjunto completo.
-- [ ] La consulta no genera una carga por slot: se resuelve con un número de consultas acotado e independiente del número de slots.
-- [ ] La pantalla de calendario de `citas-web` consume la API mediante la URL del backend leída de la configuración de entorno.
-- [ ] Existen pruebas automatizadas de la consulta con filtro de fechas y del aislamiento entre profesionales, y pasan.
-- [ ] El contrato del endpoint de calendario está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-05 están validados con evidencia concreta.
+- [x] El endpoint de calendario exige rol `PROFESSIONAL` y resuelve el titular desde el contexto de autenticación, ignorando cualquier identificador recibido por parámetro.
+- [x] La respuesta incluye el estado de cada slot y no expone datos de pacientes ni de citas ajenas.
+- [x] El filtro por rango de fechas se valida en el servidor y se aplica en la consulta a la base de datos, no en memoria sobre el conjunto completo.
+- [x] La consulta no genera una carga por slot: se resuelve con un número de consultas acotado e independiente del número de slots.
+- [x] La pantalla de calendario de `citas-web` consume la API mediante la URL del backend leída de la configuración de entorno.
+- [x] Existen pruebas automatizadas de la consulta con filtro de fechas y del aislamiento entre profesionales, y pasan.
+- [x] El contrato del endpoint de calendario está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/ScheduleIntegrationTest#aDayAcceptsSeveralBlocks` (`GET /api/professional/blocks?from=…&to=…` devuelve los dos bloques del día, con `startTime` y el conteo de franjas); `#blockExpandsIntoEightSlotsStoredWithTheSameLocalTimes` (`$.site.code`, `$.date`, `$.startTime`, `$.endTime`) | `BlockView` lleva fecha, franja, sede y la lista de slots |
+| CA-02 | Cumple | `ScheduleIntegrationTest#blockWithAppointmentsCannotChange` (`slots[0].available = false` con la cita puesta, `slots[1].available = true`); `infrastructure/persistence/schedule/JdbcScheduleQueries` (`available` = `r.slot_id IS NULL` sobre `slot_reservations`, sin mirar el estado de la cita); `citas-web/src/professionalAgenda.test.tsx` → «muestra los bloques de lunes a domingo y diferencia franjas libres de ocupadas (HU-019 CA-02)» | La prueba cubre el slot ocupado por una cita aprobada. El slot **retenido** por una solicitud `REQUESTED` cae por el mismo `LEFT JOIN slot_reservations`, que no distingue el motivo de la retención; esa equivalencia se verifica por lectura de código y por `infrastructure/rest/BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots`, que comprueba que una `REQUESTED` sí escribe sus filas en `slot_reservations` |
+| CA-03 | Cumple | `ScheduleIntegrationTest#professionalCannotTouchAnotherProfessionalsBlock` (el calendario del otro profesional devuelve `length() = 0`); `application/schedule/ManageScheduleUseCase#calendar` resuelve el titular con `professionalOf(userId)` y el endpoint no acepta ningún parámetro de profesional (`infrastructure/rest/schedule/ProfessionalScheduleController`) | No hay identificador de profesional que enviar: el contrato solo admite `from` y `to` |
+| CA-04 | Cumple | `ScheduleIntegrationTest#rangeFilterLimitsResultsAndEmptyCalendarIsOk` | Con bloques en dos fechas, el rango que cubre solo la segunda devuelve 1 bloque y su `date` es la esperada |
+| CA-05 | Cumple | `ScheduleIntegrationTest#rangeFilterLimitsResultsAndEmptyCalendarIsOk` (rango sin bloques → 200 y `length() = 0`); `citas-web/src/professionalAgenda.test.tsx` → «una semana sin bloques muestra el estado vacío, no un error (HU-019 CA-05)» | — |
+| DoD — CA-01 a CA-05 validados con evidencia concreta | Cumple | Filas CA-01 a CA-05 de esta tabla | — |
+| DoD — Exige rol PROFESSIONAL y resuelve el titular desde la autenticación | Cumple | `SecurityConfig` (`/api/professional/**` → `hasRole("PROFESSIONAL")`); `infrastructure/rest/AuthorizationIntegrationTest#onlyProfessionalReachesProfessionalRoutes` (USER y ADMIN → 403); `ManageScheduleUseCase#calendar` | — |
+| DoD — La respuesta incluye el estado de cada slot y no expone datos de pacientes ni de citas | Cumple | `application/schedule/ScheduleQueries.SlotView` = `(id, startTime, endTime, available)`; `JdbcScheduleQueries` no consulta `appointments` ni `users` | Ni identificador de cita ni nombre de paciente salen del calendario |
+| DoD — El filtro de fechas se valida en el servidor y se aplica en la consulta | Cumple | `ManageScheduleUseCase#calendar` rechaza rango invertido o mayor de 62 días (`InvalidRequestException`); `JdbcScheduleQueries#calendar` filtra con `b.block_date BETWEEN :from AND :to` en SQL | No se traen todos los bloques para filtrarlos en memoria |
+| DoD — La consulta no genera una carga por slot | Cumple | `JdbcScheduleQueries#calendar`: **una sola** sentencia con `LEFT JOIN availability_slots` y `LEFT JOIN slot_reservations`, agrupada en memoria por bloque | Número de consultas independiente del número de slots |
+| DoD — La pantalla de calendario usa la URL del backend del entorno | Cumple | `citas-web/src/api/professionalApi.ts` sobre `API_ROUTES`; `citas-web/src/api/contracts.test.ts`; `citas-web/src/pages/professional/AgendaPage.tsx` | — |
+| DoD — Pruebas de la consulta con filtro de fechas y del aislamiento entre profesionales | Cumple | `ScheduleIntegrationTest#rangeFilterLimitsResultsAndEmptyCalendarIsOk`, `#professionalCannotTouchAnotherProfessionalsBlock`, `#aDayAcceptsSeveralBlocks` | — |
+| DoD — Contrato del endpoint de calendario reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Agenda — PROFESSIONAL (HU-017 a HU-019)», con los tipos `Block` y `Slot` y la regla `editable = futuro && sin reservas` | — |
+| DoD — Trazabilidad de esta HU y de [[EP-005-agenda-del-profesional]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 5 criterios y los 9 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F4 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

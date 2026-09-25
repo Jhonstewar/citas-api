@@ -95,6 +95,14 @@ class JpaUserRepositoryAdapter implements UserRepository, DocumentTypeCatalog {
         users.saveAndFlush(entity);
     }
 
+    @Override
+    public void updatePasswordHash(long userId, String passwordHash) {
+        UserJpaEntity entity = users.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("Usuario inexistente: " + userId));
+        entity.changePasswordHash(passwordHash);
+        users.saveAndFlush(entity);
+    }
+
     private static User toDomain(UserJpaEntity e) {
         Set<Role> domainRoles = e.getRoles().stream().map(r -> Role.valueOf(r.getCode()))
                 .collect(Collectors.toSet());

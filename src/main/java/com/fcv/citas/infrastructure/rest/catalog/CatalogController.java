@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fcv.citas.application.catalog.CatalogQueries;
 import com.fcv.citas.application.catalog.CatalogQueries.AppointmentTypeView;
 import com.fcv.citas.application.catalog.CatalogQueries.CodeName;
+import com.fcv.citas.application.catalog.CatalogQueries.InsurancePlanView;
 import com.fcv.citas.application.catalog.CatalogQueries.SiteView;
 import com.fcv.citas.application.catalog.CatalogQueries.StatusView;
 import com.fcv.citas.application.catalog.ManageSpecialtiesUseCase;
@@ -67,5 +68,15 @@ class CatalogController {
     @GetMapping("/regimes")
     List<CodeName> regimes() {
         return catalogs.regimes();
+    }
+
+    /**
+     * HU-009: unica lectura de catalogo PUBLICA (ver {@code SecurityConfig}). La consume el
+     * formulario de registro, que todavia no tiene sesion. Devuelve solo planes activos de EPS
+     * activas, de modo que el cliente no pueda ofrecer algo que el servidor rechazaria.
+     */
+    @GetMapping("/insurance-plans")
+    List<InsurancePlanView> insurancePlans() {
+        return catalogs.insurancePlans();
     }
 }

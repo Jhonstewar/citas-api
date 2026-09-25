@@ -1,6 +1,7 @@
 package com.fcv.citas.infrastructure.persistence.catalog;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -71,7 +72,12 @@ class JpaSpecialtyRepositoryAdapter implements SpecialtyRepository {
         try {
             return toDomain(specialties.saveAndFlush(entity));
         } catch (DataIntegrityViolationException e) {
-            // Carrera entre existsByCode y el INSERT: la restriccion uq_specialties_code decide.
+            // Carrera entre existsBy* y la escritura: deciden las restricciones unicas de la BD,
+            // uq_specialties_code (V2) y uq_specialties_name (V8). Se distingue por el nombre.
+            String cause = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
+            if (cause.contains("uq_specialties_name")) {
+                throw new DuplicateValueException("name", "Ya existe una especialidad con ese nombre");
+            }
             throw new DuplicateValueException("code", "Ya existe una especialidad con ese código");
         }
     }

@@ -2,7 +2,7 @@
 id: HU-015
 tipo: historia-de-usuario
 titulo: "Asignar sedes al profesional"
-estado: En desarrollo
+estado: Completada
 epica: "[[EP-004-gestion-de-profesionales]]"
 requisitos: [RF-07]
 esfuerzo: "Bajo"
@@ -119,28 +119,39 @@ El esquema existe en V2 como la relación N:M `professional_sites`. Esta HU cons
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-05 están validados con evidencia concreta.
-- [ ] La operación usa la tabla `professional_sites` de V2; cualquier cambio de esquema se hace con una migración Flyway posterior a V4.
-- [ ] La consulta "profesional habilitado en sede" vive en el dominio y es la misma que usa la creación de bloques.
-- [ ] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
-- [ ] La pantalla de `citas-web` obtiene las sedes del catálogo fijo de la API y no las tiene escritas en el código.
-- [ ] Existen pruebas automatizadas de la asignación válida, del conjunto vacío, de la sede inexistente y del rol, y pasan.
-- [ ] El contrato de los endpoints de sedes del profesional está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
+- [x] Los criterios CA-01 a CA-05 están validados con evidencia concreta.
+- [x] La operación usa la tabla `professional_sites` de V2; cualquier cambio de esquema se hace con una migración Flyway posterior a V4.
+- [x] La consulta "profesional habilitado en sede" vive en el dominio y es la misma que usa la creación de bloques.
+- [x] Los endpoints exigen rol `ADMIN` aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]].
+- [x] La pantalla de `citas-web` obtiene las sedes del catálogo fijo de la API y no las tiene escritas en el código.
+- [x] Existen pruebas automatizadas de la asignación válida, del conjunto vacío, de la sede inexistente y del rol, y pasan.
+- [x] El contrato de los endpoints de sedes del profesional está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/ProfessionalAdminIntegrationTest#replacesSitesAndRejectsEmptySet` (alta con HIC; `PUT …/sites` con HIC + ICV → 200 y `sites[*].code` contiene exactamente ambas); `#createsProfessionalWithUserRoleAndHashedPassword` (`sites[0].code = HIC`) | La operación reemplaza el conjunto completo, no añade |
+| CA-02 | Cumple | `ProfessionalAdminIntegrationTest#replacesSitesAndRejectsEmptySet` (conjunto vacío → 400 y el detalle conserva las 2 sedes previas); `domain/professional/ProfessionalTest#rejectsEmptyOrNullSites` | La invariante «al menos una sede» vive en `Professional.requireSites(...)` |
+| CA-03 | Cumple | `ProfessionalAdminIntegrationTest#replacesSitesAndRejectsEmptySet` (`siteIds: [9999]` → 400 y el detalle sigue con 2 sedes); `application/professional/ManageProfessionalsUseCase#requireSites` sobre `domain/catalog/SiteCatalog#allActive` | — |
+| CA-04 | Cumple | `infrastructure/rest/ScheduleIntegrationTest#blockAtUnassignedSiteIsRejected` (ICV → 422 `SITE_NOT_ASSIGNED`, 0 bloques) y `#blockExpandsIntoEightSlotsStoredWithTheSameLocalTimes` (HIC → 201); `infrastructure/rest/VerificationGapsIntegrationTest#siteNoLongerAssignedIsNeitherOfferedNorBookable` | Verificado contra [[HU-017-crear-bloques-de-disponibilidad-con-slots]]. La última prueba añade el caso de quitar la sede después: deja de ofrecerse y deja de admitir reservas |
+| CA-05 | Cumple | `SecurityConfig` (`/api/admin/**` → `hasRole("ADMIN")`); `infrastructure/rest/AuthorizationIntegrationTest#anonymousGets401AndWrongRoleGets403OnAdminRoutes` y `#onlyAdminReachesAdminRoutes` (USER y PROFESSIONAL → 403) | La ruta es `PUT /api/admin/professionals/{id}/sites`: un PROFESSIONAL tampoco cambia las suyas |
+| DoD — CA-01 a CA-05 validados con evidencia concreta | Cumple | Filas CA-01 a CA-05 de esta tabla | — |
+| DoD — Usa `professional_sites` de V2; sin migración nueva | Cumple | `V2__configurable_catalogs_and_professionals.sql` (tabla `professional_sites`); `infrastructure/persistence/professional/ProfessionalSiteJpaEntity` | — |
+| DoD — «Profesional habilitado en sede» vive en el dominio y la usa la creación de bloques | Cumple | `domain/professional/Professional#worksAt`, invocado por `application/schedule/ManageScheduleUseCase#validated` y por `application/appointment/BookAppointmentUseCase#book` | Una sola definición para publicar agenda y para reservar; `HexagonalArchitectureTest` garantiza que no arrastra framework |
+| DoD — Los endpoints exigen rol ADMIN aplicando [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | `SecurityConfig`; `AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` | — |
+| DoD — La pantalla de `citas-web` toma las sedes del catálogo de la API | Cumple | `citas-web/src/api/catalogApi.ts#getSites`; `citas-web/src/pages/admin/professionalPickers.tsx`; `citas-web/src/adminOperations.test.tsx` → «alta: envía especialidades con principal y sedes; un 409 DUPLICATE marca el campo»; `citas-web/src/professionalAgenda.test.tsx` → «crea un bloque: solo sedes asignadas…» | Ninguna sede escrita en el código del frontend |
+| DoD — Pruebas de asignación válida, conjunto vacío, sede inexistente y rol | Cumple | `ProfessionalAdminIntegrationTest#replacesSitesAndRejectsEmptySet`; `ProfessionalTest#rejectsEmptyOrNullSites` y `#acceptsAnAlreadyImmutableSiteSet`; `AuthorizationIntegrationTest#onlyAdminReachesAdminRoutes` | — |
+| DoD — Contrato de los endpoints de sedes reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Profesionales — ADMIN (HU-013 a HU-016)» | — |
+| DoD — Trazabilidad de esta HU y de [[EP-004-gestion-de-profesionales]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-23 — Estado `Completada` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia completa, los 5 criterios y los 8 ítems de DoD en `Cumple`. Cierre dentro de la aprobación delegada de S3 (`AGENTS.md` §6); el usuario puede reabrirla.
+- 2026-09-23 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se recolecta del repositorio la evidencia de cada criterio y de cada ítem de DoD.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F3 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.

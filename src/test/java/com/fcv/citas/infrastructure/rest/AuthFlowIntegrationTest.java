@@ -20,15 +20,20 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.crypto.spec.SecretKeySpec;
+
+import jakarta.servlet.http.Cookie;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -83,6 +88,9 @@ class AuthFlowIntegrationTest {
     private static final String PASSWORD_TOO_LONG_MESSAGE =
             "no debe superar 72 bytes en UTF-8 (la ñ y las vocales con tilde ocupan 2 bytes; los emojis, 4)";
     private static final String WRONG_PASSWORD = "Otra-Clave#9999";
+    private static final String REFRESH_COOKIE = "fcv_refresh";
+    /** JWT_REFRESH_DAYS=7 del perfil de pruebas, en segundos. */
+    private static final long REFRESH_MAX_AGE = Duration.ofDays(7).toSeconds();
 
     /**
      * Reloj de la aplicacion durante estas pruebas (sustituye al bean {@code clock} de
@@ -165,10 +173,40 @@ class AuthFlowIntegrationTest {
         return json.readTree(response);
     }
 
-    private JsonNode login(String email) throws Exception {
-        String response = postJson("/api/auth/login", Map.of("email", email, "password", PASSWORD))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        return json.readTree(response);
+    private MvcResult loginResult(String email) throws Exception {
+        return postJson("/api/auth/login", Map.of("email", email, "password", PASSWORD))
+                .andExpect(status().isOk()).andReturn();
+    }
+
+    /** Refresh token que el login dejo en la cookie {@code fcv_refresh} (D36). */
+    private String loginRefreshToken(String email) throws Exception {
+        return refreshCookieValue(loginResult(email));
+    }
+
+    /** Unica cabecera {@code Set-Cookie} de {@code fcv_refresh} de la respuesta. */
+    private static String refreshSetCookie(MvcResult result) {
+        List<String> headers = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(h -> h.startsWith(REFRESH_COOKIE + "=")).toList();
+        assertThat(headers).as("una sola cabecera Set-Cookie de %s", REFRESH_COOKIE).hasSize(1);
+        return headers.getFirst();
+    }
+
+    private static String refreshCookieValue(MvcResult result) {
+        String header = refreshSetCookie(result);
+        return header.substring(REFRESH_COOKIE.length() + 1, header.indexOf(';'));
+    }
+
+    /** Atributos de la cookie sin {@code Expires}, que depende del reloj: el resto es exacto. */
+    private static Set<String> refreshCookieAttributes(MvcResult result) {
+        String[] parts = refreshSetCookie(result).split(";\\s*");
+        return Arrays.stream(parts).skip(1).filter(p -> !p.startsWith("Expires=")).collect(Collectors.toSet());
+    }
+
+    /** Cookie que el servidor manda borrar: vacia, Max-Age=0 y los mismos Path/HttpOnly/Secure/SameSite. */
+    private static void assertRefreshCookieCleared(MvcResult result) {
+        assertThat(refreshCookieValue(result)).isEmpty();
+        assertThat(refreshCookieAttributes(result))
+                .containsExactlyInAnyOrder("Path=/api/auth", "Max-Age=0", "Secure", "HttpOnly", "SameSite=Strict");
     }
 
     private ResultActions registerWithPassword(String email, String document, String password) throws Exception {
@@ -204,16 +242,34 @@ class AuthFlowIntegrationTest {
                 Arguments.of("73 x 'a': 73 caracteres, 73 bytes", "a".repeat(73)));
     }
 
-    /** Contraseñas de EXACTAMENTE 72 bytes en UTF-8: el maximo que BCrypt usa entero. */
+    /**
+     * Contraseñas de EXACTAMENTE 72 bytes en UTF-8: el maximo que BCrypt usa entero. Desde D29
+     * llevan letra y numero para cumplir la politica (antes eran 36 x ñ, 18 emojis y 72 x 'a');
+     * lo que se prueba —el limite exacto en bytes— no cambia.
+     */
     static Stream<Arguments> passwordsOfExactly72Utf8Bytes() {
         return Stream.of(
-                Arguments.of("36 x ñ", "ñ".repeat(36)),
-                Arguments.of("18 emojis", "😀".repeat(18)),
-                Arguments.of("72 x 'a'", "a".repeat(72)));
+                Arguments.of("35 x ñ + 'a1'", "ñ".repeat(35) + "a1"),
+                Arguments.of("17 emojis + 'a1b2'", "😀".repeat(17) + "a1b2"),
+                Arguments.of("71 x 'a' + '1'", "a".repeat(71) + "1"));
     }
 
+    /** D29: contraseñas que el registro rechaza con el mensaje de cada regla. */
+    static Stream<Arguments> passwordsOutsideThePolicy() {
+        return Stream.of(
+                Arguments.of("abc123", "debe tener al menos 8 caracteres"),
+                Arguments.of("abcdefgh", "debe combinar al menos una letra y un número"),
+                Arguments.of("12345678", "debe combinar al menos una letra y un número"),
+                Arguments.of("ññññññññ", "debe combinar al menos una letra y un número"));
+    }
+
+    /** D36: sin cuerpo, con el refresh token en la cookie. */
     private ResultActions refresh(String refreshToken) throws Exception {
-        return postJson("/api/auth/refresh", Map.of("refreshToken", refreshToken));
+        return mvc.perform(post("/api/auth/refresh").cookie(new Cookie(REFRESH_COOKIE, refreshToken)));
+    }
+
+    private ResultActions logout(String refreshToken) throws Exception {
+        return mvc.perform(post("/api/auth/logout").cookie(new Cookie(REFRESH_COOKIE, refreshToken)));
     }
 
     private ResultActions me(String accessToken) throws Exception {
@@ -397,6 +453,42 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.accessToken").isNotEmpty());
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("passwordsOutsideThePolicy")
+    void registerRejectsPasswordsOutsideThePolicy(String password, String message, CapturedOutput output)
+            throws Exception {
+        String email = uniqueEmail();
+
+        String response = registerWithPassword(email, uniqueDocument(), password)
+                .andExpect(status().isBadRequest())
+                .andExpect(problemJson())
+                .andExpect(jsonPath("$.title").value(INVALID_DATA_TITLE))
+                .andExpect(jsonPath("$.fieldErrors.password").value(message))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(response).doesNotContain(password);
+        assertThat(output.getAll()).doesNotContain(password);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE email = ?", Integer.class, email))
+                .isZero();
+    }
+
+    @Test
+    void registerAcceptsAnyUnicodeLetterForThePolicy() throws Exception {
+        // La ñ y las vocales con tilde son letras (\p{L}): sin ninguna letra ASCII sigue cumpliendo.
+        registerWithPassword(uniqueEmail(), uniqueDocument(), "ñáéíóú2026").andExpect(status().isCreated());
+    }
+
+    /** D29 solo se aplica al FIJAR una contraseña: una cuenta anterior con una clave corta sigue entrando. */
+    @Test
+    void loginDoesNotApplyThePolicyToExistingAccounts() throws Exception {
+        String email = uniqueEmail();
+        register(email, uniqueDocument());
+        String legacy = "corta";
+        jdbc.update("UPDATE users SET password_hash = ? WHERE email = ?", passwordEncoder.encode(legacy), email);
+
+        loginAttempt(email, legacy).andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").isNotEmpty());
+    }
+
     // ------------------------------------------------------------------ Errores de entrada comunes
 
     @Test
@@ -448,20 +540,24 @@ class AuthFlowIntegrationTest {
         assertThat(output.getAll()).doesNotContain(PASSWORD).doesNotContain("Clave-Secreta");
     }
 
+    /**
+     * Antes se probaba sobre {@code /api/auth/logout}; desde D36 el logout no tiene cuerpo (lee la
+     * cookie), asi que el mismo contrato de 400 se fija sobre el login, que sigue exigiendolo.
+     */
     @Test
     void missingOrMistypedBodyReturnsTheSame400Problem() throws Exception {
         // Cuerpo vacio con Content-Type JSON.
-        JsonNode empty = body(mvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON))
+        JsonNode empty = body(mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(problemJson())
                 .andReturn());
         // Sin cuerpo y sin Content-Type.
-        JsonNode absent = body(mvc.perform(post("/api/auth/logout"))
+        JsonNode absent = body(mvc.perform(post("/api/auth/login"))
                 .andExpect(status().isBadRequest())
                 .andExpect(problemJson())
                 .andReturn());
         // JSON valido, pero un objeto donde se espera un texto.
-        JsonNode mistyped = body(postRaw("/api/auth/logout", "{\"refreshToken\": {\"valor\": 1}}")
+        JsonNode mistyped = body(postRaw("/api/auth/login", "{\"email\": {\"valor\": 1}, \"password\": \"x\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(problemJson())
                 .andReturn());
@@ -481,9 +577,12 @@ class AuthFlowIntegrationTest {
         String email = uniqueEmail();
         long userId = register(email, uniqueDocument()).get("id").asLong();
 
-        JsonNode tokens = login(email);
+        MvcResult result = loginResult(email);
+        JsonNode tokens = body(result);
         String access = tokens.get("accessToken").asText();
-        String refresh = tokens.get("refreshToken").asText();
+        // D36: el refresh token sale solo en la cookie; el cuerpo ya no lo lleva.
+        String refresh = refreshCookieValue(result);
+        assertThat(tokens.has("refreshToken")).isFalse();
 
         assertThat(tokens.get("tokenType").asText()).isEqualTo("Bearer");
         assertThat(tokens.get("expiresIn").asLong()).isEqualTo(900);
@@ -656,11 +755,12 @@ class AuthFlowIntegrationTest {
     void logoutWithGarbageBearerStillRevokesTheFamily() throws Exception {
         String email = uniqueEmail();
         register(email, uniqueDocument());
-        String first = login(email).get("refreshToken").asText();
-        String current = body(refresh(first).andExpect(status().isOk()).andReturn()).get("refreshToken").asText();
+        String first = loginRefreshToken(email);
+        String current = refreshCookieValue(refresh(first).andExpect(status().isOk()).andReturn());
 
         // Antes: 401 "Se requiere un access token valido" y el logout no revocaba nada.
-        postJsonWithBearer("/api/auth/logout", Map.of("refreshToken", current), "basura")
+        mvc.perform(post("/api/auth/logout").cookie(new Cookie(REFRESH_COOKIE, current))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer basura"))
                 .andExpect(status().isNoContent());
 
         List<Map<String, Object>> family = jdbc.queryForList("""
@@ -678,11 +778,13 @@ class AuthFlowIntegrationTest {
         String email = uniqueEmail();
         long userId = register(email, uniqueDocument()).get("id").asLong();
 
-        postJsonWithBearer("/api/auth/login", Map.of("email", email, "password", PASSWORD),
+        MvcResult result = postJsonWithBearer("/api/auth/login", Map.of("email", email, "password", PASSWORD),
                 expiredAccessToken(userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+                .andReturn();
+        // D36: el refresh token ya no va en el cuerpo, sino en la cookie.
+        assertThat(refreshCookieValue(result)).isNotEmpty();
     }
 
     @Test
@@ -691,11 +793,11 @@ class AuthFlowIntegrationTest {
         long userId = body(postJsonWithBearer("/api/auth/register", registerBody(email, uniqueDocument()), "basura")
                 .andExpect(status().isCreated())
                 .andReturn()).get("id").asLong();
-        JsonNode tokens = login(email);
+        String refreshToken = loginRefreshToken(email);
 
         // El caso real: el access token ya vencio y el cliente llama a refresh para renovarlo.
-        postJsonWithBearer("/api/auth/refresh", Map.of("refreshToken", tokens.get("refreshToken").asText()),
-                expiredAccessToken(userId))
+        mvc.perform(post("/api/auth/refresh").cookie(new Cookie(REFRESH_COOKIE, refreshToken))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredAccessToken(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty());
     }
@@ -723,18 +825,22 @@ class AuthFlowIntegrationTest {
         // depender de lo que tarde cada peticion. En el pasado para que ningun token nazca con un
         // `iat` posterior al reloj real con el que el decoder valida `exp`.
         CLOCK.freezeAt(Instant.now().minus(Duration.ofMinutes(2)));
-        JsonNode first = login(email);
-        String oldAccess = first.get("accessToken").asText();
-        String oldRefresh = first.get("refreshToken").asText();
+        MvcResult loginResult = loginResult(email);
+        String oldAccess = body(loginResult).get("accessToken").asText();
+        String oldRefresh = refreshCookieValue(loginResult);
 
         Duration elapsed = Duration.ofMinutes(1);
         CLOCK.advance(elapsed);
-        String body = refresh(oldRefresh)
+        MvcResult refreshed = refresh(oldRefresh)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andReturn().getResponse().getContentAsString();
-        JsonNode second = json.readTree(body);
-        String newRefresh = second.get("refreshToken").asText();
+                .andReturn();
+        JsonNode second = body(refreshed);
+        // D36: la renovacion ROTA la cookie; el cuerpo solo trae el access token.
+        String newRefresh = refreshCookieValue(refreshed);
+        assertThat(second.has("refreshToken")).isFalse();
+        assertThat(refreshCookieAttributes(refreshed)).containsExactlyInAnyOrder("Path=/api/auth",
+                "Max-Age=" + REFRESH_MAX_AGE, "Secure", "HttpOnly", "SameSite=Strict");
         String newAccess = second.get("accessToken").asText();
 
         // HU-003 CA-01: access token nuevo, distinto, y con expiracion ESTRICTAMENTE posterior;
@@ -776,8 +882,9 @@ class AuthFlowIntegrationTest {
         register(email, uniqueDocument());
         CLOCK.freezeAt(Instant.now().minus(Duration.ofMinutes(1)));
 
-        JsonNode first = login(email);
-        JsonNode second = body(refresh(first.get("refreshToken").asText()).andExpect(status().isOk()).andReturn());
+        MvcResult firstResult = loginResult(email);
+        JsonNode first = body(firstResult);
+        JsonNode second = body(refresh(refreshCookieValue(firstResult)).andExpect(status().isOk()).andReturn());
 
         Jwt oldJwt = jwtDecoder.decode(first.get("accessToken").asText());
         Jwt newJwt = jwtDecoder.decode(second.get("accessToken").asText());
@@ -792,11 +899,12 @@ class AuthFlowIntegrationTest {
     void reusingOldRefreshTokenReturns401AndRevokesFamily(CapturedOutput output) throws Exception {
         String email = uniqueEmail();
         register(email, uniqueDocument());
-        String oldRefresh = login(email).get("refreshToken").asText();
-        String newRefresh = json.readTree(refresh(oldRefresh).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString()).get("refreshToken").asText();
+        String oldRefresh = loginRefreshToken(email);
+        String newRefresh = refreshCookieValue(refresh(oldRefresh).andExpect(status().isOk()).andReturn());
 
-        refresh(oldRefresh).andExpect(status().isUnauthorized()).andExpect(problemJson());
+        // El reuso tambien borra la cookie que se presento.
+        assertRefreshCookieCleared(refresh(oldRefresh).andExpect(status().isUnauthorized())
+                .andExpect(problemJson()).andReturn());
 
         List<Map<String, Object>> family = jdbc.queryForList("""
                 SELECT t.revoked_at, t.revoked_reason FROM refresh_tokens t JOIN users u ON u.id = t.user_id
@@ -815,17 +923,63 @@ class AuthFlowIntegrationTest {
     void unknownAndExpiredRefreshTokensReturnSame401() throws Exception {
         String email = uniqueEmail();
         register(email, uniqueDocument());
-        String token = login(email).get("refreshToken").asText();
+        String token = loginRefreshToken(email);
         jdbc.update("UPDATE refresh_tokens SET expires_at = ? WHERE token_hash = ?",
                 Timestamp.from(Instant.now().minusSeconds(60)), RefreshTokenHasher.sha256Hex(token));
 
-        String expired = refresh(token).andExpect(status().isUnauthorized())
-                .andReturn().getResponse().getContentAsString();
-        String unknown = refresh("desconocido-" + UUID.randomUUID()).andExpect(status().isUnauthorized())
-                .andReturn().getResponse().getContentAsString();
+        MvcResult expired = refresh(token).andExpect(status().isUnauthorized()).andReturn();
+        MvcResult unknown = refresh("desconocido-" + UUID.randomUUID()).andExpect(status().isUnauthorized())
+                .andReturn();
+        MvcResult absent = mvc.perform(post("/api/auth/refresh")).andExpect(status().isUnauthorized())
+                .andExpect(problemJson()).andReturn();
+        MvcResult tooLong = refresh("x".repeat(257)).andExpect(status().isUnauthorized()).andReturn();
 
-        // Cuerpos completos identicos: nada distingue un token que existio de uno inventado.
-        assertThat(json.readTree(expired)).isEqualTo(json.readTree(unknown));
+        // Cuerpos completos identicos: nada distingue un token que existio de uno inventado, ni
+        // de una cookie ausente (D36). Y en todos los casos la cookie se manda borrar.
+        assertThat(body(expired)).isEqualTo(body(unknown)).isEqualTo(body(absent)).isEqualTo(body(tooLong));
+        assertThat(body(absent).get("detail").asText()).isEqualTo("La sesión no es válida o ha expirado");
+        for (MvcResult result : List.of(expired, unknown, absent, tooLong)) {
+            assertRefreshCookieCleared(result);
+        }
+    }
+
+    // ------------------------------------------------------------------ D36 cookie del refresh token
+
+    @Test
+    void loginSetsTheRefreshCookieWithExactAttributes(CapturedOutput output) throws Exception {
+        String email = uniqueEmail();
+        long userId = register(email, uniqueDocument()).get("id").asLong();
+
+        MvcResult result = loginResult(email);
+        String token = refreshCookieValue(result);
+
+        assertThat(token).isNotBlank().hasSizeLessThanOrEqualTo(256);
+        assertThat(refreshCookieAttributes(result)).containsExactlyInAnyOrder("Path=/api/auth",
+                "Max-Age=" + REFRESH_MAX_AGE, "Secure", "HttpOnly", "SameSite=Strict");
+        assertThat(body(result).has("refreshToken")).isFalse();
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(token);
+        // Solo el hash llega a la base (HU-002 CA-05), y el valor no llega al log.
+        assertThat(jdbc.queryForObject("SELECT token_hash FROM refresh_tokens WHERE user_id = ?", String.class,
+                userId)).isEqualTo(RefreshTokenHasher.sha256Hex(token));
+        assertThat(output.getAll()).doesNotContain(token);
+    }
+
+    /**
+     * El cliente anterior a D36 enviaba el refresh token en el cuerpo. Ahora se ignora: sin cookie
+     * es 401, y el token del cuerpo ni siquiera se consume.
+     */
+    @Test
+    void refreshIgnoresATokenSentInTheBody() throws Exception {
+        String email = uniqueEmail();
+        register(email, uniqueDocument());
+        String token = loginRefreshToken(email);
+
+        assertRefreshCookieCleared(postJson("/api/auth/refresh", Map.of("refreshToken", token))
+                .andExpect(status().isUnauthorized()).andReturn());
+
+        assertThat(jdbc.queryForMap("SELECT used_at, revoked_at FROM refresh_tokens WHERE token_hash = ?",
+                RefreshTokenHasher.sha256Hex(token))).allSatisfy((column, value) -> assertThat(value).isNull());
+        refresh(token).andExpect(status().isOk());
     }
 
     // ------------------------------------------------------------------ HU-004 logout
@@ -834,9 +988,10 @@ class AuthFlowIntegrationTest {
     void logoutRevokesRefreshTokenAndIsIdempotent(CapturedOutput output) throws Exception {
         String email = uniqueEmail();
         register(email, uniqueDocument());
-        String refreshToken = login(email).get("refreshToken").asText();
+        String refreshToken = loginRefreshToken(email);
 
-        postJson("/api/auth/logout", Map.of("refreshToken", refreshToken)).andExpect(status().isNoContent());
+        // D36: el logout lee la cookie y la manda borrar.
+        assertRefreshCookieCleared(logout(refreshToken).andExpect(status().isNoContent()).andReturn());
         Map<String, Object> row = jdbc.queryForMap(
                 "SELECT revoked_at, revoked_reason FROM refresh_tokens WHERE token_hash = ?",
                 RefreshTokenHasher.sha256Hex(refreshToken));
@@ -845,13 +1000,43 @@ class AuthFlowIntegrationTest {
 
         refresh(refreshToken).andExpect(status().isUnauthorized());
 
-        postJson("/api/auth/logout", Map.of("refreshToken", refreshToken)).andExpect(status().isNoContent());
+        logout(refreshToken).andExpect(status().isNoContent());
         assertThat(jdbc.queryForMap("SELECT revoked_at FROM refresh_tokens WHERE token_hash = ?",
                 RefreshTokenHasher.sha256Hex(refreshToken)).get("revoked_at")).isEqualTo(row.get("revoked_at"));
-        postJson("/api/auth/logout", Map.of("refreshToken", "inexistente-" + UUID.randomUUID()))
-                .andExpect(status().isNoContent());
+        logout("inexistente-" + UUID.randomUUID()).andExpect(status().isNoContent());
+        // Sin cookie tambien es 204 y tambien la borra: idempotente, sin confirmar nada.
+        assertRefreshCookieCleared(mvc.perform(post("/api/auth/logout")).andExpect(status().isNoContent())
+                .andReturn());
 
         assertThat(output.getAll()).doesNotContain(refreshToken);
+    }
+
+    @Test
+    void logoutRevokesTheWholeFamilyOfTheCookieAfterRotation() throws Exception {
+        String email = uniqueEmail();
+        register(email, uniqueDocument());
+        String first = loginRefreshToken(email);
+        String current = refreshCookieValue(refresh(first).andExpect(status().isOk()).andReturn());
+
+        logout(current).andExpect(status().isNoContent());
+
+        assertThat(jdbc.queryForList("""
+                SELECT t.revoked_reason FROM refresh_tokens t JOIN users u ON u.id = t.user_id
+                WHERE u.email = ?""", String.class, email)).hasSize(2).containsOnly("LOGOUT");
+        refresh(current).andExpect(status().isUnauthorized());
+    }
+
+    /** El cliente anterior a D36 mandaba el token en el cuerpo: se ignora y no revoca nada. */
+    @Test
+    void logoutIgnoresATokenSentInTheBody() throws Exception {
+        String email = uniqueEmail();
+        register(email, uniqueDocument());
+        String token = loginRefreshToken(email);
+
+        postJson("/api/auth/logout", Map.of("refreshToken", token)).andExpect(status().isNoContent());
+
+        assertThat(jdbc.queryForObject("SELECT revoked_at FROM refresh_tokens WHERE token_hash = ?", Object.class,
+                RefreshTokenHasher.sha256Hex(token))).isNull();
     }
 
     @Test
@@ -859,11 +1044,11 @@ class AuthFlowIntegrationTest {
         String email = uniqueEmail();
         register(email, uniqueDocument());
         // Una sesion viva: hay al menos una fila que un logout mal hecho podria alterar.
-        String liveRefresh = login(email).get("refreshToken").asText();
+        String liveRefresh = loginRefreshToken(email);
         String unknown = "inexistente-" + UUID.randomUUID();
 
         List<Map<String, Object>> before = refreshTokensTable();
-        MvcResult unknownLogout = postJson("/api/auth/logout", Map.of("refreshToken", unknown))
+        MvcResult unknownLogout = logout(unknown)
                 .andExpect(status().isNoContent())
                 .andReturn();
         List<Map<String, Object>> after = refreshTokensTable();
@@ -872,13 +1057,15 @@ class AuthFlowIntegrationTest {
         assertThat(after).isEqualTo(before);
 
         // Mismo codigo y mismo mensaje (ninguno: 204 sin cuerpo) que un logout correcto.
-        MvcResult realLogout = postJson("/api/auth/logout", Map.of("refreshToken", liveRefresh))
+        MvcResult realLogout = logout(liveRefresh)
                 .andExpect(status().isNoContent())
                 .andReturn();
         assertThat(unknownLogout.getResponse().getStatus()).isEqualTo(realLogout.getResponse().getStatus());
         assertThat(unknownLogout.getResponse().getContentAsString())
                 .isEqualTo(realLogout.getResponse().getContentAsString())
                 .isEmpty();
+        // D36: la cabecera que borra la cookie tampoco distingue un caso del otro.
+        assertThat(refreshCookieAttributes(unknownLogout)).isEqualTo(refreshCookieAttributes(realLogout));
 
         // HU-004 CA-06: ninguno de los dos valores llega al log.
         assertThat(output.getAll()).doesNotContain(unknown).doesNotContain(liveRefresh);
@@ -892,12 +1079,37 @@ class AuthFlowIntegrationTest {
                         .header(HttpHeaders.ORIGIN, "http://localhost:5173")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"));
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"))
+                // D36: sin esto el navegador no envia ni guarda la cookie del refresh token.
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+
+        mvc.perform(options("/api/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
 
         mvc.perform(options("/api/auth/login")
                         .header(HttpHeaders.ORIGIN, "http://evil.example")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+    }
+
+    /** Una peticion real con credenciales desde el frontend recibe permiso y la cookie. */
+    @Test
+    void credentialedLoginFromTheFrontendOriginGetsCorsHeadersAndTheCookie() throws Exception {
+        String email = uniqueEmail();
+        register(email, uniqueDocument());
+
+        MvcResult result = mvc.perform(post("/api/auth/login").header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("email", email, "password", PASSWORD))))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+                .andReturn();
+        assertThat(refreshCookieValue(result)).isNotBlank();
     }
 
     // ------------------------------------------------------------------ reloj controlable

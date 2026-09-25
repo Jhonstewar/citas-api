@@ -26,5 +26,9 @@ public interface ProfessionalRepository {
 
     void replaceSites(long professionalId, Set<Integer> siteIds);
 
-    void setActive(long professionalId, boolean active);
+    /**
+     * Persiste el resultado de {@link Professional#activate()} o {@link Professional#deactivate()}:
+     * solo el estado, nunca especialidades, sedes ni citas (HU-016).
+     */
+    void saveActivation(Professional professional);
 }

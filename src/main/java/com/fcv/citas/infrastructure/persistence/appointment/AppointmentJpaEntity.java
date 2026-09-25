@@ -62,6 +62,14 @@ public class AppointmentJpaEntity {
         this.statusId = statusId;
     }
 
+    /** HU-031: la reprogramacion aprobada mueve la cita (dia, horas y sede, D21). */
+    public void moveTo(int siteId, LocalDate scheduledDate, LocalTime startTime, LocalTime endTime) {
+        this.siteId = (short) siteId;
+        this.scheduledDate = scheduledDate;
+        this.startTime = startTime;
+        this.endTime = endTime;
+    }
+
     public Long getId() {
         return id;
     }

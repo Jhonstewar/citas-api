@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fcv.citas.application.professional.CreateProfessionalCommand;
 import com.fcv.citas.application.professional.ManageProfessionalsUseCase;
 import com.fcv.citas.application.professional.ProfessionalQueries.Filter;
-import com.fcv.citas.infrastructure.rest.validation.BcryptPasswordLength;
+import com.fcv.citas.infrastructure.rest.validation.PasswordPolicyCompliant;
 
 /** HU-013 a HU-016: gestion de profesionales. Solo ADMIN (prefijo {@code /api/admin}). */
 @RestController
@@ -37,7 +37,7 @@ class AdminProfessionalController {
             @NotBlank @Size(max = 20) String documentNumber,
             @NotBlank @Email @Size(max = 160) String email,
             @NotBlank @Size(max = 30) String phone,
-            @NotBlank @BcryptPasswordLength String password,
+            @NotBlank @PasswordPolicyCompliant String password,
             @NotBlank @Size(max = 30) String professionalCode,
             @NotBlank @Size(max = 40) String licenseNumber,
             @NotNull(message = "Asigne al menos una especialidad") List<Integer> specialtyIds,
@@ -111,6 +111,6 @@ class AdminProfessionalController {
 
     @PatchMapping("/{id}/status")
     ProfessionalResponse setStatus(@PathVariable long id, @Valid @RequestBody ActiveRequest r) {
-        return ProfessionalResponse.from(professionals.setActive(id, r.active()));
+        return ProfessionalResponse.from(r.active() ? professionals.activate(id) : professionals.deactivate(id));
     }
 }

@@ -14,6 +14,17 @@ public interface CatalogQueries {
     record CodeName(String code, String name) {
     }
 
+    /** Referencia compacta a una fila de catalogo, con su id. */
+    record CatalogRef(int id, String code, String name) {
+    }
+
+    /**
+     * HU-009: plan de EPS ofrecido en el registro. La EPS y el regimen se derivan del plan y no
+     * se almacenan repetidos en la afiliacion.
+     */
+    record InsurancePlanView(int id, String code, String name, CatalogRef eps, CatalogRef regime) {
+    }
+
     record AppointmentTypeView(String code, String name, boolean requiresAdminApproval) {
     }
 
@@ -34,4 +45,10 @@ public interface CatalogQueries {
     List<CodeName> roles();
 
     List<CodeName> regimes();
+
+    /**
+     * HU-009: planes activos de EPS activas, ordenados por EPS y luego por plan. Es la unica
+     * lectura de catalogo publica: la consume el formulario de registro, que aun no tiene sesion.
+     */
+    List<InsurancePlanView> insurancePlans();
 }

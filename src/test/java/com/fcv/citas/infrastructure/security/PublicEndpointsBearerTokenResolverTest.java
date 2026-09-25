@@ -10,7 +10,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 
 /**
- * Fija el alcance exacto de la excepcion: SOLO {@code POST} sobre las cuatro rutas publicas de
+ * Fija el alcance exacto de la excepcion: SOLO {@code POST} sobre las seis rutas publicas de
  * autenticacion ignora la cabecera {@code Authorization}. Cualquier otra combinacion de metodo y
  * ruta sigue leyendo el token, y por tanto sigue exigiendo que sea valido.
  */
@@ -28,7 +28,8 @@ class PublicEndpointsBearerTokenResolverTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout" })
+    @ValueSource(strings = { "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
+        "/api/auth/password-recovery", "/api/auth/password-reset" })
     void ignoresTheAuthorizationHeaderOnPublicAuthPosts(String path) {
         assertThat(resolver.resolve(request("POST", path))).isNull();
     }

@@ -2,7 +2,7 @@
 id: HU-020
 tipo: historia-de-usuario
 titulo: "Consultar la agenda de citas aprobadas"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-005-agenda-del-profesional]]"
 requisitos: [RF-16]
 esfuerzo: "Medio"
@@ -163,9 +163,13 @@ La agenda solo tiene contenido cuando existen citas aprobadas, que llegan por do
 
 ## Historial de validación
 
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Profesional», fase F4) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. Ninguna decisión D15–D30 afecta a sus criterios. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
+
+- Ninguna decisión D15–D30 de [[dec-006-decisiones-s4-ciclo-de-vida]] resuelve las incógnitas de esta HU. Siguen abiertas y se resuelven dentro de F4 con registro: la lista de campos del paciente visibles para el profesional (`PLAN_RETOMA_S4.md` F4: «decidir y justificar la proyección en el contrato», exigido además por la DoD) y el día de inicio de la semana. Si alguna de las dos cambia un criterio, se anota aquí antes de validar.
+- Esta HU cierra además CA-06 de [[HU-005-autorizar-peticiones-por-rol-y-ownership]] (el profesional ve solo datos de sus pacientes), según `PLAN_RETOMA_S4.md` F4.
 
 - Incógnita abierta **INC-017** (ver [[EP-005-agenda-del-profesional]]): sin zona horaria de referencia definida, los filtros por día y por semana de CA-02 y CA-03 quedan expresados sobre la fecha de la cita, sin fijar el desplazamiento aplicado.
 - RF-16 prohíbe exponer datos de usuarios fuera de las propias citas, pero no enumera qué campos del paciente sí puede ver el profesional dentro de sus citas. El conjunto exacto es una decisión humana pendiente; CA-06 se redacta sobre el principio de mínimo necesario y no sobre una lista inventada.

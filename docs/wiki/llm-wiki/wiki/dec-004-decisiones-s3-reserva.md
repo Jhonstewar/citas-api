@@ -2,7 +2,7 @@
 titulo: "Decisión 004 — Decisiones de S3 para reservar citas (aprobación delegada)"
 tipo: decision
 estado: Provisional
-actualizado: 2026-09-18
+actualizado: 2026-09-23
 fuentes: ["PRD.md §4-§5", "PLAN_RETOMA_S3.md", "[[sintesis-preguntas-abiertas]]", "[[datos-modelo-3fn]]"]
 tags: [decision, s3, reserva, aprobacion-delegada]
 ---
@@ -13,6 +13,10 @@ tags: [decision, s3, reserva, aprobacion-delegada]
 pidió continuar S3 "a criterio del agente"). Cada una responde a una pregunta abierta de
 [[sintesis-preguntas-abiertas]] o a una incógnita `INC-NNN` de las épicas. Pasan a `Vigente`
 cuando el usuario las confirme; si rechaza alguna, se anota aquí y se abre la HU afectada.
+
+La tabla va de **D5 a D14** (D1–D4 son las de S2, en [[sintesis-preguntas-abiertas]]). D14 se
+añadió después de D13 y por eso rompe el orden en la tabla; se deja en su sitio para no renumerar
+lo que ya está citado en otras páginas y en [[log]].
 
 | # | Pregunta | Decisión | Alternativa descartada | Motivo |
 |---|---|---|---|---|
@@ -37,8 +41,12 @@ cuando el usuario las confirme; si rechaza alguna, se anota aquí y se abre la H
 
 - [[sintesis-preguntas-abiertas]]
 - [[dec-003-libro-unico-slot-reservations]]
-- [[datos-modelo-3fn]]
+- [[datos-modelo-3fn]] — D7 y D8 ya **aplicadas** en `V6` y `V5`
+- [[contrato-rest-citas]] — los endpoints que estas decisiones producen
+- [[riesgo-prueba-intermitente-flyway]] — la red de hooks que instala D13
 
 ## Historial
 
+- 2026-09-23 (LINT) — aclarado el rango real de la tabla (D5–**D14**, con D14 fuera de orden) y
+  añadido que D7 y D8 ya están aplicadas en migraciones, aunque la decisión siga `Provisional`.
 - 2026-09-18 — creada al planificar S3 (`PLAN_RETOMA_S3.md`).

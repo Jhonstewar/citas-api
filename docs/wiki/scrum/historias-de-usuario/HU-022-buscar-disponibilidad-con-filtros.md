@@ -2,7 +2,7 @@
 id: HU-022
 tipo: historia-de-usuario
 titulo: "Buscar disponibilidad con filtros"
-estado: En desarrollo
+estado: En validación
 epica: "[[EP-006-busqueda-de-disponibilidad-y-reserva]]"
 requisitos: [RF-10, RF-09]
 esfuerzo: "Alto"
@@ -163,31 +163,45 @@ Aunque pertenece a [[EP-006-busqueda-de-disponibilidad-y-reserva]], se planifica
 
 - [ ] Los criterios CA-01 a CA-09 están validados con evidencia concreta.
 - [ ] La regla de franja ofrecible, incluida la consecutividad de 60 minutos, está implementada en el dominio sin dependencias de Spring ni de JPA y es reutilizable por la reserva y la reprogramación.
-- [ ] La ocupación se determina exclusivamente a partir de `slot_reservations`, sin un estado de slot paralelo que pueda desincronizarse.
-- [ ] La búsqueda es de solo lectura y no escribe en ninguna tabla.
-- [ ] No se crean migraciones salvo índices adicionales justificados, que irían en una migración Flyway posterior a V4.
-- [ ] La pantalla de `citas-web` consume la API mediante la URL leída de la configuración de entorno y no calcula disponibilidad en el cliente.
-- [ ] Existen pruebas automatizadas de dominio para la regla de 30 y 60 minutos con sus casos límite, y de integración para cada filtro y cada exclusión, y pasan.
-- [ ] El contrato del endpoint de búsqueda está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] está actualizada en `docs/wiki/scrum/`.
+- [x] La ocupación se determina exclusivamente a partir de `slot_reservations`, sin un estado de slot paralelo que pueda desincronizarse.
+- [x] La búsqueda es de solo lectura y no escribe en ninguna tabla.
+- [x] No se crean migraciones salvo índices adicionales justificados, que irían en una migración Flyway posterior a V4.
+- [x] La pantalla de `citas-web` consume la API mediante la URL leída de la configuración de entorno y no calcula disponibilidad en el cliente.
+- [x] Existen pruebas automatizadas de dominio para la regla de 30 y 60 minutos con sus casos límite, y de integración para cada filtro y cada exclusión, y pasan.
+- [x] El contrato del endpoint de búsqueda está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-23**: backend `docker compose run --rm citas-api-dev mvn -B test` → **242 pruebas, 0 fallos** en 22 clases; frontend `npm test` en `citas-web` → **88 pruebas, 0 fallos**, con `typecheck`, `lint` y `build` en verde. La verificación fue independiente (`backend-verifier` y `frontend-verifier`, agentes que no escribieron el código): `EVIDENCIAS_S3.md` §10. Las clases de prueba del backend cuelgan de `citas-api/src/test/java/com/fcv/citas/`.
+
+**La HU no se cierra.** CA-03 no es verificable hoy y un ítem de DoD está en `No cumple`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | `infrastructure/rest/BookingIntegrationTest#offersRespectDurationAndReservations` | Con las 08:30 ya reservadas, la especialidad de 30 minutos ofrece 3 franjas empezando en 08:00, con `durationMinutes: 30`, y no ofrece las 08:30. `EVIDENCIAS_S3.md` §8 lo repite contra la API real («8 franjas de 30 min») |
+| CA-02 | Cumple | `BookingIntegrationTest#offersRespectDurationAndReservations` (bloque 08:00–10:00 de una especialidad de 60 minutos: ofrece exactamente 08:00, 08:30 y 09:00, nunca 09:30; con las 09:00 reservadas queda solo 08:00, porque 08:30 pierde su consecutivo); `domain/schedule/AvailabilityBlockTest#sixtyMinutesNeedsTheNextSlotInsideTheSameBlock`; `EVIDENCIAS_S3.md` §8 («60 min: 5 franjas, nunca 16:30») | Cubre las cuatro exclusiones del criterio |
+| CA-03 | No verificable | La retención por una cita `REQUESTED` sí está probada: `BookingIntegrationTest#specializedRequestRetainsTwoConsecutiveSlots` (la franja retenida desaparece de la oferta). La retención por una **solicitud de reprogramación `PENDING`** no tiene productor: `reservation_type = 'RESCHEDULE_REQUEST'` solo aparece en `V3__schedule_and_appointments.sql` y en `SlotReservationJpaEntity`; una búsqueda en `src/main` no devuelve ningún código que inserte una fila de ese tipo | El «dado» del criterio exige las dos retenciones a la vez, y la segunda no puede existir en S3: llega con [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] / [[HU-031-aprobar-o-rechazar-reprogramacion]] (S4). Nota técnica a favor: `infrastructure/persistence/appointment/JdbcAvailabilityQueries` excluye con `NOT EXISTS (… FROM slot_reservations r WHERE r.slot_id = s1.id)`, **sin** mirar `reservation_type`, así que cuando exista el productor la exclusión debería darse sola. Aun así, hoy no hay evidencia ejecutable: **`No verificable` y no cuenta como `Cumple`** |
+| CA-04 | Cumple | `infrastructure/rest/VerificationGapsIntegrationTest#searchNeverOffersPastSlots` (bloque de ayer → 0 franjas); `JdbcAvailabilityQueries` (`b.block_date > :today OR (b.block_date = :today AND s1.start_time > :nowTime)`) | El instante se toma en `America/Bogota` |
+| CA-05 | Cumple | `BookingIntegrationTest#searchingRetainsNothingAndSiteFilterNarrows` (filtro de sede: el profesional de HIC no aparece al filtrar por ICV); `VerificationGapsIntegrationTest#availabilityFiltersByAppointmentTypeWithoutSpecialty` (filtro por tipo de cita: todas las franjas son `SPECIALIZED`, aparece la cardióloga y no el médico general; sin especialidad ni tipo → 400); `#offersRespectDurationAndReservations` (filtro de especialidad); `#searchingRetainsNothingAndSiteFilterNarrows` (filtro de rango de fechas en `/availability/days`); `JdbcAvailabilityQueries#filters` compone los cinco filtros | El filtro por profesional se aplica por la misma función `filters(...)` y se ejercita en `EVIDENCIAS_S3.md` §8 y en `citas-web/src/patientBooking.test.tsx` («F4: tras un 409 con filtro de profesional, el filtro se reinicia…») |
+| CA-06 | Cumple | `BookingIntegrationTest#inactiveProfessionalIsNeitherOfferedNorBookable`; `VerificationGapsIntegrationTest#deactivatedSpecialtyIsNoLongerOffered` (3 franjas → 0) y `#siteNoLongerAssignedIsNeitherOfferedNorBookable`; `availabilityFiltersByAppointmentTypeWithoutSpecialty` (el profesional no asociado a la especialidad buscada no aparece) | Las tres exclusiones de RN-08, cada una con su prueba |
+| CA-07 | Cumple | `BookingIntegrationTest#offersRespectDurationAndReservations` (`professional.id`, `durationMinutes`, `startTime`, `endTime`); `infrastructure/rest/appointment/PatientBookingController.OfferResponse` (sede, profesional, especialidad, fecha, inicio, fin y duración); `JdbcAvailabilityQueries#offers` calcula el fin con `start.plusMinutes(duration)` de la especialidad | La duración viene siempre de `specialties.duration_minutes` (RF-09) |
+| CA-08 | Cumple | `BookingIntegrationTest#searchingRetainsNothingAndSiteFilterNarrows`: tras la búsqueda, `COUNT(*)` de `slot_reservations` del profesional es cero | La consulta es exclusivamente `SELECT` |
+| CA-09 | Cumple | `infrastructure/rest/AuthorizationIntegrationTest#onlyUserReachesPatientRoutes` (PROFESSIONAL y ADMIN → 403); `infrastructure/rest/AuthFlowIntegrationTest#protectedEndpointRejectsMissingMalformedAndExpiredTokens` (401 sin token, malformado o caducado) | — |
+| DoD — CA-01 a CA-09 validados con evidencia concreta | No cumple | Fila CA-03, `No verificable` | Bloquea el cierre |
+| DoD — La regla de franja ofrecible, con la consecutividad de 60 minutos, está en el dominio y la reutilizan reserva y reprogramación | No cumple | La regla **existe** en el dominio: `domain/schedule/AvailabilityBlock#canHost(start, slots)`, probada por `AvailabilityBlockTest#sixtyMinutesNeedsTheNextSlotInsideTheSameBlock`, y la **reserva** la usa (`BookAppointmentUseCase#book`). Pero la **búsqueda** no la reutiliza: `JdbcAvailabilityQueries.FROM_WHERE` reimplementa la consecutividad en SQL con `LEFT JOIN availability_slots s2 … ON s2.start_time = ADDTIME(s1.start_time, '00:30:00')` y `sp.duration_minutes = 30 OR (s2.id IS NOT NULL AND NOT EXISTS …)` | Hay **dos** definiciones de la misma regla, una en Java y otra en SQL, que pueden divergir: cambiar el tamaño de slot o permitir citas de 90 minutos exigiría tocar las dos. Hoy coinciden y las pruebas lo confirman por los dos lados, así que no es un defecto funcional, pero el ítem tal como está escrito no se cumple. La cláusula «y la reprogramación» tampoco es comprobable hasta S4. **Acción pendiente de desarrollo:** decidir con el usuario si se acepta la duplicación (documentándola como decisión, dado que la oferta se resuelve en una sola consulta por rendimiento, decisión D14) o si la búsqueda pasa a apoyarse en el dominio. Bloquea el cierre |
+| DoD — La ocupación se determina exclusivamente a partir de `slot_reservations` | Cumple | `JdbcAvailabilityQueries` (dos `NOT EXISTS` sobre `slot_reservations`); `infrastructure/persistence/schedule/JdbcScheduleQueries` (`available` = `r.slot_id IS NULL`); `availability_slots` no tiene ninguna columna de estado (`V3__schedule_and_appointments.sql` líneas 48-61) | Libro único de ocupación: [[dec-003-libro-unico-slot-reservations]]. No hay estado paralelo que pueda desincronizarse |
+| DoD — La búsqueda es de solo lectura y no escribe en ninguna tabla | Cumple | Fila CA-08; `JdbcAvailabilityQueries` solo emite `SELECT` | — |
+| DoD — Sin migraciones salvo índices justificados | Cumple | Se usan las tablas e índices de V3; no hay migración asociada a esta HU | — |
+| DoD — `citas-web` usa la URL del entorno y no calcula disponibilidad en el cliente | Cumple | `citas-web/src/api/patientApi.ts` y `src/pages/patient/booking/offers.ts` (solo agrupan y ordenan lo que devuelve la API); `citas-web/src/patientBooking.test.tsx`: «cita general: preselecciona Medicina General, resalta los días con cupo y confirma al instante»; `citas-web/src/api/contracts.test.ts` | Los días con cupo salen de `/api/patient/availability/days`, no de un cálculo local |
+| DoD — Pruebas de dominio de 30 y 60 minutos con sus casos límite, y de integración de cada filtro y exclusión | Cumple | `AvailabilityBlockTest` (8 pruebas, incluidos los bordes de la rejilla y el 60 que no cabe); `BookingIntegrationTest#offersRespectDurationAndReservations`, `#searchingRetainsNothingAndSiteFilterNarrows`, `#inactiveProfessionalIsNeitherOfferedNorBookable`; `VerificationGapsIntegrationTest#searchNeverOffersPastSlots`, `#deactivatedSpecialtyIsNoLongerOffered`, `#siteNoLongerAssignedIsNeitherOfferedNorBookable`, `#availabilityFiltersByAppointmentTypeWithoutSpecialty` | Falta solo la exclusión por retención de reprogramación (fila CA-03) |
+| DoD — Contrato del endpoint de búsqueda reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`, sección «Reserva — USER (HU-022 a HU-025)»: `/api/patient/availability` y `/availability/days` con sus parámetros, el tipo `Offer` y la regla del máximo de 62 días | — |
+| DoD — Trazabilidad de esta HU y de [[EP-006-busqueda-de-disponibilidad-y-reserva]] actualizada | Cumple | Esta tabla y el historial de validación | — |
 
 ## Historial de validación
 
+- 2026-09-25 — Estado sin cambios (`En validación`). Se retoma en S4 (`PLAN_RETOMA_S4.md` §1, «Qué hay que revisar de antes», R4 y R6): CA-03 se cierra en la fase **F5** (LOOP_02), cuando exista el productor de retenciones `RESCHEDULE_REQUEST` y la prueba de que la búsqueda las excluye; la regla de 60 minutos duplicada en dominio y SQL se unifica en la fase **F8**, LOOP_03 «Una regla, un sitio», elegido por el usuario el 2026-09-25. La verificación de cierre es de **F10**.
+- 2026-09-23 — Estado `En validación` (fase F11 de `PLAN_RETOMA_S3.md`): matriz de evidencia registrada. 8 de 9 criterios en `Cumple`; **no se cierra**. Falta: (1) CA-03, la exclusión de una franja retenida por una solicitud de reprogramación `PENDING`, que no tiene productor —nada inserta `reservation_type = 'RESCHEDULE_REQUEST'`— hasta [[HU-027-solicitar-reprogramacion-de-cita-aprobada]]; (2) el ítem de DoD que exige que la regla de franja ofrecible viva en el dominio y la reutilicen todos los consumidores: `JdbcAvailabilityQueries` reimplementa en SQL la consecutividad de 60 minutos que `AvailabilityBlock#canHost` ya define, así que hay dos definiciones de la misma regla.
 - 2026-09-18 — Estado `En desarrollo` (skill `scrum-spec-orchestrator`, paso 9): se inicia la implementación en la fase F5 de `PLAN_RETOMA_S3.md`.
 - 2026-09-18 — Estado `Aprobada` por **aprobación delegada** de S3: el usuario pidió continuar S3 dejando las decisiones de diseño a criterio del agente (`AGENTS.md` §6). Alcance y decisiones D5–D13 en `PLAN_RETOMA_S3.md` y [[dec-004-decisiones-s3-reserva]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
@@ -200,3 +214,6 @@ Aunque pertenece a [[EP-006-busqueda-de-disponibilidad-y-reserva]], se planifica
 - Incógnita abierta **INC-026** (ver [[EP-006-busqueda-de-disponibilidad-y-reserva]]): no hay asignación automática de profesional; el filtro de profesional es opcional y el usuario elige la franja de un profesional concreto.
 - El PRD no define si dos slots consecutivos pueden pertenecer a dos bloques contiguos del mismo profesional y sede (por ejemplo 08:00–10:00 y 10:00–12:00). CA-02 asume que ambos slots deben pertenecer al mismo bloque; debe confirmarse antes de implementar porque altera T-01.
 - Incógnita abierta **INC-014** (ver [[EP-004-gestion-de-profesionales]]): si a un profesional se le retira una sede con bloques futuros, esta HU no ofrece esos slots, por coherencia con RN-07.
+- Hallazgo de la verificación independiente del 2026-09-23: **no existe ningún productor de retenciones de tipo `RESCHEDULE_REQUEST`.** `V3__schedule_and_appointments.sql` declara el valor en el `ENUM` de `slot_reservations` y `SlotReservationJpaEntity` lo refleja, pero nada lo inserta. Por eso CA-03 queda `No verificable`: la mitad de su «dado» no puede construirse hasta [[HU-027-solicitar-reprogramacion-de-cita-aprobada]]. La consulta de oferta (`JdbcAvailabilityQueries`) excluye cualquier fila de `slot_reservations` sin mirar el tipo, así que la exclusión debería darse sola cuando exista el productor; falta la prueba, no la lógica.
+- Deuda de diseño registrada al validar: la regla de consecutividad de 60 minutos está escrita **dos veces**, en `AvailabilityBlock#canHost` (Java, la usa la reserva) y en el SQL de `JdbcAvailabilityQueries` (la usa la búsqueda). Hoy coinciden y las pruebas lo fijan por los dos lados, pero cualquier cambio de la regla obliga a tocar ambas. Decisión pendiente del usuario: aceptar la duplicación como precio de resolver la oferta en una sola consulta (decisión D14) o unificar.
+- **Decidido el 2026-09-25 (respondido por el usuario):** unificar. Es el LOOP_03 «Una regla, un sitio» de `PLAN_RETOMA_S4.md` F8, que el usuario eligió como reto propio: una sola implementación de la regla de consecutividad y del criterio de "futuro", con prueba de equivalencia búsqueda ↔ reserva y sin cambiar comportamiento aprobado ([[dec-006-decisiones-s4-ciclo-de-vida]]).

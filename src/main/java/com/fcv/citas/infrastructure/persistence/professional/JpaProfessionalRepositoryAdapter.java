@@ -82,10 +82,10 @@ class JpaProfessionalRepositoryAdapter implements ProfessionalRepository {
     }
 
     @Override
-    public void setActive(long professionalId, boolean active) {
-        ProfessionalJpaEntity entity = professionals.findById(professionalId)
+    public void saveActivation(Professional professional) {
+        ProfessionalJpaEntity entity = professionals.findById(professional.id())
                 .orElseThrow(() -> new NotFoundException("El profesional no existe"));
-        entity.setActive(active);
+        entity.setActive(professional.active());
         professionals.saveAndFlush(entity);
     }
 

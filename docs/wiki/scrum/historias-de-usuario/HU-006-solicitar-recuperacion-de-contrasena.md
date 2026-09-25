@@ -2,7 +2,7 @@
 id: HU-006
 tipo: historia-de-usuario
 titulo: "Solicitar recuperación de contraseña"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-001-identidad-y-acceso-seguro]]"
 requisitos: [RF-03]
 esfuerzo: "Medio"
@@ -40,7 +40,7 @@ Esta HU introduce la tabla de tokens de recuperación, por lo que requiere una m
 - Generación de un token de recuperación temporal, de un solo uso y con suficiente aleatoriedad.
 - Persistencia del token únicamente como hash, con referencia al usuario, fecha de expiración y marca de consumo.
 - Respuesta idéntica exista o no el email indicado en el sistema.
-- Entrega del token en entorno de desarrollo mediante log o respuesta controlada, desactivable por configuración fuera de desarrollo.
+- Entrega del token en entorno de laboratorio únicamente en la respuesta controlada, activable por una variable de entorno y desactivada por omisión; nunca en logs (D27, ver notas).
 - Migración Flyway que crea la tabla de tokens de recuperación.
 - Validación server-side del formato del email recibido.
 
@@ -137,9 +137,9 @@ Esta HU introduce la tabla de tokens de recuperación, por lo que requiere una m
 
 ### CA-05 — Entrega del token en desarrollo
 
-**Dado** el entorno de desarrollo con la exposición controlada del token activada por configuración
+**Dado** la aplicación arrancada con la variable de entorno de exposición controlada del token activada
 **Cuando** un usuario registrado solicita la recuperación
-**Entonces** el token queda disponible por el medio configurado y permite continuar el flujo de [[HU-007-restablecer-contrasena-con-token]] sin consultar la base de datos.
+**Entonces** la respuesta de la API contiene el token, la salida de log de la aplicación no lo contiene, y el token permite continuar el flujo de [[HU-007-restablecer-contrasena-con-token]] sin consultar la base de datos (D27).
 
 ### CA-06 — Exposición del token desactivada fuera de desarrollo
 
@@ -189,11 +189,14 @@ Esta HU introduce la tabla de tokens de recuperación, por lo que requiere una m
 
 ## Historial de validación
 
+- 2026-09-25 — CA-05 ajustado a D27: el token viaja solo en la respuesta cuando la variable de laboratorio lo activa y nunca en el log (antes decía "por el medio configurado", que admitía el log). Se ajusta en el mismo sentido el punto de alcance sobre la entrega del token.
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Cuenta», fase F7) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Incógnita abierta **INC-002** (ver [[EP-001-identidad-y-acceso-seguro]]): el PRD no define la vigencia del token de recuperación. CA-04 solo exige que exista una fecha de expiración futura; el valor concreto y si es configurable por entorno requieren decisión humana.
-- Incógnita abierta **INC-005** (ver [[EP-001-identidad-y-acceso-seguro]]): RF-03 permite exponer el token "de forma segura en log/respuesta controlada" en desarrollo sin precisar el mecanismo. CA-05 y CA-06 describen el comportamiento activado y desactivado, pero el medio exacto queda pendiente de decidir.
+- **Resuelta (D27, provisional bajo delegación):** INC-002 (ver [[EP-001-identidad-y-acceso-seguro]]) en lo que toca al token de recuperación: vigencia de **30 minutos, configurable por entorno** ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-04 sigue exigiendo solo una expiración futura; el valor de 30 min se comprueba contra la configuración por defecto al validar. La vigencia de access y refresh token no la toca D27.
+- **Resuelta (D27, provisional bajo delegación):** INC-005 (ver [[EP-001-identidad-y-acceso-seguro]]): el token viaja **en la respuesta** solo si una variable de entorno de laboratorio lo activa, apagada por defecto, y **nunca en logs** ([[dec-006-decisiones-s4-ciclo-de-vida]]). Motivo: un log con tokens contradice PRD §8. CA-05 y CA-06 lo reflejan.
+- Esquema ya existente: la tabla `password_reset_tokens` existe desde `V1__identity_and_fixed_catalogs.sql` (`token_hash CHAR(64)` único, `expires_at`, `used_at`, `revoked_at`). T-02 no requiere migración nueva y CA-08 se valida citando V1 (`PLAN_RETOMA_S4.md` F7).
 - Incógnita abierta: el PRD no indica qué ocurre cuando un mismo usuario solicita la recuperación varias veces seguidas, si los tokens anteriores se invalidan o conviven. Esta HU no lo resuelve y debe confirmarse antes de implementar.
 - Incógnita abierta: el PRD no exige limitación de frecuencia sobre este endpoint público. No se añade ningún criterio al respecto para no inventar requisitos, pero queda señalado como riesgo.

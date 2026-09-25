@@ -2,7 +2,7 @@
 id: HU-021
 tipo: historia-de-usuario
 titulo: "Registrar el cierre de atención"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-005-agenda-del-profesional]]"
 requisitos: [RF-17, RF-19]
 esfuerzo: "Medio"
@@ -28,7 +28,7 @@ relacionadas:
 
 RF-17 otorga al profesional la capacidad de cerrar el ciclo de una cita marcándola como `COMPLETED` cuando el paciente fue atendido o como `NO_SHOW` cuando no se presentó, y exige que el cambio quede registrado en el historial. Es la última transición del recorrido de una cita en el alcance del profesional.
 
-El cierre es una transición de estado y, por tanto, queda sujeto a RN-11, que exige transiciones explícitas y verificables, y a RF-19, que obliga a registrar cita, estado nuevo, actor, fuente, fecha y motivo opcional en cada cambio. Aquí el actor es el profesional y la fuente es `ADMIN` o `USER` según la clasificación que se decida para el rol `PROFESSIONAL`, cuestión que se anota en las notas de esta HU. La escritura del historial se apoya en el mecanismo de [[HU-032-auditar-cambios-de-estado-de-cita]], y el punto de entrada natural es la agenda de [[HU-020-consultar-agenda-de-citas-aprobadas]].
+El cierre es una transición de estado y, por tanto, queda sujeto a RN-11, que exige transiciones explícitas y verificables, y a RF-19, que obliga a registrar cita, estado nuevo, actor, fuente, fecha y motivo opcional en cada cambio. Aquí el actor es el profesional y la fuente es `PROFESSIONAL`, valor que D8 añadió en V5 (ver notas). La escritura del historial se apoya en el mecanismo de [[HU-032-auditar-cambios-de-estado-de-cita]], y el punto de entrada natural es la agenda de [[HU-020-consultar-agenda-de-citas-aprobadas]].
 
 RF-17 describe la cita candidata como "pasada/aplicable" sin precisar la condición, lo que deja abierta la incógnita INC-018 de [[EP-005-agenda-del-profesional]]. Los criterios de esta HU se redactan sobre el mecanismo de la transición y no sobre un umbral temporal concreto.
 
@@ -123,9 +123,9 @@ RF-17 describe la cita candidata como "pasada/aplicable" sin precisar la condici
 
 ### CA-04 — Cita todavía no cerrable rechazada
 
-**Dado** una cita propia en estado `APPROVED` que aún no cumple la condición de aplicabilidad definida para el cierre  
-**Cuando** el profesional intenta cerrarla  
-**Entonces** la API responde con un error que indica que la cita todavía no puede cerrarse, el estado no cambia y no se escribe ninguna entrada de historial.
+**Dado** una cita propia en estado `APPROVED` cuya hora de inicio es posterior al instante actual, y otra cuya hora de inicio ya llegó pero cuya franja aún no ha terminado  
+**Cuando** el profesional intenta cerrar cada una  
+**Entonces** para la primera la API responde con un error que indica que la cita todavía no puede cerrarse, el estado no cambia y no se escribe ninguna entrada de historial; la segunda sí se cierra, porque la condición es la hora de inicio y no el final de la franja, y no existe plazo máximo (D19).
 
 ### CA-05 — Cita en estado terminal rechazada
 
@@ -180,11 +180,13 @@ RF-17 describe la cita candidata como "pasada/aplicable" sin precisar la condici
 
 ## Historial de validación
 
+- 2026-09-25 — CA-04 ajustado a D19: la condición de "todavía no cerrable" deja de ser genérica y pasa a ser "la hora de inicio aún no ha llegado"; se añade el caso de una cita ya empezada y no terminada, que sí se cierra. En el contexto se corrige la frase sobre la fuente del historial, que D8 ya fijó como `PROFESSIONAL`.
+- 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Profesional», fase F4) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
 
 ## Notas y decisiones
 
-- Incógnita abierta **INC-018** (ver [[EP-005-agenda-del-profesional]]): RF-17 habla de una cita "pasada/aplicable" sin precisar desde qué momento puede cerrarse (al terminar su franja, al finalizar el día u otro) ni si existe un plazo máximo para hacerlo. Es una decisión humana pendiente. CA-04 se redacta sobre el mecanismo de rechazo de una cita todavía no aplicable, no sobre un umbral temporal inventado, y T-02 aísla la condición para que la decisión pueda aplicarse sin rehacer el caso de uso.
-- Incógnita abierta **INC-017** (ver [[EP-005-agenda-del-profesional]]): sin zona horaria de referencia definida, cualquier condición temporal de aplicabilidad queda sin punto de corte preciso.
-- RF-19 admite las fuentes `SYSTEM`, `USER` y `ADMIN`, pero el PRD no indica cuál corresponde a una acción ejecutada por un `PROFESSIONAL`. CA-06 exige que la fuente quede registrada sin fijar cuál; el valor concreto debe confirmarse con el usuario del proyecto y alinearse con [[HU-032-auditar-cambios-de-estado-de-cita]].
+- **Resuelta (D19, respondida por el usuario):** INC-018 (ver [[EP-005-agenda-del-profesional]]): una cita `APPROVED` se puede cerrar como `COMPLETED` o `NO_SHOW` **desde su hora de inicio**, sin esperar al final de la franja y **sin plazo máximo**. La condición vive en un único punto de decisión (T-02), para poder cambiarla sin tocar el caso de uso ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-04 lo refleja.
+- Incógnita **INC-017** (ver [[EP-005-agenda-del-profesional]]): no la resuelve ninguna decisión D15–D30. El punto de corte de D19 debe usar el mismo reloj que las demás reglas de "futuro" del sistema (`PLAN_RETOMA_S4.md` §5: `America/Bogota`, ver [[riesgo-zona-horaria-columnas-time]]).
+- **Resuelta antes de S4 (D8 de [[dec-004-decisiones-s3-reserva]]):** la fuente del historial para el cierre es `PROFESSIONAL`, añadida al ENUM `source` por `V5__audit_history_append_only.sql`. CA-06 debe verificarse con ese valor.
 - RF-19 permite un motivo opcional en el historial. El PRD no exige motivo para el cierre de atención, a diferencia del rechazo administrativo de RN-04, por lo que esta HU no lo hace obligatorio.

@@ -70,9 +70,12 @@ Además:
 - Todo secreto se lee de variables de entorno (`.env.example` las enumera). `application.yml`
   no contiene valores reales; la app rechaza un `JWT_ACCESS_SECRET` que sea el marcador `CHANGE_ME`.
 - Nunca registres en logs contraseñas, access tokens ni refresh tokens.
-- Contraseñas con BCrypt; límite de 72 **bytes** validado (`BcryptPasswordLength`).
-- Refresh token rotativo con revocación por familia ante reuso (dec-002).
-- CORS con orígenes exactos desde `FRONTEND_ORIGIN`; nunca `*`.
+- Contraseñas con BCrypt. Al fijar una contraseña se aplica la política D29 de
+  `domain/auth/PasswordPolicy` (mín. 8, letra y dígito, máx. 72 **bytes**) con
+  `@PasswordPolicyCompliant`; el login no la aplica.
+- Refresh token rotativo con revocación por familia ante reuso (dec-002), transportado solo en la
+  cookie `HttpOnly; SameSite=Strict; Path=/api/auth` `fcv_refresh` (D36).
+- CORS con orígenes exactos desde `FRONTEND_ORIGIN` y credenciales; nunca `*` (la app no arranca).
 - Actuator expone solo `health`, sin detalles.
 
 ## 5. Comandos

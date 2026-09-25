@@ -8,6 +8,7 @@ import com.fcv.citas.application.TransactionRunner;
 import com.fcv.citas.application.professional.ProfessionalQueries.Filter;
 import com.fcv.citas.application.professional.ProfessionalQueries.ProfessionalView;
 import com.fcv.citas.domain.auth.PasswordHasher;
+import com.fcv.citas.domain.auth.PasswordPolicy;
 import com.fcv.citas.domain.catalog.SiteCatalog;
 import com.fcv.citas.domain.catalog.Specialty;
 import com.fcv.citas.domain.catalog.SpecialtyRepository;
@@ -66,6 +67,8 @@ public class ManageProfessionalsUseCase {
     }
 
     public ProfessionalView create(CreateProfessionalCommand c) {
+        // D29: el ADMIN fija la contraseña inicial del profesional, asi que tambien aplica la politica.
+        PasswordPolicy.require(c.password(), "password");
         SpecialtyAssignment assignment = SpecialtyAssignment.of(c.specialtyIds(), c.primarySpecialtyId());
         Set<Integer> siteIds = Professional.requireSites(c.siteIds() == null ? null : new HashSet<>(c.siteIds()));
         String email = User.normalizeEmail(c.email());
@@ -134,11 +137,21 @@ public class ManageProfessionalsUseCase {
         return get(id);
     }
 
-    /** HU-016: sin borrado; las citas existentes se conservan (D11). */
-    public ProfessionalView setActive(long id, boolean active) {
+    /** HU-016 CA-02: vuelve a ofrecerse con sus especialidades y sedes previas. */
+    public ProfessionalView activate(long id) {
+        return changeActivation(id, Professional::activate);
+    }
+
+    /** HU-016 CA-01 y CA-05: sin borrado; citas, reservas e historial se conservan (D11). */
+    public ProfessionalView deactivate(long id) {
+        return changeActivation(id, Professional::deactivate);
+    }
+
+    /** La transicion la decide el dominio; aqui solo se carga, se aplica y se persiste. */
+    private ProfessionalView changeActivation(long id, java.util.function.UnaryOperator<Professional> operation) {
         tx.inTransaction(() -> {
-            requireExisting(id);
-            professionals.setActive(id, active);
+            Professional current = professionals.findById(id).orElseThrow(ManageProfessionalsUseCase::notFound);
+            professionals.saveActivation(operation.apply(current));
             return null;
         });
         return get(id);
