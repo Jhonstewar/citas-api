@@ -2,9 +2,9 @@
 titulo: "Decisión 006 — Decisiones de S4 para el ciclo de vida de la cita, la cuenta y la UI"
 tipo: decision
 estado: Provisional
-actualizado: 2026-09-25
-fuentes: ["PRD.md §4-§6", "PLAN_RETOMA_S4.md §2", "[[sintesis-preguntas-abiertas]]", "citas-web/docs/diseno/PANTALLAS_OBLIGATORIAS.md"]
-tags: [decision, s4, ciclo-de-vida, reprogramacion, cuenta, aprobacion-delegada]
+actualizado: 2026-09-30
+fuentes: ["PRD.md §4-§6", "PLAN_RETOMA_S4.md §2, §4 F10, ▶ Dónde retomar", "[[sintesis-preguntas-abiertas]]", "citas-web/docs/diseno/PANTALLAS_OBLIGATORIAS.md", "citas-api/docs/wiki/scrum/HU-*.md (frontmatter)", "evidencias/s4/loops/LOOP-02/iter-1-verifier.json"]
+tags: [decision, s4, ciclo-de-vida, reprogramacion, cuenta, aprobacion-delegada, estado-de-sesion]
 ---
 
 # Decisión 006 — Decisiones de S4
@@ -116,6 +116,87 @@ D29) y HU-032 (por D22) deben revisar su matriz en la verificación final de S4.
 `tokens.css:27` dice 4,1:1 y está mal. Como borde cumple de sobra (WCAG 1.4.11 exige 3:1) y el
 texto deshabilitado está exento, así que solo hay que corregir el comentario.
 
+## Estado real de S4 al pausarse (2026-09-25) y al retomarse (2026-09-30)
+
+Esta sección existe porque el plan **no** se puede leer literalmente: sus casillas dicen más de lo
+que se hizo. Todo lo de abajo se comprobó el 2026-09-30 contra los ficheros reales.
+
+### S4 cerró cero HU
+
+**HECHO**, leído del frontmatter de los 33 `HU-*.md` de `citas-api/docs/wiki/scrum/`:
+
+| Estado | Nº | Cuáles |
+|---|---|---|
+| `Completada` | **16** | HU-001, 002, 003, 004, 010, 013, 014, 015, 017, 018, 019, 023, 024, 025, 030, 032 |
+| `En validación` | 5 | HU-005, 011, 016, 022, 029 — deuda heredada de S3 |
+| `Aprobada`, con código escrito y **sin verificación independiente** | 11 | HU-006, 007, 008, 009, 012, 020, 021, 026, 027, 028, 031 |
+| `En desarrollo` | 1 | HU-033, viva por diseño (artefacto vivo) |
+
+Esas 16 son **exactamente** las mismas que ya estaban cerradas al empezar S4 (§1 de
+`PLAN_RETOMA_S4.md`). Es decir: S4 escribió mucho código y no cerró ninguna historia. Las 11
+`Aprobada` tienen implementación y suites en verde, pero nadie las contrastó HU por HU contra sus
+criterios ni llenó su matriz de evidencia; eso es justamente F10. **`Aprobada` con código no es
+`Completada`.**
+
+### DEFECTO DE DOCUMENTO — las casillas de F10 estaban `[x]` y F10 no se ejecutó (saneado el 2026-09-30)
+
+Las siete casillas de la fase F10 de `PLAN_RETOMA_S4.md` aparecían marcadas. No lo estaban
+porque se hiciera el trabajo: **todo el archivo se escribió en un único commit (`bc13adc`)**, que
+incluye a la vez las casillas marcadas y la sección "▶ Dónde retomar" que lista F10 como
+pendiente. Pruebas de que F10 no corrió:
+
+- ninguna HU pasó a `Completada` en S4 (tabla de arriba), así que la verificación HU por HU no ocurrió;
+- `EVIDENCIAS_S4.md` solo contiene la §1 de LOOP_01: no hay guía de prueba manual en navegador con
+  los tres roles;
+- [[log]] no tiene ninguna entrada `lint` posterior al 2026-09-23 (la última es la del cierre de F11 de S3);
+- [[datos-modelo-3fn]] (líneas 17-20) sigue afirmando que la comparación contra `database/reference/`
+  **sigue pendiente**;
+- la **única** casilla de F10 que sí se cumplió es la última: el push y el merge a `main`.
+
+El error iba **en los dos sentidos**: F4, F6 y F7 estaban **sin marcar** aunque su código está
+escrito, como decía el Registro de avance. Verificado endpoint por endpoint y ruta por ruta:
+`ProfessionalAppointmentController` (agenda, `complete`, `no-show`), `AdminEpsController`,
+`MeController` (`PUT /api/me`, afiliación), `PasswordRecoveryController`, `ResetPasswordUseCase:70`
+(revoca los refresh), `PasswordPolicyCompliant` (D29), `AuthFlowIntegrationTest` con
+`OutputCaptureExtension` (CA-09) y las rutas `perfil`, `/admin/eps` y `/restablecer-password`.
+
+**Saneado el 2026-09-30:** F10 desmarcada salvo el push/merge, cada casilla con la razón de por qué
+no está hecha; F4, F6 y F7 marcadas con la referencia que las prueba; nota de precedencia añadida al
+encabezado del §4 del plan.
+
+> **REGLA, para quien retome:** una casilla `[x]` en `PLAN_RETOMA_S4.md` significa "el código existe
+> y su suite estaba en verde", **no** "HU verificada ni cerrada" — eso es F10, que no ha corrido, y
+> por eso las 11 HU de S4 siguen en `Aprobada`. Si el plan se contradice consigo mismo, manda la
+> sección **"▶ Dónde retomar"**.
+
+### LOOP_02 quedó a medias
+
+`evidencias/s4/loops/LOOP-02/iter-1-verifier.json`: en la iteración 1 el Builder terminó, el
+`frontend-verifier` dio **PASS** (typecheck 0, lint 0, 212/212, build OK) y el `backend-verifier`
+quedó **INTERRUMPIDO** por la pausa del usuario — hay que ejecutarlo **entero** al retomar, no
+reanudarlo. El resultado registrado es `ITERATION_2_REQUIRED`, con el feedback ya convertido en
+decisión aquí mismo: **D38**, **D39** y tres correcciones de frontend (texto del aviso de rechazo
+sin botón de cancelar; el tipo `AdminAppointment` exige `cancellable`/`reschedulable` que el backend
+no emite).
+
+### `develop` se mergeó a `main` con F5, F8, F9 y F10 sin terminar
+
+Merge commits del 2026-09-25 `0ae5184` (raíz) y `016baae` (citas-api), ambos "Merge pull request #3
+from Jhonstewar/develop". Hoy `git rev-list --count origin/main..origin/develop` = **0** en los tres
+repos: están idénticos.
+
+**CONTRADICCIÓN con la convención del workspace.** `AGENTS.md:102` dice que "`main` solo recibe
+incrementos que el usuario declara estables", y `AGENTS.md:41` que `main` = estable. Hoy `main`
+contiene trabajo de S4 a medio verificar. Se deja anotado, no resuelto: qué hacer con `main` es una
+decisión del usuario, registrada como pregunta abierta en [[sintesis-preguntas-abiertas]].
+
+### Entorno al retomar
+
+Docker Desktop no está arrancado en esta máquina (`docker ps` falla con
+`open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`). El backend,
+Maven y la suite de pruebas dependen de él, así que **ninguna cifra de backend se puede reverificar**
+hasta levantarlo.
+
 ## Consecuencias
 
 - La reprogramación y la cancelación comparten un único camino de liberación de slots (D18).
@@ -136,4 +217,7 @@ texto deshabilitado está exento, así que solo hay que corregir el comentario.
 
 ## Historial
 
+- 2026-09-30 — añadida la sección "Estado real de S4": cero HU cerradas, las 11 `Aprobada` sin
+  verificar, el defecto de las casillas de F10, LOOP_02 a medias y el merge a `main` con S4 a medio
+  verificar. Ninguna decisión D15–D39 cambia.
 - 2026-09-25 — creada con D15–D30 al resolver el plan de S4.

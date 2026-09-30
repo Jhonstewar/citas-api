@@ -2,7 +2,7 @@
 titulo: "Riesgo — Dos copias del laboratorio compartían proyecto Docker"
 tipo: riesgo
 estado: Vigente
-actualizado: 2026-09-23
+actualizado: 2026-09-30
 fuentes:
   [
     'docker-compose.yml',
@@ -61,9 +61,17 @@ Este workspace tiene identidad propia, así que las dos copias pueden convivir:
 
 Verificado contra `docker-compose.yml`: `name: fcv-citas-v1` (línea 5),
 `container_name: fcv-citas-v1-mysql` / `-api-dev` / `-web-dev` (líneas 11, 41, 85) y los mapeos
-`${MYSQL_PORT:-3308}:3306` (línea 22) y `${API_PORT:-8081}:8080` (línea 71); `.env.example` de la
-raíz fija `COMPOSE_PROJECT_NAME=fcv-citas-v1`, `MYSQL_PORT=3308`, `API_PORT=8081`,
+`${MYSQL_PORT:-3308}:3306` (línea 22) y `${API_PORT:-8081}:8080` (**línea 76**, era la 71 antes de
+`dafb0fa`); `.env.example` de la raíz fija `COMPOSE_PROJECT_NAME=fcv-citas-v1`, `MYSQL_PORT=3308`, `API_PORT=8081`,
 `REACT_PORT=5175`, `ANGULAR_PORT=4201` y `FRONTEND_ORIGIN=http://localhost:5174`.
+
+> **Falsa alarma del 2026-09-30, resuelta el mismo día.** Al retomar se creyó que la sección
+> "Entorno" del `CLAUDE.md` de la raíz seguía diciendo `fcv-citas-mysql` y el puerto **3307**. No es
+> así: `CLAUDE.md:53-54` ya dice `fcv-citas-v1-mysql` y **3308**, coherente con
+> `docker-compose.yml:22` y `.env.example:13`. El texto viejo era la copia que el agente tenía
+> cargada en contexto desde *antes* del `git pull` de ese día. **Lección para el agente:** las
+> instrucciones de proyecto que lleva en contexto se congelan al abrir la sesión; después de bajar
+> commits hay que releer del disco el archivo antes de declararlo desfasado.
 
 **Los puertos del host cambian; los de dentro del contenedor no.** MySQL sigue escuchando en el
 3306 y la API en el 8080 *dentro* de la red de Docker: `3308` y `8081` son solo el lado del host.
@@ -141,6 +149,9 @@ descrito arriba. El *fallback* de `application.yml:69`
 
 ## Historial
 
+- 2026-09-30 — corregida la línea del mapeo de la API en `docker-compose.yml` (71 → 76) y
+  descartada una supuesta contradicción con el `CLAUDE.md` de la raíz: el archivo ya estaba al día
+  en disco y lo desfasado era el contexto del agente antes del `git pull`.
 - 2026-09-23 (LINT) — añadidos los nombres de contenedor completos con su verificación contra
   `docker-compose.yml`, la distinción puerto de host / puerto interno, la fecha de la cifra de
   pruebas del hook y la divergencia entre los dos `.env.example`.

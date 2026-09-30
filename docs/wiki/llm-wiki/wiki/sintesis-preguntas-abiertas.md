@@ -2,8 +2,8 @@
 titulo: "Síntesis — Preguntas abiertas del dominio"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-23
-fuentes: ["citas-api/docs/wiki/scrum/historias-de-usuario/", "PRD.md", "[[MODELO-DATOS-3FN]]"]
+actualizado: 2026-09-30
+fuentes: ["citas-api/docs/wiki/scrum/historias-de-usuario/", "PRD.md", "[[MODELO-DATOS-3FN]]", "PLAN_RETOMA_S4.md §4 F10"]
 tags: [sintesis, preguntas-abiertas, dominio]
 ---
 
@@ -137,6 +137,20 @@ correcto de hoy deje de serlo sin que nada avise. Ver [[datos-modelo-3fn]] y
 HU-027 y HU-031 existan, cualquier criterio que dependa de ellas es literalmente no verificable.
 Es la causa de que HU-022 y HU-029 queden abiertas.
 
+## Defecto de documento y preguntas abiertas al retomar S4 (2026-09-30)
+
+Salieron al bajar a esta máquina los commits de S4 y comprobar el estado real contra los ficheros.
+No son huecos del PRD como los de arriba: son huecos entre lo que los documentos del proyecto dicen
+y lo que pasó. El detalle y las pruebas están en
+[[dec-006-decisiones-s4-ciclo-de-vida]] § "Estado real de S4".
+
+| # | Pregunta | Estado |
+|---|---|---|
+| R1 | **Defecto verificado, no pregunta:** las 7 casillas de F10 de `PLAN_RETOMA_S4.md` estaban `[x]` y F10 no se ejecutó; el archivo entero se escribió en el commit `bc13adc`. Resultó estar mal **en los dos sentidos**: F4, F6 y F7 estaban sin marcar con su código escrito | **Cerrada el 2026-09-30.** Casillas saneadas contra el código real: F10 desmarcada salvo el push/merge, F4/F6/F7 marcadas con la referencia que las prueba, y nota de precedencia añadida al §4 |
+| R2 | `main` == `develop` en los tres repos desde el 2026-09-25 con S4 a medio verificar (F5, F8, F9 y F10 sin terminar), contra `AGENTS.md:102`. ¿Se acepta el estado, se revierte el merge, o se redefine qué significa "estable" para `main`? | **Resuelta el 2026-09-30:** el usuario decide **dejar `main` como está** —es un laboratorio y revertir un merge publicado añade más riesgo que valor— y que el próximo merge a `main` se haga solo al cerrar F10 |
+| R3 | ¿Cuáles de las **11 HU `Aprobada` con código escrito** resisten la verificación independiente? Hoy es literalmente no verificable: F10 no corrió y la suite de backend no se puede ejecutar con Docker apagado | Abierta hasta F10 |
+| R4 | La comparación del modelo 3FN propio contra `database/reference/` sigue pendiente desde S2, aunque su casilla de F10 esté marcada | Abierta — ver [[datos-modelo-3fn]] |
+
 ## Relacionado
 
 - [[dec-004-decisiones-s3-reserva]]
@@ -148,6 +162,10 @@ Es la causa de que HU-022 y HU-029 queden abiertas.
 
 ## Historial
 
+- 2026-09-30 — añadidas R1–R4 al retomar S4: el defecto de las casillas de F10, `main` con trabajo a
+  medio verificar, las 11 HU `Aprobada` sin verificación independiente y la comparación 3FN que
+  sigue pendiente. El mismo día se cerraron R1 (casillas saneadas) y R2 (el usuario deja `main` como
+  está); quedan abiertas R3 y R4, que dependen de F10.
 - 2026-09-23 (LINT) — E1, E2 y S3 marcadas como cerradas con cita a `V5` y `V6`; las preguntas de
   afiliación renumeradas `A1–A3` → `AF1–AF3` para deshacer la colisión con las `A1–A4` de
   autenticación.
