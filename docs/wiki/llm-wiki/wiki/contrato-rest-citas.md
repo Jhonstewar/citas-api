@@ -204,7 +204,8 @@ HistoryEntry      + { event?: 'RESCHEDULED' }                 // aditivo (D39); 
 ProfessionalAppointment { id, status, statusName, date, startTime, endTime, durationMinutes,
                     site: SiteRef, specialty: SpecialtyRef,
                     patient: { fullName, documentType, documentNumber },  // mínimo de RF-16: sin email ni teléfono
-                    closable: boolean }       // APPROVED y ya empezó (D19)
+                    closable: boolean,        // APPROVED y ya empezó (D19)
+                    pendingReschedule: boolean }  // añadido el 2026-09-30: el paciente tiene una solicitud PENDING
 Eps               { id, code, name, active, planCount }
 EpsPlan           { id, epsId, code, name, active, regime: { code, name } }
 ```
@@ -264,9 +265,18 @@ el único camino de liberación (`ReservationHolder.ofRescheduleRequest`, que no
 cita). Así la franja propuesta vuelve a ofrecerse en `GET /api/patient/availability`. Sin esto la
 retención quedaría sin salida, porque HU-031 CA-05 solo deja decidir sobre una cita `APPROVED`
 (`application/appointment/ProfessionalAppointmentsUseCase.java:112-115`,
-`domain/appointment/RescheduleRequest.java:181-183`). El efecto **no** se ve en la respuesta del
-cierre —`ProfessionalAppointment` no lleva la solicitud— sino en el detalle de la cita:
-`pendingReschedule` pasa a `false` y `lastReschedule.status` a `CANCELLED`. Por D39 el cierre añade
+`domain/appointment/RescheduleRequest.java:181-183`).
+
+> **Corregido el 2026-09-30.** Aquí se decía que el efecto «**no** se ve en la respuesta del cierre
+> —`ProfessionalAppointment` no lleva la solicitud—». Eso describía una **asimetría que era un
+> defecto**, no una decisión: el payload del paciente y el del ADMIN sí emitían `pendingReschedule`,
+> así que al paciente se le avisaba antes de cancelar (D18) y al profesional no, aunque su cierre
+> tuviera la misma consecuencia. `ProfessionalAppointment` **ya emite `pendingReschedule`**, y la
+> pantalla del profesional advierte en la confirmación del cierre que cancelará la solicitud y
+> liberará la franja propuesta. Lo destapó la verificación independiente del frontend.
+
+El efecto se observa también en el detalle de la cita del paciente: `pendingReschedule` pasa a
+`false` y `lastReschedule.status` a `CANCELLED`. Por D39 el cierre añade
 **una sola** fila de historial, la del propio cierre. Pruebas:
 `ProfessionalAgendaIntegrationTest:520` (`complete`), `:550` (`no-show`) y `:569` (si liberar la
 retención falla, todo vuelve atrás: cita `APPROVED`, solicitud `PENDING`, retención intacta).

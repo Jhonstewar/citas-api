@@ -2,7 +2,7 @@
 id: HU-026
 tipo: historia-de-usuario
 titulo: "Cancelar una cita futura"
-estado: Aprobada
+estado: En validación
 epica: "[[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]"
 requisitos: [RF-14, RF-19]
 esfuerzo: "Medio"
@@ -166,21 +166,34 @@ Esta HU es, junto a [[HU-030-aprobar-o-rechazar-cita-especializada]], una de las
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-30**: el `backend-verifier`, agente independiente que no escribió el código, reejecutó la suite completa de `citas-api` → **484 pruebas, 0 fallos, 0 errores, `BUILD SUCCESS`**. El `frontend-verifier` reejecutó la de `citas-web` → **218 pruebas**, con typecheck, `oxlint` y build limpios, y dejó **14 hallazgos abiertos** (3 en reparación y 4 pruebas que faltan).
+
+Ruta abreviada: **CIT** = `src/test/java/com/fcv/citas/infrastructure/rest/CancellationIntegrationTest.java`.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | CIT:150 `cancelsAnApprovedAppointmentReleasesItsSlotAndRecordsTheUser`: una `APPROVED` futura responde 200 con `status = CANCELLED`, `cancellable = false` y `reschedulable = false`, y la tabla `appointments` queda en `CANCELLED`; CIT:192 cubre además el caso `REQUESTED` que exige D16 | El criterio dice «estado no terminal» y las dos ramas reales —`APPROVED` y `REQUESTED`— están probadas |
+| CA-02 | Cumple | CIT:150 (un slot: `slot_reservations` de la cita queda a cero y la búsqueda de disponibilidad vuelve a ofrecer las 08:00 **a otro paciente**); CIT:192 (`REQUESTED` de 60 min: dos reservas → cero, y la búsqueda ofrece 08:00 y 08:30); CIT:211 (`APPROVED` especializada de 60 min ya aprobada por el ADMIN) | La reaparición se comprueba con el token de **otro** paciente, como pide RN-09 |
+| CA-03 | Cumple | CIT:251 `aCancelledAppointmentCannotBeReactivated`: cancelar dos veces → 409 `INVALID_TRANSITION`, y `POST /api/admin/appointments/{id}/approve` sobre la cancelada también → 409 `INVALID_TRANSITION`; el estado sigue `CANCELLED` y el recuento de historial no cambia; `AppointmentStatus:23` declara `CANCELLED` sin salidas (`EnumSet.noneOf`) | Se prueban las dos vías que la API expone para volver atrás, y la imposibilidad se deriva del enum, no de un `if` del controlador |
+| CA-04 | Cumple | CIT:286 `aPastAppointmentCannotBeCancelled`: una cita de ayer con su reserva → 409 `APPOINTMENT_EXPIRED`, conserva `APPROVED` y su reserva; el detalle ya la traía con `cancellable = false`; `Appointment.cancel:77-87` comprueba primero el estado y después la hora | El orden de las dos comprobaciones está fijado a propósito y es el mismo que en `reject` |
+| CA-05 | Cumple | CIT:268 `terminalAppointmentsCannotBeCancelled`: `REJECTED`, `COMPLETED` y `NO_SHOW` **futuras** → 409 `INVALID_TRANSITION`, sin cambio de estado, con cero filas de historial y `cancellable = false` en el detalle; `CANCELLED` en CIT:251 | Los cuatro estados terminales del criterio quedan cubiertos entre las dos pruebas |
+| CA-06 | Cumple | CIT:309 `anotherPatientsAppointmentIsNotFoundAndStaysIntact`: la cita de otro paciente → **404 `NOT_FOUND`**, exactamente igual que un id inexistente; la cita ajena conserva su estado, su reserva y su historial; `application/shared/Ownership#requireOwned`; CIT:327 `onlyUsersCanCancel` (PROFESSIONAL y ADMIN → 403, anónimo → 401) | El criterio admite 403 o 404; el código elige 404 para no revelar que la cita de otro existe |
+| CA-07 | Cumple | CIT:150: el historial gana **exactamente una** fila, verificada en la respuesta (`status = CANCELLED`, `source = USER`, `actorName`, `reason`) y en la tabla (`status`, `actor_user_id` = el paciente, `source = 'USER'`, `changed_at` no nulo); CIT:224 `anEmptyReasonMeansNoReason` y CIT:236 `aTooLongReasonIsRejectedWithoutChanges` cubren el motivo opcional de RF-19 | — |
+| CA-08 | Cumple | CIT:339 `aFailureReleasingSlotsRollsBackTheWholeCancellation`: con un espía que hace fallar `releaseReservations`, la respuesta es 500 y la cita sigue `REQUESTED` con sus **dos** reservas y sin historial nuevo; CIT:392 `aFailureAlsoKeepsThePendingRescheduleUntouched` repite el escenario con una reprogramación `PENDING`, que sigue `PENDING` con su retención en pie | No hay resultado parcial en ninguna de las dos configuraciones |
+| CA-09 | Cumple | CIT:360 `cancellingWithAPendingRescheduleCancelsTheRequestAndReleasesBothSlots`: la solicitud queda `CANCELLED` con `decided_at` y `decided_by_user_id` = el paciente (D37), la cita `CANCELLED`, **cero** filas de `slot_reservations` tanto de la cita como de la solicitud, y la búsqueda vuelve a ofrecer la franja original (08:00) y la propuesta (09:00); la solicitud la crea el productor real de [[HU-027-solicitar-reprogramacion-de-cita-aprobada]], no una siembra por SQL | Cubre D18 por completo, incluido el decisor automático que D37 fijó para satisfacer el `CHECK ck_reschedule_requests_decision` de V3 |
+| DoD — CA-01 a CA-09 validados con evidencia concreta | Cumple | Filas CA-01 a CA-09 de esta tabla | Los nueve son de backend y todos tienen prueba propia |
+| DoD — La transición a `CANCELLED` es una operación explícita del dominio, no una asignación directa del campo | Cumple | `Appointment.cancel:77-87` valida estado y hora y devuelve una `Transition`; `AppointmentStatus:19-29` declara los destinos válidos y deriva de ahí los terminales; ningún controlador ni caso de uso escribe el estado directamente; `HexagonalArchitectureTest` | RN-11 queda satisfecha por construcción: el único camino a `CANCELLED` es el método de dominio |
+| DoD — Cambio de estado, liberación de slots y escritura del historial en una única transacción | Cumple | `CancelAppointmentUseCase` ejecuta todo dentro de `tx.inTransaction`, con la cita bloqueada; CIT:339 y CIT:392 (ambas ramas del fallo simulado dejan el estado anterior intacto) | — |
+| DoD — Una búsqueda posterior a la cancelación ofrece de nuevo la franja liberada, verificado contra [[HU-022-buscar-disponibilidad-con-filtros]] | Cumple | CIT:150, CIT:192, CIT:211 y CIT:360 consultan el endpoint real de disponibilidad con el token de otro paciente después de cancelar | La verificación es de extremo a extremo entre las dos HU, no una comprobación de la tabla de slots |
+| DoD — No existe ningún endpoint que devuelva una cita `CANCELLED` a un estado activo | Cumple | `AppointmentStatus:23` (`CANCELLED` sin destinos); CIT:251 prueba las dos vías expuestas (cancelar otra vez y aprobar como ADMIN) | — |
+| DoD — La acción de cancelar de `citas-web` solo se ofrece sobre citas futuras no terminales y exige confirmación explícita | Pendiente | Existen `citas-web/src/pages/patient/CancelAppointmentDialog.tsx` y `ConfirmDialog`, y 8 pruebas en `src/patientLifecycle.test.tsx:92-218`: diálogo accesible con datos, advertencia y motivo; sin motivo no envía `reason`; aviso de D18 cuando hay reprogramación `PENDING`; 409 `APPOINTMENT_EXPIRED`; 5xx que deja reintentar; 400 del motivo en su campo; y `:205`, que comprueba que el inicio **no** ofrece «Cancelar cita» si el listado la trae con `cancellable = false` | No se marca `Cumple`: la verificación de frontend criterio a criterio la hace el `frontend-verifier`, que dejó 14 hallazgos abiertos (3 en reparación, 4 pruebas que faltan), y falta la prueba manual en navegador de F10 |
+| DoD — Pruebas de cancelación con uno y con dos slots, cita pasada, cita terminal y cita ajena, y pasan | Cumple | CIT (13 pruebas de integración: CIT:150, :192, :211, :224, :236, :251, :268, :286, :309, :327, :339, :360, :392); suite completa 484/484 `BUILD SUCCESS` reejecutada por el `backend-verifier` | — |
+| DoD — Contrato del endpoint de cancelación reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md:234` (`POST /api/patient/appointments/{id}/cancel` con `{ reason? }` ≤ 500 → 200 `AppointmentDetail` `CANCELLED` · 404 · 409 `INVALID_TRANSITION` / `APPOINTMENT_EXPIRED`) y `:386` (el cuerpo es opcional) | `llm-wiki/` queda fuera del límite de escritura de esta skill: la evidencia se leyó, no se produjo aquí |
+| DoD — Trazabilidad de esta HU y de [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] actualizada | Cumple | Esta matriz, el historial de validación y las notas (D16, D17 y D18 registradas); en [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] las anotaciones de INC-027 e INC-030; `docs/wiki/scrum/README.md` | — |
 
 ## Historial de validación
 
+- 2026-09-30 — **Matriz de evidencia recolectada del repositorio.** CA-01 a CA-09 y toda la DoD de backend, de contrato y de trazabilidad en `Cumple`. Estado: `Aprobada` → `En validación`. **No pasa a `Completada`**: el ítem de DoD de la acción de cancelar en `citas-web` queda en `Pendiente` porque la verificación de frontend criterio a criterio y la prueba manual en navegador de F10 no se han hecho. CA-09 ya se ejercita con el productor real de reprogramaciones, que llegó en F5.
 - 2026-09-25 — Se añade CA-09 por D18 (cancelar con reprogramación `PENDING`), y el punto de "Fuera de alcance" que excluía tocar la solicitud se ajusta a D18 y D20: ya no era cierto que la cancelación dejara la solicitud intacta. La DoD pasa a CA-01 a CA-09. CA-01 a CA-08 no cambian: ya eran coherentes con D16 y D17.
 - 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Ciclo de vida del paciente», fase F3; CA-09 se ejercita cuando exista el productor de reprogramaciones, en F5) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
