@@ -3,7 +3,7 @@ titulo: "Decisión 006 — Decisiones de S4 para el ciclo de vida de la cita, la
 tipo: decision
 estado: Provisional
 actualizado: 2026-09-30
-fuentes: ["PRD.md §4-§6", "PLAN_RETOMA_S4.md §2, §4 F10, ▶ Dónde retomar", "[[sintesis-preguntas-abiertas]]", "citas-web/docs/diseno/PANTALLAS_OBLIGATORIAS.md", "citas-api/docs/wiki/scrum/HU-*.md (frontmatter)", "evidencias/s4/loops/LOOP-02/iter-1-verifier.json"]
+fuentes: ["PRD.md §4-§6 y §RF-19 (textual, para D40)", "PLAN_RETOMA_S4.md §2, §4 F5 y F10, ▶ Dónde retomar", "[[sintesis-preguntas-abiertas]]", "citas-web/docs/diseno/PANTALLAS_OBLIGATORIAS.md", "citas-api/docs/wiki/scrum/HU-*.md (frontmatter)", "citas-api/docs/wiki/scrum/epicas/EP-008-operacion-administrativa-de-solicitudes.md", "evidencias/s4/loops/LOOP-02/iter-1-verifier.json, iter-2-verifier.json", "suites ejecutadas el 2026-09-30: backend 484/484, frontend 218/218"]
 tags: [decision, s4, ciclo-de-vida, reprogramacion, cuenta, aprobacion-delegada, estado-de-sesion]
 ---
 
@@ -30,7 +30,7 @@ Origen: **U** = respondida por el usuario · **P** = provisional bajo delegació
 | D19 U | INC-018 · Desde cuándo se cierra como `COMPLETED`/`NO_SHOW` | Desde la **hora de inicio**, sin plazo máximo, aislado en un único punto de decisión (T-02 de HU-021) | Al terminar la franja o el día | Permite marcar la inasistencia sin esperar; el punto único permite cambiarlo sin tocar el caso de uso |
 | D20 P | INC-028 / INC-029 · Número de solicitudes y retirada | Una sin decidir por cita; tras la decisión se puede pedir otra. El paciente no retira la solicitud en S4 | Retirada explícita | `uq_reschedule_requests_active` (`V3:162`) ya impone una activa; retirar añade una transición sin RF que la pida |
 | D21 P | INC-031 · ¿Reprogramar a otra sede? | Sí, si el profesional atiende en ella | Misma sede obligatoria | RF-15 solo obliga a conservar profesional y especialidad |
-| D22 P | N3 · ¿La decisión sobre una reprogramación deja historial? | Sí: fila con estado `APPROVED`, origen `ADMIN` y motivo que nombra franja anterior y nueva | Sin historial, porque el estado no cambia | RF-19 pide trazar el cambio. Sin migración: `appointment_status_history` guarda solo el estado nuevo (`V3:115`) |
+| ~~D22 P~~ **SUPERADA por D39** | N3 · ¿La decisión sobre una reprogramación deja historial? | ~~Sí, las dos decisiones~~ → **solo la aprobación** escribe fila; el rechazo no toca la cita (ver D39) | Sin historial, porque el estado no cambia | Se justificó en «RF-19 pide trazar el cambio», pero eso venía de una **reformulación de RF-19 en EP-008**, no del PRD: RF-19 audita «todo cambio de estado de cita» y el rechazo no cambia ninguno. Corregido en **D40** |
 | D23 P | INC-036 · Reprogramación cuya franja propuesta ya pasó | Aprobar responde 409; el ADMIN rechaza con motivo | Aprobarla igual | Igual que D12 y RN-06 |
 | D24 P | N6 · Filtros de la bandeja sobre una reprogramación | Por la **franja propuesta** | Por la franja actual | Es lo que el ADMIN decide |
 | D25 P | INC-006 · Campos editables del perfil | Nombres, apellidos y teléfono. Fijos: email y documento | Todo editable | El email es la credencial de login y el documento es identidad única (`users`, `V1`) |
@@ -192,10 +192,60 @@ decisión del usuario, registrada como pregunta abierta en [[sintesis-preguntas-
 
 ### Entorno al retomar
 
-Docker Desktop no está arrancado en esta máquina (`docker ps` falla con
-`open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`). El backend,
-Maven y la suite de pruebas dependen de él, así que **ninguna cifra de backend se puede reverificar**
-hasta levantarlo.
+Al abrir la sesión, Docker Desktop **no** estaba arrancado (`docker ps` fallaba con
+`open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`), así que ninguna
+cifra de backend se podía reverificar. **Se levantó ese mismo día** y a partir de ahí la suite corrió
+varias veces de verdad: 471 → 480 → **484**, siempre `BUILD SUCCESS`.
+
+> **Este párrafo estuvo obsoleto unas horas y causó un error real.** Mientras decía «Docker no está
+> arrancado», un agente lo leyó aquí y en `index.md` y lo propagó de buena fe a
+> [[contrato-rest-citas]] como reserva de «pruebas leídas, no ejecutadas», cuando ya se habían
+> ejecutado. **Un dato de entorno desactualizado en la wiki no se queda quieto: se copia.** Al cambiar
+> el entorno, actualiza estas páginas en el momento, no al cerrar el turno.
+
+Sigue pendiente, y es del usuario: el **`.env` de la raíz quedó atrás de `dafb0fa`**. No viaja en git,
+así que `COMPOSE_PROJECT_NAME` sigue valiendo `fcv-citas-training` y MySQL se publica en **3307**, no
+3308. Los volúmenes se crean como `fcv-citas-training_*` y se comparten con cualquier otra copia del
+laboratorio, que es el riesgo de [[riesgo-dos-copias-mismo-proyecto-docker]] — latente hoy porque solo
+hay una copia. Comprobable sin abrir el fichero, con `docker compose ls` y `docker port`.
+
+### Cierre del LOOP_02 (iteración 3) y la deriva respecto del PRD
+
+**El loop cerró en 3 iteraciones de 4.** La iteración 2 implementó D38 y D39; el `backend-verifier`
+dio **PASS al comportamiento** (43 criterios con evidencia, las cinco reglas innegociables cumplidas,
+y descartados **con prueba** los dos riesgos del §5 del plan) y **FAIL a la Definition of Done**,
+porque los documentos afirmaban lo contrario del código. La iteración 3 cerró ese FAIL.
+
+**Lección del loop, que vale más que las cifras.** El Verifier no se limitó a comprobar que la
+derivación de D39 funciona: verificó **la razón escrita** en el javadoc, y era **falsa**. Decía que la
+reprogramación aprobada es «la única escritura de historial que no pasa por `transitionTo`», y
+`bookGeneral` y `requestSpecialized` también construyen su `StatusChange` directamente. El invariante
+real: el historial se escribe solo por `AppointmentRepository.create` y `apply`; la fila de `create` es
+por contrato **la primera** de la cita, donde no hay anterior con la que comparar; y toda fila
+posterior viene de un `Transition`, que solo `Appointment` construye. Al simular la violación,
+`HistoryEventTest` y `HexagonalArchitectureTest` **seguían en verde**: la suite entera pasaba con la
+mentira dentro. **Una prueba verde no dice que el razonamiento sea correcto; solo dice que ese camino
+no se rompió.** Cerrado con `HistoryRowInvariantTest` (reflexión, sin lista que mantener) y
+`HistoryWritersArchitectureTest` (bytecode: quién puede componer una fila de historial).
+
+**D40 U — corregida una deriva respecto del PRD en EP-008.** Aprobación **directa del usuario**, no
+delegada. [[EP-008]] reformulaba RF-19 como «cada **decisión** se registra en el historial con actor y
+origen `ADMIN`», y `PRD.md` §RF-19 dice «**todo cambio de estado de cita** guarda: cita; estado nuevo;
+actor cuando existe; fuente `SYSTEM`, `USER` o `ADMIN`; fecha/hora; motivo opcional». Rechazar una
+reprogramación **no cambia el estado de la cita**, que sigue `APPROVED`, así que el PRD **nunca pidió**
+esa fila: la exigencia la había añadido la épica, y **fue la que justificó D22**. Se alinearon cinco
+textos —la regla y el criterio de completitud de EP-008, y el contexto, el alcance y la tarea T-03 de
+HU-031— citando RF-19 textualmente. **No se relajó ningún requisito: se volvió al PRD.** HU-030 no
+cambia, porque allí la decisión sí es un cambio de estado de la cita.
+
+**Estado de las HU tras el cierre:** HU-027, HU-028 y HU-031 pasan de `Aprobada` a `En validación` con
+matriz de evidencia rellenada. **Ninguna a `Completada`**: les faltan los criterios de frontend
+verificados uno a uno y la prueba manual en navegador de F10.
+
+**Queda abierto para F10:** la carrera «cerrar la atención» contra «decidir la reprogramación» que D38
+abre no tiene prueba concurrente; el aviso `CANCELLED` del frontend descarta `decisionReason` y deja al
+paciente sin explicación; HU-021 no menciona D38 en ninguna parte; y las matrices de HU-021, HU-026 y
+HU-029 siguen sin rellenar.
 
 ## Consecuencias
 

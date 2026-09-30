@@ -19,8 +19,10 @@ Historia cronológica: [[log]].
 - **Sesión en curso:** S4 — **pausada el 2026-09-25, retomada el 2026-09-30** (el trabajo se hizo
   en otra máquina; hoy se bajaron los 16 + 28 + 14 commits que estaban en `origin/develop` y los
   tres repos quedaron limpios y al día). Plan en `PLAN_RETOMA_S4.md` (raíz), decisiones D15–D39 en
-  [[dec-006-decisiones-s4-ciclo-de-vida]]. **S4 cerró cero HU**: siguen las mismas 16 `Completada`
-  de antes de empezar. Punto de retoma: LOOP_02 iteración 2 → F8 → F9 → F10
+  [[dec-006-decisiones-s4-ciclo-de-vida]]. **F5 cerrada el 2026-09-30: LOOP_02 PASS en 3 iteraciones
+  de 4.** HU-027, HU-028 y HU-031 pasan de `Aprobada` a `En validación` con matriz de evidencia;
+  **ninguna a `Completada`**, porque les faltan criterios de frontend y la prueba manual de F10.
+  Punto de retoma: **F8 (LOOP_03) → F9 → F10**
 - ⚠️ **Al leer `PLAN_RETOMA_S4.md`:** sus casillas estaban mal en los dos sentidos y se **sanearon el
   2026-09-30** (F10 desmarcada salvo el push/merge; F4, F6 y F7 marcadas con su referencia en el
   código). Una casilla `[x]` significa "código escrito y suite verde", **no** "HU verificada": eso es
@@ -29,8 +31,15 @@ Historia cronológica: [[log]].
 - **Ramas:** `origin/main` y `origin/develop` están **idénticos** en los tres repos desde el merge
   del 2026-09-25, así que `main` contiene S4 a medio verificar. Contradecía `AGENTS.md:102`; el
   usuario decidió el 2026-09-30 **dejarlo así** y hacer el próximo merge a `main` solo al cerrar F10
-- **Entorno de esta máquina:** Docker Desktop **no** está arrancado, y el backend, Maven y la suite
-  de pruebas dependen de él. Nada de backend se puede reejecutar hasta levantarlo
+- **Entorno de esta máquina (2026-09-30):** Docker Desktop **arrancado**, MySQL 8.4 en
+  `fcv-citas-v1-mysql` (healthy) y la base de pruebas `citas_fcv_training_test` creada con
+  `.\scripts\init-test-db.ps1`. **Pero el `.env` de la raíz quedó atrás de `dafb0fa`:** no viaja en
+  git, así que `COMPOSE_PROJECT_NAME` sigue valiendo `fcv-citas-training` y MySQL se publica en
+  **3307**, no 3308. Comprobable sin abrirlo, con `docker compose ls` y `docker port`. Los volúmenes
+  se crean como `fcv-citas-training_*` y se comparten con cualquier otra copia del laboratorio: es el
+  riesgo de [[riesgo-dos-copias-mismo-proyecto-docker]], latente porque hoy solo hay una copia.
+  Pendiente del usuario alinear `COMPOSE_PROJECT_NAME`, `MYSQL_PORT` y `API_PORT` con `.env.example`.
+  Node del host es **22.19** y `react-router@8.4.0` pide ≥22.22.0 (`AGENTS.md` pide Node 24)
 - **En paralelo:** rediseño del frontend con los mockups de Stitch, ya aplicado en código — ver [[dec-005-sistema-visual-stitch]]
 - **Sesión anterior:** S3 cerrada el 2026-09-23 con 12 HU `Completada` y 6 abiertas con su causa
 - **Antes:** S2 cerrada salvo la prueba manual en navegador
@@ -44,20 +53,25 @@ Cualquier número distinto en una página de la wiki es historia fechada, no el 
 
 | Qué | Valor | Dónde se comprobó |
 |---|---|---|
-| Suite del backend ⚠️ desfasada | **242** pruebas (2026-09-23) | `EVIDENCIAS_S3.md` §11 |
-| Suite del frontend ⚠️ desfasada | **88** pruebas, 11 archivos (2026-09-23) | `npm test` ejecutado en `citas-web` |
+| Suite del backend (**2026-09-30**) | **484** pruebas, `BUILD SUCCESS` · `HexagonalArchitectureTest` 4/4 · clases concurrentes 89/89 en dos pasadas | `docker compose run --rm citas-api-dev mvn -B test`, ejecutado por el `backend-verifier` y de nuevo tras el cierre del LOOP_02 |
+| Suite del frontend (**2026-09-30**) | **218** pruebas, 20 archivos · typecheck 0 · `oxlint` 0 · build OK | los cuatro comandos ejecutados por el `frontend-verifier` en `citas-web` |
 | Migraciones Flyway (**2026-09-30**) | **V1..V10**, 24 tablas de negocio (V8, V9, V10 son de S4 y no crean tablas) | `FlywayMigratesEmptySchemaTest.java:37,116,121` |
 | Proyecto Docker | `fcv-citas-v1`, contenedores `fcv-citas-v1-*` | `docker-compose.yml:5,11,41,85` |
 | Puertos del **host** | MySQL **3308** · API **8081** · Vite **5174** (web en contenedor 5175, Angular 4201) | `.env.example` de la raíz; `docker-compose.yml:22,76` |
 | Puertos **dentro** del contenedor | MySQL 3306 · API 8080 | `docker-compose.yml:22,76` |
-| HU por estado (**2026-09-30**) | **16** `Completada` · 5 `En validación` · 11 `Aprobada` sin verificar · 1 `En desarrollo` (HU-033) | frontmatter de los 33 `HU-*.md` de `citas-api/docs/wiki/scrum/` |
+| HU por estado (**2026-09-30**, tras cerrar F5) | **16** `Completada` · **8** `En validación` (las 5 de S3 + HU-027, HU-028, HU-031) · **8** `Aprobada` sin verificar · 1 `En desarrollo` (HU-033) | frontmatter de los 33 `HU-*.md` de `citas-api/docs/wiki/scrum/` |
 
-**Las dos cifras de suite están fechadas el 2026-09-23 y ya no son el estado de hoy.** Al pausar
-S4 el registro de avance anota **471** pruebas de backend y **212** de frontend
-(Registro de avance de `PLAN_RETOMA_S4.md`, 2026-09-25; las 212 las confirma
-`evidencias/s4/loops/LOOP-02/iter-1-verifier.json`).
-Ninguna de las dos se ha vuelto a ejecutar en esta máquina: Docker está apagado. La fila de arriba
-se actualizará cuando la suite corra de verdad, no antes.
+**Las dos cifras son de ejecuciones reales del 2026-09-30, no de un registro heredado.** Cada una la
+corrió el Verifier independiente correspondiente, además del Builder. Progresión de la sesión:
+backend 471 → 480 (D38 y D39) → **484** (las dos pruebas que protegen el invariante de D39);
+frontend 212 → **218**.
+
+> **Aviso para el próximo agente.** Hasta el 2026-09-30 esta sección decía que Docker estaba apagado
+> y que las cifras no se habían vuelto a ejecutar. Era cierto a primera hora y dejó de serlo al
+> arrancar Docker Desktop, pero la página no se actualizó hasta el cierre del turno, y en ese
+> intervalo **un agente leyó el dato viejo aquí y lo propagó de buena fe** a otro documento como
+> reserva de «leído, no ejecutado». Cuando cambies el entorno, actualiza esta fila en el momento: un
+> dato viejo en el índice no se queda quieto, se copia.
 
 ## Dominio
 
