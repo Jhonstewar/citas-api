@@ -260,3 +260,6 @@ Formato fijo del encabezado, para que sea parseable:
 
 ## [2026-09-30] learn | LOOP_03 cerrado: AgendaRules como única fuente de las reglas de agenda
 PASS en 2 iteraciones (la 2 eliminó copias residuales en SlotAllocator y ProfessionalScheduleController). Backend 500/500. Límite: la equivalencia no cubre la cláusula SQL de "ya empezó". Ver PLAN_RETOMA_S4 §F8.
+
+## [2026-09-30] learn | F9 cerrada y F10 parcial: 3FN vs referencia, verificación sin FAIL, huecos de prueba cerrados
+Backend 513, frontend 248. Decisiones delegadas: HU-021 CA-03 acepta 404; HU-001..004 siguen Completada con nota D29/D36. Pendiente: matrices de HU y prueba manual en navegador. Preguntas C1–C6 en [[datos-modelo-3fn]].

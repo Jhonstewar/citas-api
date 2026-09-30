@@ -3,7 +3,7 @@ titulo: "Datos — Modelo 3FN propio de citas-api"
 tipo: datos
 estado: Vigente
 actualizado: 2026-09-30
-fuentes: ["[[MODELO-DATOS-3FN]]", "citas-api/src/main/resources/db/migration/ (V1..V10)", "citas-api/src/test/java/com/fcv/citas/infrastructure/persistence/FlywayMigratesEmptySchemaTest.java:37,116,121", "database/ANALISIS_NORMALIZACION_3FN.md"]
+fuentes: ["[[MODELO-DATOS-3FN]]", "database/reference/erd.mmd", "database/reference/README_DB.md", "citas-api/src/main/resources/db/migration/ (V1..V10)", "citas-api/src/test/java/com/fcv/citas/infrastructure/persistence/FlywayMigratesEmptySchemaTest.java:37,116,121", "database/ANALISIS_NORMALIZACION_3FN.md"]
 tags: [datos, mysql, flyway, 3fn]
 ---
 
@@ -14,16 +14,12 @@ tags: [datos, mysql, flyway, 3fn]
 Diseño **propio** del esquema, construido desde `database/ANALISIS_NORMALIZACION_3FN.md` sin
 consultar el material de referencia del trainer.
 
-> **Corregido en el LINT del 2026-09-23:** esta página citaba `database/reference/db.sql` como la
-> solución de referencia. **Ese archivo no existe.** Lo que hay en `database/reference/` es
-> `README_DB.md`, `erd.mmd` y el ERD en PNG/SVG (verificado con `ls database/reference`). La
-> comparación contra esa referencia **sigue pendiente**: S2 cerró sin hacerla.
->
-> **Confirmado el 2026-09-30:** sigue pendiente. La casilla de F10 que la reclama estaba marcada
-> `[x]` (ya desmarcada ese mismo día), pero F10 nunca se ejecutó — el plan se escribió
-> entero en un solo commit. Esta página es una de las pruebas de ello; ver
-> [[dec-006-decisiones-s4-ciclo-de-vida]] § "Estado real de S4" y R4 de
-> [[sintesis-preguntas-abiertas]].
+> **Comparación ejecutada el 2026-09-30 (F10 de S4).** La comparación pendiente desde S2 está en
+> § "Comparación contra la referencia del trainer" de esta página. `database/reference/` contiene
+> `README_DB.md`, `erd.mmd` y el ERD en PNG/SVG; **`db.sql` no existe** aunque el README lo
+> anuncie, así que se compara contra `erd.mmd` + `README_DB.md`. Con esto R4 de
+> [[sintesis-preguntas-abiertas]] queda hecha; las preguntas que abre (C1–C6) están al final de
+> esa sección.
 
 ## Lo que sabemos (verificado)
 
@@ -81,6 +77,130 @@ inserta la afiliación en la misma transacción que la cuenta — ver
   `citas\_fcv\_%`, para que la prueba pueda crear y borrar su esquema desechable. Es aceptable en
   laboratorio y **no** debe replicarse en un despliegue real.
 
+## Comparación contra la referencia del trainer (F10, 2026-09-30)
+
+**Límite de la fuente.** La referencia es un ERD Mermaid (`database/reference/erd.mmd`) que lista
+**solo columnas clave** de cada entidad, más la prosa de `README_DB.md`. Sin `db.sql` no se puede
+afirmar que a la referencia le *falte* una columna no clave (p. ej. `first_names`, `created_at`):
+las diferencias de columnas se limitan a lo que el ERD muestra. Las diferencias de **tablas** y
+de **relaciones** sí son firmes.
+
+### Equivalencia entidad ↔ tabla
+
+| Referencia (`erd.mmd`) | `citas-api` | Migración | Equivalencia |
+|---|---|---|---|
+| `USERS` | `users` | V1 | Igual; nosotros añadimos `document_type_id` |
+| `ROLES` | `roles` | V1 | Igual |
+| `USER_ROLES` | `user_roles` | V1 | Igual (PK compuesta) |
+| `REFRESH_TOKENS` | `refresh_tokens` | V1 | Igual + rotación por familia |
+| `PASSWORD_RESET_TOKENS` | `password_reset_tokens` | V1 | Igual (+ `revoked_at`) |
+| `INSURANCE_REGIMES` | `regimes` | V1 | Solo cambia el nombre |
+| `EPS` | `eps` | V2, V9 | Igual (+ `UNIQUE(name)` en V9) |
+| `EPS_PLANS` | `eps_plans` | V2, V9 | Igual: `regime_id` en el plan en ambos modelos |
+| `USER_INSURANCE_AFFILIATIONS` | `affiliations` | V2, V9 | Igual + `started_on`/`ended_on` e historial |
+| `PROFESSIONALS` | `professionals` | V2 | Igual (1:1 con `users`, código y licencia únicos) |
+| `APPOINTMENT_TYPES` | `appointment_types` | V1 | Igual, `requires_admin_approval` en el tipo |
+| `SPECIALTIES` | `specialties` | V2, V6, V8 | Igual (`duration_minutes` ↔ `appointment_duration_minutes`) |
+| `LOCATIONS` | `sites` | V1, V7 | Solo cambia el nombre; nosotros añadimos `city`, `department`, `active` |
+| `PROFESSIONAL_SPECIALTIES` | `professional_specialties` | V2 | Igual, con `is_primary` |
+| `PROFESSIONAL_LOCATIONS` | `professional_sites` | V2 | Igual |
+| `APPOINTMENT_STATUSES` | `appointment_statuses` | V1, V4 | Igual + `releases_slots` |
+| `APPOINTMENTS` | `appointments` | V3 | Mismas FKs; fecha/hora partida en `DATE` + `TIME` |
+| `AVAILABILITY_BLOCKS` | `availability_blocks` | V3 | Igual salvo `active` (la referencia lo tiene) |
+| `PROFESSIONAL_SLOTS` | `availability_slots` **+** `slot_reservations` | V3 | **Diferencia estructural** (ver abajo) |
+| `APPOINTMENT_STATUS_HISTORY` | `appointment_status_history` | V3, V5 | Igual; `change_source` ↔ `source` |
+| `RESCHEDULE_REQUEST_STATUSES` | `reschedule_statuses` | V1 | Solo cambia el nombre |
+| `RESCHEDULE_REQUESTS` | `reschedule_requests` | V3, V10 | Igual en lo esencial; difieren `patient_action_after_rejection` y la franja anterior |
+| — | `document_types` | V1 | Solo nuestra |
+
+Resultado: **22 entidades de la referencia ↔ 24 tablas nuestras**. Las dos tablas de más son
+`document_types` y el desdoble `PROFESSIONAL_SLOTS` → `availability_slots` + `slot_reservations`.
+Los dos modelos coinciden en todas las decisiones de normalización grandes: roles N:M, profesional
+como extensión de `users`, cadena régimen → plan ← EPS con la afiliación apuntando al plan, tipo
+de cita como catálogo con la política de aprobación, y citas con solo FKs.
+
+### Qué tiene la referencia y nosotros no
+
+| Diferencia | Justificación en la wiki |
+|---|---|
+| **Una sola tabla `PROFESSIONAL_SLOTS` con `appointment_id` nulable** como marca de ocupación | Descartada a propósito: [[dec-003-libro-unico-slot-reservations]]. Con la ocupación dentro del slot no cabe la **retención** de la franja propuesta de una reprogramación `PENDING` sin una segunda columna o tabla, y ahí la unicidad ya no la da una sola restricción. Ver la sección de doble reserva |
+| `RESCHEDULE_REQUESTS.patient_action_after_rejection` | "Conservar la cita" tras un rechazo **no se persiste**: HU-028 T-03 y N4 en [[sintesis-preguntas-abiertas]]; contrato en [[contrato-rest-citas]]. Cancelar se registra como transición normal de la cita |
+| `AVAILABILITY_BLOCKS.active` | **Sin decisión** que lo respalde ni lo descarte — ver C1 |
+| Fecha y hora en `DATETIME` (`scheduled_start_at`, `start_at`, `requested_start_at`) | Nosotros usamos `DATE` + `TIME` atómicos ([[MODELO-DATOS-3FN]] §5 1FN). No hay DEC que compare contra `DATETIME`; la elección tuvo coste real en [[riesgo-zona-horaria-columnas-time]] — ver C2 |
+
+### Qué tenemos nosotros y la referencia no
+
+| Diferencia | Justificación en la wiki |
+|---|---|
+| `slot_reservations` (PK `slot_id`, titular cita **o** reprogramación, `slot_order`) | [[dec-003-libro-unico-slot-reservations]]; retención de la franja propuesta por D18/D20 de [[dec-006-decisiones-s4-ciclo-de-vida]] |
+| `document_types` + `users.document_type_id` | Solo el diseño [[MODELO-DATOS-3FN]] §2; D35 de [[dec-006-decisiones-s4-ciclo-de-vida]] lo usa (el profesional ve tipo y número). La unicidad global de `document_number` sigue abierta (ver "Preguntas abiertas") |
+| `refresh_tokens.family_id`, `used_at`, `replaced_by_token_id`, `revoked_reason` | [[dec-002-rotacion-refresh-tokens]] (detección de reutilización); D34 revoca todas las familias al restablecer |
+| `appointment_statuses.releases_slots` | [[MODELO-DATOS-3FN]] §3 y [[contrato-rest-citas]] (debe coincidir con `AppointmentStatus`) |
+| `affiliations.started_on` / `ended_on` e historial por `current_marker` | D26 y D32 de [[dec-006-decisiones-s4-ciclo-de-vida]] |
+| `reschedule_requests.previous_*` y `proposed_site_id` (V10) | D31 (HU-027 CA-03/CA-09) y D21 (otra sede). El README de la referencia dice que la solicitud "conserva la fecha anterior", pero su ERD solo muestra `requested_*`: ahí coincidimos con la prosa, no con el diagrama |
+| `reschedule_requests.decided_by_user_id`, `decided_at`, `decision_reason` | RF-15 y [[MODELO-DATOS-3FN]] §3; no aparecen en el ERD de la referencia (puede ser solo omisión del diagrama) |
+| `source` con `PROFESSIONAL` además de `SYSTEM`/`USER`/`ADMIN` | D8 de [[dec-004-decisiones-s3-reserva]] (V5) |
+| `sites.city`, `department`, `active` | Solo el diseño [[MODELO-DATOS-3FN]]; V7 corrige la dirección según PRD §3. No hay DEC — trivial, no se abre pregunta |
+| `UNIQUE` sobre nombres de especialidad, EPS y plan | D-R1 (V8) y D33 (V9) |
+| Columnas generadas + `UNIQUE` (`primary_marker`, `current_marker`, `active_marker`) y `CHECK` de rejilla y duración | [[MODELO-DATOS-3FN]] §6. La referencia no muestra constraints; no se puede decir si las tiene |
+
+### Evaluación 3FN
+
+**Referencia (sobre lo que muestra el ERD):** no se ve ninguna dependencia transitiva. Guarda
+`requires_admin_approval` en `APPOINTMENT_TYPES` y `regime_id` en `EPS_PLANS`, igual que nosotros.
+`PROFESSIONAL_SLOTS.start_at`/`end_at` como `DATETIME` repite la fecha del bloque
+(`slot → availability_block_id → available_date`): es una dependencia transitiva **salvo** que se
+lea como instante absoluto; nuestro `availability_slots` no repite la fecha y deriva `end_time`
+con columna generada ([[MODELO-DATOS-3FN]] §5 punto 6).
+
+**Nuestro modelo:** sin dependencias parciales (las PK compuestas solo tienen atributos propios
+de la relación). Revisión de posibles transitividades o redundancias:
+
+| Punto | Veredicto |
+|---|---|
+| `appointments.scheduled_date/start_time/end_time` | Snapshot intencional, no transitividad: el acuerdo sobrevive a la edición de bloques (RF-08, [[MODELO-DATOS-3FN]] §5 "Excepción consciente"). La referencia hace lo mismo con `scheduled_*_at` |
+| `reschedule_requests.previous_*` (V10) | Snapshot intencional: tras aprobar, la cita se mueve y la franja anterior deja de existir en otra parte (D31) |
+| `reschedule_requests.proposed_site_id` | Derivable de la reserva retenida (`slot_reservations → slot → bloque → site_id`) mientras la retención existe, pero la retención se borra al decidir; como registro histórico es snapshot (D31). Aceptable |
+| `slot_reservations.reservation_type` | Redundante con cuál de las dos FK es no nula; `ck_slot_reservations_owner` impide que diverjan. Redundancia controlada por el motor, no anomalía |
+| `affiliations.is_current` frente a `ended_on` | **Posible redundancia sin decisión**: si "vigente" equivale siempre a `ended_on IS NULL`, `is_current` depende de otro atributo no clave. Ningún `CHECK` las ata — ver C3 |
+| `reschedule_requests.status_id` frente a `decided_at` | **Posible redundancia sin decisión**: `PENDING` equivale a `decided_at IS NULL`, y `active_marker` se genera desde `decided_at`, no desde el estado. Ningún `CHECK` las ata — ver C4 |
+
+Conclusión: **ambos modelos cumplen 3FN** en lo verificable; los dos puntos de riesgo propios son
+redundancias entre columnas de la misma fila, no transitividades a través de otra entidad.
+
+### Índices y constraints anti doble reserva
+
+| Aspecto | Referencia | `citas-api` |
+|---|---|---|
+| Dónde vive la ocupación | `PROFESSIONAL_SLOTS.appointment_id` (nulable) | Tabla aparte `slot_reservations`, **PK = `slot_id`** (V3) |
+| Qué impide dos citas en un slot | La propia columna: un slot solo tiene un `appointment_id`. Reservar es un `UPDATE` que debe condicionarse a `appointment_id IS NULL` (o bloquear la fila) — si el código hace `UPDATE` incondicional, el segundo sobrescribe al primero | Un `INSERT` duplicado falla por PK. Trampa conocida: exige `INSERT`, no `merge` (`Persistable.isNew() = true`, [[dec-003-libro-unico-slot-reservations]]) |
+| Retención de reprogramación `PENDING` | No representable en el ERD sin otra columna | Misma PK: una franja no puede estar en una cita y en una retención a la vez |
+| Unicidad de slots dentro del bloque | No visible en el ERD | `uq_availability_slots_block_start (availability_block_id, start_time)` + `CHECK` de rejilla |
+| Bloques duplicados | No visible | `uq_availability_blocks_start (professional_id, block_date, start_time)`; el **no solape** lo valida el dominio |
+| 60 min = 2 slots | README: dos slots consecutivos | `slot_order IN (1,2)`, `uq_slot_reservations_appointment_order`, `uq_slot_reservations_request_order`; consecutivos y del mismo bloque (D9) en el dominio |
+| Concurrencia | No documentada | `SELECT … FOR UPDATE` sobre el profesional + PK como red; el 409 sale `SLOT_TAKEN` de forma estable ([[dec-003-libro-unico-slot-reservations]]) |
+| Índices de consulta | No visibles | `ix_appointments_*` (paciente, profesional, bandeja por estado, sede, especialidad, afiliación), `ix_availability_blocks_lookup (site_id, block_date)`, `ix_ash_appointment (appointment_id, changed_at)` |
+
+El diseño de la referencia **también** hace estructuralmente imposible que un slot pertenezca a dos
+citas, pero traslada al código que la reserva sea un `UPDATE` condicionado; el nuestro lo hace
+fallar en el motor con un `INSERT`, y además cubre la retención de reprogramaciones.
+
+### Preguntas abiertas de la comparación
+
+- **C1.** La referencia tiene `availability_blocks.active`; nosotros no. ¿Cómo se retira un bloque
+  futuro con citas (RF-08)? No hay DEC que lo resuelva.
+- **C2.** `DATE` + `TIME` frente a `DATETIME`: nunca se decidió contra la alternativa, y causó
+  [[riesgo-zona-horaria-columnas-time]]. ¿Se mantiene como decisión explícita?
+- **C3.** `affiliations.is_current` y `ended_on` pueden divergir; ¿se añade un `CHECK`
+  (`is_current = (ended_on IS NULL)`) en una migración nueva, o hay caso de negocio para la
+  divergencia?
+- **C4.** `reschedule_requests.status_id` y `decided_at` pueden divergir; ¿se ata con un `CHECK`
+  o se acepta como invariante de dominio?
+- **C5.** `database/reference/README_DB.md` anuncia un `db.sql` que no existe. Sin él no se pueden
+  comparar columnas no clave ni constraints. ¿Lo aporta el trainer?
+- **C6.** La referencia modela `patient_action_after_rejection`; nosotros no (HU-028 T-03). Si el
+  trainer lo considera requisito, falta HU; hoy no hay RF que lo exija.
+
 ## Reglas garantizadas por el motor, no por el código
 
 - **No doble reserva (RN-01):** ver [[dec-003-libro-unico-slot-reservations]].
@@ -129,6 +249,10 @@ usuario no las ha confirmado, pero ya no son huecos del esquema.
 - [[sintesis-preguntas-abiertas]]
 
 ## Historial
+
+- 2026-09-30 — **F10: comparación real contra `database/reference/`** (`erd.mmd` y `README_DB.md`;
+  `db.sql` no existe). Equivalencias, diferencias justificadas con decisiones existentes,
+  evaluación 3FN y anti doble reserva. Preguntas nuevas C1–C6.
 
 - 2026-09-30 — siete migraciones → **diez** (V8, V9, V10 de S4), verificado con `ls db/migration` y
   `FlywayMigratesEmptySchemaTest.java:116`; 24 tablas sigue en pie. Confirmado que la comparación
