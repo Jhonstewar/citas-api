@@ -90,7 +90,10 @@ public class AdminAppointmentsUseCase {
     public Detail detail(long appointmentId) {
         AppointmentView view = queries.findById(appointmentId)
                 .orElseThrow(() -> new NotFoundException("La cita no existe"));
-        return new Detail(view, queries.history(appointmentId), queries.lastReschedule(appointmentId).orElse(null));
+        // D39: el evento de cada fila se deriva aqui, no en el adaptador: es una lectura del historial
+        // completo, no una columna. El ADMIN si ve el nombre del actor.
+        return new Detail(view, HistoryEntry.derive(queries.history(appointmentId)),
+                queries.lastReschedule(appointmentId).orElse(null));
     }
 
     public Summary summary() {

@@ -2,7 +2,7 @@
 id: HU-009
 tipo: historia-de-usuario
 titulo: "Registrar la afiliación a EPS y plan"
-estado: Aprobada
+estado: En validación
 epica: "[[EP-002-perfil-y-afiliacion-del-paciente]]"
 requisitos: [RF-04]
 esfuerzo: "Medio"
@@ -33,7 +33,9 @@ La decisión de diseño que gobierna toda la historia es de normalización. La a
 De esa decisión se derivan dos consecuencias visibles. La primera es que la prevención de duplicados de RF-04 se resuelve impidiendo que un mismo usuario registre dos veces el mismo plan, porque el plan ya determina la EPS y el régimen. La segunda es que la selección disponible al usuario se limita a los planes activos del catálogo, en coherencia con la desactivación en lugar de borrado que exige RF-06.
 
 ~~Esta HU introduce la tabla de afiliaciones, por lo que requiere una migración Flyway propia.~~
-**Corregido el 2026-09-23:** la tabla `affiliations` ya existe desde `V2__configurable_catalogs_and_professionals.sql`, con la restricción `uq_affiliations_user_plan`, igual que `eps` y `eps_plans`. Esta HU **no** lleva migración: solo faltaba el código (entidad, repositorio, caso de uso y endpoints).
+**Corregido el 2026-09-23:** la tabla `affiliations` ya existe desde `V2__configurable_catalogs_and_professionals.sql:145-168`, con `is_current`, `started_on`, `ended_on`, la columna generada `current_marker` y las restricciones `uq_affiliations_user_plan` y `uq_affiliations_user_current`, igual que `eps` y `eps_plans`. El primer corte **no** llevó migración: solo faltaba el código (entidad, repositorio, caso de uso y endpoints).
+
+**Ampliado el 2026-09-30:** el segundo corte sí llevó una migración, `V9__eps_names_and_affiliation_history.sql`, que por **D32** sustituye `uq_affiliations_user_plan` por `uq_affiliations_user_plan_current (user_id, eps_plan_id, current_marker)` para que el historial de D26 permita volver a un plan ya usado. Ver notas.
 
 ## Alcance
 
@@ -157,17 +159,19 @@ ser un apoyo de laboratorio y no la única fuente del catálogo.
 **Cuando** se consulta la afiliación del usuario y se inspecciona su registro en la base de datos
 **Entonces** la respuesta incluye la EPS y el régimen correspondientes al plan, y el registro almacenado referencia únicamente al plan sin columnas propias que repitan la EPS ni el régimen.
 
-### CA-03 — Duplicidad impedida dentro del mismo usuario
+### CA-03 — Reenviar el plan vigente es idempotente y no duplica la afiliación
 
-**Dado** un usuario que ya registró su afiliación a un plan concreto
-**Cuando** intenta registrar otra afiliación al mismo plan
-**Entonces** la API responde con un error de conflicto, no se crea un segundo registro y el mensaje indica que esa afiliación ya está registrada.
+**Dado** un usuario `USER` autenticado con una afiliación vigente a un plan concreto
+**Cuando** vuelve a enviar ese mismo plan
+**Entonces** la API responde con éxito devolviendo la afiliación vigente —el mismo identificador y el mismo plan—, no se crea un segundo registro y el usuario sigue teniendo exactamente una afiliación vigente.
 
-### CA-04 — Duplicidad impedida también en la base de datos
+> Reescrito el 2026-09-30 por **decisión directa del usuario**. Ver el historial de validación para el motivo; la prohibición de dos afiliaciones vigentes al mismo plan vive en CA-04, a nivel de esquema.
 
-**Dado** la tabla de afiliaciones creada por la migración
-**Cuando** se intenta insertar directamente dos filas con el mismo usuario y el mismo plan
-**Entonces** la segunda inserción es rechazada por la restricción de unicidad del esquema.
+### CA-04 — Duplicidad impedida a nivel de esquema
+
+**Dado** la tabla de afiliaciones con las restricciones de unicidad vigentes
+**Cuando** se intenta insertar directamente una segunda fila vigente del mismo usuario, al mismo plan o a un plan distinto
+**Entonces** la base de datos rechaza la inserción, y una fila **cerrada** del mismo plan sí puede convivir con una vigente, para que el historial de afiliaciones se conserve (D26, D32).
 
 ### CA-05 — Solo se ofrecen planes activos
 
@@ -220,22 +224,38 @@ ser un apoyo de laboratorio y no la única fuente del catálogo.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-30**: el `backend-verifier`, agente independiente que no escribió el código, reejecutó la suite completa de `citas-api` → **484 pruebas, 0 fallos, 0 errores, `BUILD SUCCESS`**. El `frontend-verifier` reejecutó la de `citas-web` → **218 pruebas**, con typecheck, `oxlint` y build limpios, y dejó **14 hallazgos abiertos** (3 en reparación y 4 pruebas que faltan).
+
+Rutas abreviadas: **AIT** = `src/test/java/com/fcv/citas/infrastructure/rest/AffiliationIntegrationTest.java`; **RAIT** = `src/test/java/com/fcv/citas/infrastructure/rest/RegistrationAffiliationIntegrationTest.java` (primer corte); **AT** = `src/test/java/com/fcv/citas/domain/affiliation/AffiliationTest.java`; **FMES** = `src/test/java/com/fcv/citas/infrastructure/persistence/FlywayMigratesEmptySchemaTest.java`. Los números de línea son los del árbol de trabajo del 2026-09-30.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| CA-10 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | AIT:134 `registersTheFirstAffiliation`: `PUT /api/me/affiliation` con un plan activo → 200 y la fila persistida con el `user_id` del token y el `eps_plan_id` elegido; AT:16 `aNewAffiliationIsCurrentAndOpen`; el primer corte (afiliación durante el registro) en RAIT | Cubre los dos momentos: registro público y perfil autenticado |
+| CA-02 | Cumple | AIT:134 (la respuesta trae `plan`, `plan.eps` y `plan.regime` derivados) y AIT:157 `theAffiliationStoresOnlyThePlan`, que enumera las columnas de `affiliations` contra `information_schema`: contiene `eps_plan_id` y **no** contiene `eps_id` ni `regime_id`; `JdbcAffiliationQueries:18-31` resuelve EPS y régimen con `JOIN` desde el plan | La 3FN se asevera contra el catálogo del motor, no leyendo el DDL |
+| CA-03 | Cumple | AIT:170 `theSamePlanAgainChangesNothing`: el segundo `PUT` con el plan vigente responde **200 con el mismo `id` y el mismo `plan.id`**, `affiliations` sigue con una sola fila y el usuario con exactamente una vigente; `ManageAffiliationUseCase#change` sale con el id actual sin crear ni cerrar nada cuando `current.isFor(insurancePlanId)`; AIT:242 documenta la variante deliberada (repetir el plan vigente se acepta incluso si el ADMIN lo desactivó después, mientras cambiar a **otro** plan no ofrecible sigue siendo 422) | **Criterio reescrito el 2026-09-30 por decisión directa del usuario**: antes exigía 409 y el código responde 200. Ver el historial para el motivo. La prohibición de duplicidad quedó en CA-04 |
+| CA-04 | Cumple | AIT:182 `theDatabaseRejectsTwoCurrentRowsForTheSamePlan`: un `INSERT` directo de una segunda fila vigente del mismo plan lanza `DataIntegrityViolationException`; también la de un plan **distinto** (`uq_affiliations_user_current`); y una cerrada más una vigente del mismo plan **sí** conviven (D32); `V2:157-158` y `V9` (`uq_affiliations_user_plan_current`, `uq_affiliations_user_current`); FMES:234 `laUnicaDeAfiliacionPermiteVolverAUnPlanYaUsado` | La restricción se prueba por inserción directa, sin pasar por la aplicación |
+| CA-05 | Pendiente | La parte de servidor **cumple**: AIT:212 `theCatalogOffersOnlyActivePlans` comprueba que `GET /api/catalogs/insurance-plans` contiene los dos planes activos y **no** contiene el desactivado ni el de una EPS inactiva; en frontend existen `citas-web/src/lib/insurancePlans.ts` y las pruebas `src/registroAfiliacion.test.tsx` y `src/profileAndPassword.test.tsx:138` | No se marca `Cumple` porque el criterio está redactado sobre lo que el usuario ve en `citas-web` («la lista presentada»), y la verificación de frontend criterio a criterio la hace el `frontend-verifier`, que dejó 14 hallazgos abiertos (3 en reparación, 4 pruebas que faltan); falta la prueba manual en navegador de F10 |
+| CA-06 | Cumple | AIT:200 `unavailablePlansAreRejected`: plan desactivado, plan de EPS inactiva y plan inexistente → 422 `INSURANCE_PLAN_UNAVAILABLE` (los tres el mismo código, para no revelar si el plan existe); sin `insurancePlanId` → 400 con `fieldErrors.insurancePlanId`; ninguna fila creada; AIT:221 `aRejectedChangeKeepsTheCurrentAffiliation` (la vigente queda intacta) | El predicado «ofrecible» es el mismo del catálogo público (`InsurancePlanCatalog#isSelectable`), así que cliente y servidor no pueden divergir |
+| CA-07 | Cumple | AIT:273 `aUserNeverTouchesAnotherUsersAffiliation`: no existe ruta a la afiliación de otro (`GET`/`DELETE /api/users/{otroId}/affiliation` → 403 por `SecurityConfig:94`), un `userId` ajeno en el cuerpo del `PUT` se ignora y la operación toca la propia, y tras `PUT` + `DELETE` del primer usuario las filas del segundo quedan idénticas; AIT:293 `onlyUsersManageTheirAffiliation` (PROFESSIONAL y ADMIN → 403, anónimo → 401); `SecurityConfig:88` (`/api/me/affiliation` exige `ROLE_USER`) | El titular sale siempre del token (`MeController:96`), nunca del cuerpo ni de la ruta |
+| CA-08 | Cumple | `V2__configurable_catalogs_and_professionals.sql:145-168` crea `affiliations` con las FK a `users` y a `eps_plans`, el `CHECK` de fechas y las dos restricciones de unicidad; `V9` ajusta una de ellas por D32; FMES:98 `aplicaTodasLasMigracionesEnOrden`, FMES:120 y FMES:125 aplican V1–V10 sobre un esquema vacío desechable y validan el resultado | La tabla nace en V2, no en una migración propia de esta HU: V2 sí es incremental sobre V1 |
+| CA-09 | Cumple | AIT:310 `changingThePlanClosesTheCurrentOne`: cambiar de A a B deja dos filas, la de A con `is_current = false` y `ended_on = hoy` (`America/Bogota`) y su `started_on` intacto, exactamente una vigente, y `GET /api/me` devuelve el plan B con su EPS y su régimen; AT:28 y AT:43; AIT:335 `returningToAPreviouslyUsedPlanWorks` (A → B → A el mismo día, tres filas, una vigente) | `ManageAffiliationUseCase#change` cierra y abre bajo `lockCurrent`, en una sola transacción |
+| CA-10 | Cumple | AIT:349 `removingClosesItWithoutReplacement`: `DELETE /api/me/affiliation` → 204, la fila **sigue existiendo** con `is_current = false` y `ended_on = hoy`, ninguna vigente, y `GET /api/me` omite `affiliation`; sin vigente el `DELETE` vuelve a responder 204; AT:50 `onlyACurrentAffiliationCanBeClosed` | La baja es idempotente por diseño, sin error cuando no hay nada que cerrar |
+| DoD — CA-01 a CA-10 validados con evidencia concreta | No cumple | CA-01 a CA-04 y CA-06 a CA-10 en `Cumple`; **CA-05 en `Pendiente`** | El ítem depende de los diez; queda abierto por CA-05 |
+| DoD — Migración Flyway versionada que crea la tabla, aplicada de forma incremental sobre el esquema existente | Cumple | `V2:145-168` (creación, incremental sobre V1) y `V9` (ajuste de la unicidad por D32, incremental sobre V8); FMES:98 y FMES:125; `application.yml` con `ddl-auto: validate` | — |
+| DoD — La tabla no replica EPS ni régimen: ambos se navegan desde el plan, con justificación de normalización | Cumple | AIT:157 (las columnas reales no incluyen `eps_id` ni `regime_id`); `JdbcAffiliationQueries:18-31`; `V2:138-144` documenta la dependencia funcional `affiliation_id → eps_plan_id → eps_id / regime_id`; `citas-api/docs/wiki/llm-wiki/wiki/datos-modelo-3fn.md` | — |
+| DoD — Prevención de duplicados en dos niveles: caso de uso y restricción de unicidad del esquema | Cumple | Caso de uso: `ManageAffiliationUseCase#change` nunca crea una segunda fila vigente —bloquea la vigente, sale sin cambios si es el mismo plan y la cierra antes de abrir la nueva si es otro—, probado en AIT:170 y AIT:310. Esquema: `uq_affiliations_user_current` y `uq_affiliations_user_plan_current` (`V2`, `V9`), probadas por inserción directa en AIT:182 | En el caso de uso la prevención toma la forma de **idempotencia**, no de error, desde que D26 convirtió la operación en un `PUT` que reemplaza. El invariante protegido es el mismo: a lo sumo una afiliación vigente por usuario |
+| DoD — Dominio de la afiliación sin Spring ni JPA | Cumple | `domain/affiliation/Affiliation`, `AffiliationRepository`, `InsurancePlanCatalog` e `InsurancePlanUnavailableException` son Java puro; AT (5 pruebas de dominio sin framework); `HexagonalArchitectureTest` | — |
+| DoD — Las operaciones resuelven el usuario desde el contexto de seguridad y aplican el ownership de [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Cumple | `MeController:96` (`PUT`) y el `DELETE` del mismo controlador, ambos con `CurrentUser.id(auth)`; AIT:273 y AIT:293 | No hay `Ownership.requireOwned` aquí porque no existe ninguna ruta que reciba un id de afiliación ajena: el recurso no es direccionable, que es la forma más fuerte del mismo resultado |
+| DoD — La lista de planes de `citas-web` contiene solo activos y coincide con lo que acepta `citas-api` | Pendiente | El servidor ya lo garantiza con un único predicado compartido (`InsurancePlanCatalog#isSelectable`, usado por el catálogo público, por el registro y por el cambio desde el perfil), probado en AIT:212 y AIT:200 | La parte de servidor está cerrada; falta comprobar en `citas-web` que la lista mostrada es exactamente la del catálogo. Misma causa que CA-05 |
+| DoD — Pruebas de alta correcta, duplicidad rechazada, plan desactivado rechazado y acceso ajeno, y pasan | Cumple | AIT (14 pruebas de integración), RAIT (primer corte) y AT (5 de dominio); suite completa 484/484 `BUILD SUCCESS` reejecutada por el `backend-verifier` | «Duplicidad rechazada» se cubre con AIT:182 (esquema) y AIT:170 (el caso de uso no crea la segunda fila) |
+| DoD — Contrato de los endpoints de afiliación y del catálogo de planes reflejado en [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-identidad.md:342` (`PUT /api/me/affiliation`), `:343` (`DELETE`), `:370` («el plan que ya está vigente responde 200 con la afiliación vigente»), `:386` y `:393` (V9 y la unicidad nueva), y `:482` (el catálogo público de planes entre las rutas sin token) | El contrato documenta el 200 idempotente que CA-03 ahora exige. `llm-wiki/` queda fuera del límite de escritura de esta skill |
+| DoD — Trazabilidad de esta HU y de [[EP-002-perfil-y-afiliacion-del-paciente]] actualizada | Cumple | Esta matriz, el historial de validación y las notas (D26 y D32 registradas, pregunta abierta cerrada); en [[EP-002-perfil-y-afiliacion-del-paciente]] las anotaciones de INC-006 e INC-007; `docs/wiki/scrum/README.md` | — |
 
 ## Historial de validación
 
+- 2026-09-30 — **Matriz de evidencia recolectada del repositorio.** CA-01 a CA-04 y CA-06 a CA-10 en `Cumple`, junto con toda la DoD de backend, de contrato y de trazabilidad. Estado: `Aprobada` → `En validación`. **No pasa a `Completada`**: CA-05 y el ítem de DoD sobre la lista de planes en `citas-web` quedan en `Pendiente`, y el ítem «CA-01 a CA-10 validados» en `No cumple` por arrastre de CA-05. Falta la verificación de frontend criterio a criterio y la prueba manual en navegador de F10.
+- 2026-09-30 — **CA-03 reescrito. Decisión directa del usuario, no delegada.** El criterio exigía 409 al reenviar el plan que ya está vigente; el código responde 200 sin cambios y el contrato lo documenta así (`contrato-rest-identidad.md:370`). **Manda el código: el criterio estaba mal.** Razón: CA-03 se escribió en S2 para un `POST` que *creaba* la afiliación, donde repetir el plan sí duplicaba; **D26** lo convirtió en un `PUT` que *reemplaza* la vigente, y un `PUT` cuyo cuerpo describe el estado actual debe ser idempotente. Además el invariante que CA-03 protegía —a lo sumo una afiliación vigente, y nunca dos al mismo plan— ya lo imponen `uq_affiliations_user_current` y `uq_affiliations_user_plan_current` (`V9`), y **CA-04 lo verifica** con un `INSERT` directo. CA-03 pasa a exigir el 200 idempotente, la ausencia de un segundo registro y la unicidad de la afiliación vigente; CA-04 se reformula sobre el esquema y recoge además la convivencia de una fila cerrada con una vigente que D32 hizo posible. **No se relaja el requisito de RF-04:** sigue siendo imposible duplicar EPS, régimen y plan dentro del usuario.
+- 2026-09-30 — La nota «Pregunta abierta que D26 no resuelve» sobre `uq_affiliations_user_plan` se sustituye por la decisión que la resolvió, **D32**, ejecutada por `V9`. Decía que había que decidirlo «antes de implementar F6», y F6 ya está implementada y probada: quien retomara podía bloquearse sin motivo.
 - 2026-09-25 — Se añaden CA-09 y CA-10 por D26 (cambio y baja de la afiliación), que no tenían ningún criterio que los hiciera verificables; la DoD pasa a CA-01 a CA-10. Ningún criterio existente se reescribe.
 - 2026-09-25 — Estado sin cambios (`Aprobada`). Alcance **ampliado** al segundo corte —consultar, cambiar y quitar la afiliación desde el perfil— por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Decisiones en [[dec-006-decisiones-s4-ciclo-de-vida]]; fase F6 del plan. El primer corte sigue siendo aprobación directa del usuario; solo la ampliación es delegada.
 - 2026-09-23 — **el usuario la aprueba** y la adelanta fuera del Sprint 2 para cubrir la afiliación opcional durante el registro. Aprobación directa del usuario, no delegada. Se recorta el alcance a ese primer corte y se sustituye la dependencia de [[HU-012-gestionar-eps-y-planes]] por una semilla por script.
@@ -244,7 +264,7 @@ ser un apoyo de laboratorio y no la única fuente del catálogo.
 ## Notas y decisiones
 
 - **Resuelta (D26, provisional bajo delegación):** INC-007 (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): **una sola afiliación vigente** por usuario, que el esquema ya impone con `uq_affiliations_user_current` (`V2__configurable_catalogs_and_professionals.sql:158`). Cambiar de plan cierra la anterior con `ended_on` y abre una nueva; quitarla la cierra sin reemplazo ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-09 y CA-10 lo cubren. La nota sobre modificación y baja "que requieren decisión humana previa" queda resuelta por esta decisión.
-- **Pregunta abierta que D26 no resuelve:** `V2` también declara `uq_affiliations_user_plan UNIQUE (user_id, eps_plan_id)` sin condición de vigencia (`V2:157`). Con el historial de D26, un usuario que pasa del plan A al B **no puede volver al plan A**: la fila cerrada de A choca con la nueva. Opciones: reactivar la fila cerrada de A (sin migración) o hacer la unicidad solo sobre la afiliación vigente (con migración). Hay que decidirlo antes de implementar F6; CA-03 tal como está es compatible con ambas si se lee sobre la afiliación vigente, pero no lo dice.
+- **Resuelta (D32, provisional bajo delegación):** `V2:157` declaraba `uq_affiliations_user_plan UNIQUE (user_id, eps_plan_id)` sin condición de vigencia, lo que con el historial de D26 impedía **volver a un plan ya usado**: la fila cerrada de A chocaba con la nueva. **D32** eligió la unicidad sobre la afiliación vigente y la **ejecutó `V9__eps_names_and_affiliation_history.sql`**, que sustituye esa restricción por `uq_affiliations_user_plan_current UNIQUE (user_id, eps_plan_id, current_marker)` —`current_marker` vale 1 en la vigente y `NULL` en las cerradas, y MySQL admite varios `NULL` en un índice único—. Dos afiliaciones **vigentes** al mismo plan siguen prohibidas, y además ya lo estaban por `uq_affiliations_user_current`. Probado en `AffiliationIntegrationTest:295` `returningToAPreviouslyUsedPlanWorks`, `AffiliationIntegrationTest:182` (los tres casos de la restricción) y `FlywayMigratesEmptySchemaTest:234` `laUnicaDeAfiliacionPermiteVolverAUnPlanYaUsado`. CA-04 lo refleja desde el 2026-09-30.
 - Incógnita abierta **INC-008** (ver [[EP-002-perfil-y-afiliacion-del-paciente]]): el PRD no define si la afiliación es obligatoria para solicitar una cita. Ningún criterio de esta HU bloquea el agendamiento; si se decidiera que es obligatoria, la regla se escribiría en la épica de reserva y afectaría a [[HU-024-solicitar-cita-especializada]].
 - ~~El PRD no indica si el usuario puede eliminar o cambiar una afiliación ya registrada. Esta HU solo cubre registrar y consultar; la modificación y la baja requieren decisión humana previa.~~ Resuelta por D26 (ver arriba).
 - La decisión de no duplicar EPS ni régimen dentro de la afiliación se apoya en la exigencia de 3FN de las restricciones técnicas y debe quedar reflejada en la justificación de claves y dependencias funcionales del modelo de datos.

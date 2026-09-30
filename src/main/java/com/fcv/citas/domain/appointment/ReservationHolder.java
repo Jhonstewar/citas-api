@@ -10,7 +10,9 @@ package com.fcv.citas.domain.appointment;
  *       {@code APPOINTMENT} y las retenciones {@code RESCHEDULE_REQUEST} de sus solicitudes de
  *       reprogramacion. Lo usan cancelar (HU-026, con D18) y rechazar una cita (HU-030).</li>
  *   <li>{@link #ofRescheduleRequest}: solo la retencion de una solicitud; la cita conserva su
- *       franja. Lo usa rechazar una reprogramacion (HU-031).</li>
+ *       franja. Lo usan rechazar una reprogramacion (HU-031) y cerrar la atencion con una solicitud
+ *       {@code PENDING} (HU-021, D38), donde la cita queda {@code COMPLETED} o {@code NO_SHOW} y por
+ *       tanto NO libera su propia franja.</li>
  *   <li>{@link #ofCurrentSlot}: solo las reservas {@code APPOINTMENT} de la cita, su franja vigente,
  *       sin tocar la retencion de su solicitud. Lo usa aprobar una reprogramacion (HU-031): primero se
  *       libera la franja antigua y despues la retencion se CONVIERTE en ocupacion de la cita

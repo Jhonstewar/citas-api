@@ -2,8 +2,8 @@
 titulo: "Datos — Modelo 3FN propio de citas-api"
 tipo: datos
 estado: Vigente
-actualizado: 2026-09-23
-fuentes: ["[[MODELO-DATOS-3FN]]", "citas-api/src/main/resources/db/migration/ (V1..V7)", "citas-api/src/test/java/com/fcv/citas/infrastructure/persistence/FlywayMigratesEmptySchemaTest.java:37,118", "database/ANALISIS_NORMALIZACION_3FN.md"]
+actualizado: 2026-09-30
+fuentes: ["[[MODELO-DATOS-3FN]]", "citas-api/src/main/resources/db/migration/ (V1..V10)", "citas-api/src/test/java/com/fcv/citas/infrastructure/persistence/FlywayMigratesEmptySchemaTest.java:37,116,121", "database/ANALISIS_NORMALIZACION_3FN.md"]
 tags: [datos, mysql, flyway, 3fn]
 ---
 
@@ -18,13 +18,19 @@ consultar el material de referencia del trainer.
 > solución de referencia. **Ese archivo no existe.** Lo que hay en `database/reference/` es
 > `README_DB.md`, `erd.mmd` y el ERD en PNG/SVG (verificado con `ls database/reference`). La
 > comparación contra esa referencia **sigue pendiente**: S2 cerró sin hacerla.
+>
+> **Confirmado el 2026-09-30:** sigue pendiente. La casilla de F10 que la reclama estaba marcada
+> `[x]` (ya desmarcada ese mismo día), pero F10 nunca se ejecutó — el plan se escribió
+> entero en un solo commit. Esta página es una de las pruebas de ello; ver
+> [[dec-006-decisiones-s4-ciclo-de-vida]] § "Estado real de S4" y R4 de
+> [[sintesis-preguntas-abiertas]].
 
 ## Lo que sabemos (verificado)
 
-**Siete migraciones Flyway** aplicadas contra MySQL 8.4; el esquema deja **24 tablas** de negocio
+**Diez migraciones Flyway** aplicadas contra MySQL 8.4; el esquema deja **24 tablas** de negocio
 sin contar `flyway_schema_history`. Ambas cifras están fijadas por
-`FlywayMigratesEmptySchemaTest`, que afirma `containsExactly("1".."7")` sobre el historial leído
-con SQL plano (línea 118) y `EXPECTED_TABLES = 24` (línea 37):
+`FlywayMigratesEmptySchemaTest`, que afirma `containsExactly("1".."10")` sobre el historial leído
+con SQL plano (línea 116) y `EXPECTED_TABLES = 24` (línea 37):
 
 | Migración | Contenido |
 |---|---|
@@ -35,9 +41,19 @@ con SQL plano (línea 118) y `EXPECTED_TABLES = 24` (línea 37):
 | V5 | auditoría append-only (D8): `fk_ash_appointment` pasa a `ON DELETE RESTRICT` y `source` gana `PROFESSIONAL` |
 | V6 | semilla de la especialidad protegida `MEDICINA_GENERAL` (GENERAL, 30 min), decisión D7 |
 | V7 | corrección de datos: la dirección de HIC con la raya del PRD §3, sin crear tablas |
+| V8 | nombre único de especialidad (cierra el defecto S1 de S3, D-R1) |
+| V9 | nombres únicos de EPS y de plan, y afiliación con historial: `uq_affiliations_user_plan` pasa a `(user_id, eps_plan_id, current_marker)` (D32, D33) |
+| V10 | `reschedule_requests` guarda la franja **anterior** y la sede propuesta: `previous_date`, `previous_start_time`, `previous_end_time`, `previous_site_id`, `proposed_site_id` (D31) |
 
-V5, V6 y V7 **no crean tablas**: por eso el total sigue en 24 con siete migraciones
-(`grep "CREATE TABLE" V5*.sql V6*.sql V7*.sql` no devuelve nada).
+De V5 a V10 **ninguna crea tablas**: por eso el total sigue en 24 con diez migraciones
+(`grep -c "CREATE TABLE"` da 0 en V5–V10).
+
+> **Corregido el 2026-09-30.** Esta página decía "siete migraciones" y `containsExactly("1".."7")`:
+> era el estado del 2026-09-23. S4 añadió V8, V9 y V10 (`ls db/migration` y
+> `FlywayMigratesEmptySchemaTest.java:116`). El número de tabla no cambió, así que la cifra de 24
+> sigue viva. V8 cierra el defecto S1 de [[sintesis-preguntas-abiertas]]; V9 y V10 vienen de D31–D33
+> en [[dec-006-decisiones-s4-ciclo-de-vida]]. **Cuidado:** que las migraciones existan no significa
+> que las HU que las motivaron estén verificadas — ninguna cerró en S4.
 
 Hibernate corre con `ddl-auto: validate`: **Flyway manda sobre el esquema**.
 
@@ -114,6 +130,10 @@ usuario no las ha confirmado, pero ya no son huecos del esquema.
 
 ## Historial
 
+- 2026-09-30 — siete migraciones → **diez** (V8, V9, V10 de S4), verificado con `ls db/migration` y
+  `FlywayMigratesEmptySchemaTest.java:116`; 24 tablas sigue en pie. Confirmado que la comparación
+  contra `database/reference/` sigue pendiente; su casilla de F10 estaba marcada por error y se
+  desmarcó ese mismo día.
 - 2026-09-23 (LINT) — corregidas dos cifras desfasadas (cuatro migraciones → **siete**;
   `flyway_schema_history` en v4 → **v7**) y una ruta inexistente (`database/reference/db.sql`).
   E1, E2 y la semilla de Medicina General pasan de abiertas a cerradas con cita a V5 y V6.

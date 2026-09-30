@@ -52,7 +52,7 @@ Es el punto de control humano del sistema. Sin esta épica las citas especializa
 - RN-10: la cita original se mantiene hasta que la reprogramación sea aprobada.
 - RN-01: al aprobar una reprogramación, los nuevos slots ya retenidos se confirman y los antiguos se liberan.
 - RN-11: las transiciones de estado son explícitas y verificables.
-- RF-19: cada decisión se registra en el historial con actor y origen `ADMIN`, incluyendo el motivo cuando existe.
+- RF-19, textual: «**Todo cambio de estado de cita** guarda: cita; estado nuevo; actor cuando existe; fuente `SYSTEM`, `USER` o `ADMIN`; fecha/hora; motivo opcional» (`PRD.md` §RF-19). Lo que se audita es el **cambio de estado de la cita**, no la decisión administrativa en sí. De ahí que: decidir una cita especializada la lleva de `REQUESTED` a `APPROVED` o `REJECTED` y escribe su fila con actor y origen `ADMIN`, con el motivo en el rechazo (RN-04); aprobar una reprogramación cambia la cita —fecha, hora y sede— y escribe fila `APPROVED`/`ADMIN` con un motivo que nombra la franja anterior y la nueva; y **rechazar una reprogramación no cambia el estado de la cita, que sigue `APPROVED`, así que no escribe fila**: decisor, fecha de decisión y motivo quedan en `reschedule_requests`, de donde los lee el paciente. Esto último es D39 ([[dec-006-decisiones-s4-ciclo-de-vida]]), que es la lectura fiel de RF-19.
 - Solo el rol `ADMIN` puede ejecutar estas decisiones (PRD §8).
 
 ## Dependencias
@@ -74,7 +74,7 @@ Es el punto de control humano del sistema. Sin esta épica las citas especializa
 - [ ] Ningún rechazo se persiste sin motivo.
 - [ ] Un rechazo de cita especializada deja sus slots disponibles para otro paciente.
 - [ ] Una aprobación de reprogramación deja la franja antigua libre, la nueva ocupada y la cita actualizada, sin crear una cita duplicada.
-- [ ] Cada decisión aparece en el historial de estados con origen `ADMIN`.
+- [ ] Cada **cambio de estado de cita** provocado por una decisión de ADMIN aparece en el historial de estados con actor, origen `ADMIN`, fecha y hora, y con motivo cuando lo hubo: la decisión sobre una cita especializada (`REQUESTED` → `APPROVED` o `REJECTED`) y la aprobación de una reprogramación (fila `APPROVED` que mueve la cita). El rechazo de una reprogramación no cambia el estado de la cita y, conforme a RF-19, no escribe fila: queda trazado en `reschedule_requests` con decisor, fecha de decisión y motivo (D39).
 - [ ] No quedan dependencias bloqueantes dentro del alcance de la épica.
 
 ## Riesgos e incógnitas
@@ -84,3 +84,7 @@ Es el punto de control humano del sistema. Sin esta épica las citas especializa
 - **INC-034** — El PRD no define si la bandeja administrativa se restringe por sede o si todo ADMIN ve todas las sedes.
 - **INC-035** — El PRD no define si ADMIN puede revertir una decisión ya tomada (por ejemplo, deshacer un rechazo). RN-11 y RN-12 sugieren que no, pero no es explícito.
 - **INC-036** — El PRD no define el comportamiento ante una solicitud cuya fecha ya pasó mientras esperaba decisión administrativa.
+
+## Historial
+
+- 2026-09-30 — **Corregida una deriva respecto del PRD.** La regla de RF-19 de esta épica y la casilla correspondiente del criterio de completitud decían «cada **decisión** se registra en el historial con actor y origen `ADMIN`» y «cada **decisión** aparece en el historial de estados con origen `ADMIN`». RF-19 no dice eso: dice «**todo cambio de estado de cita**» (`PRD.md` §RF-19). La reformulación de la épica añadía una exigencia que el PRD no contiene, y fue la que en su momento justificó D22 (escribir historial también al rechazar una reprogramación, aunque la cita no cambie). Ambos textos se reescriben citando RF-19 tal cual y registrando D39 como la decisión que lo respeta. **No se relaja ningún requisito ni se baja el listón: se vuelve al PRD.** Aprobado **directamente por el usuario** el 2026-09-30 (no es aprobación delegada). Afecta a [[HU-031-aprobar-o-rechazar-reprogramacion]], cuyos textos heredados se alinean el mismo día; [[HU-030-aprobar-o-rechazar-cita-especializada]] no cambia, porque allí la decisión **sí** es un cambio de estado de la cita.

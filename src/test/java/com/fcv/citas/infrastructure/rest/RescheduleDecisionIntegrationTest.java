@@ -50,8 +50,9 @@ import com.fcv.citas.support.S3TestData;
 import com.fcv.citas.support.TestTokens;
 
 /**
- * HU-031 (aprobar / rechazar una reprogramacion, D22, D23, D18), la lectura de HU-028 (el paciente ve
- * el rechazo y decide), la mitad de reprogramaciones de HU-029 (bandeja, D24) y D37.
+ * HU-031 (aprobar / rechazar una reprogramacion, D23, D18), la lectura de HU-028 (el paciente ve
+ * el rechazo y decide), la mitad de reprogramaciones de HU-029 (bandeja, D24), D37 y el historial de
+ * D39 (CA-06: solo la aprobacion escribe fila, con {@code event = 'RESCHEDULED'} derivado).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -274,11 +275,18 @@ class RescheduleDecisionIntegrationTest {
                 .andExpect(jsonPath("$[*].startTime", hasItem("08:00")))
                 .andExpect(jsonPath("$[*].startTime", not(hasItem("10:00"))));
 
-        // El paciente ve la cita movida y puede volver a pedir (D20).
+        // El paciente ve la cita movida y puede volver a pedir (D20). D39: la especializada tiene
+        // REQUESTED → APPROVED → APPROVED, y solo la ULTIMA (que repite el estado) es RESCHEDULED.
         mvc.perform(get("/api/patient/appointments/" + id).header(HttpHeaders.AUTHORIZATION, patient))
                 .andExpect(jsonPath("$.startTime").value("10:00"))
                 .andExpect(jsonPath("$.reschedulable").value(true))
-                .andExpect(jsonPath("$.lastReschedule.status").value("APPROVED"));
+                .andExpect(jsonPath("$.lastReschedule.status").value("APPROVED"))
+                .andExpect(jsonPath("$.history.length()").value(3))
+                .andExpect(jsonPath("$.history[0].status").value("REQUESTED"))
+                .andExpect(jsonPath("$.history[0].event").doesNotExist())
+                .andExpect(jsonPath("$.history[1].status").value("APPROVED"))
+                .andExpect(jsonPath("$.history[1].event").doesNotExist())
+                .andExpect(jsonPath("$.history[2].event").value("RESCHEDULED"));
     }
 
     /** CA-01 (30 min) y D21: aprobar hacia otra sede y otro dia mueve tambien la sede de la cita. */
@@ -313,6 +321,7 @@ class RescheduleDecisionIntegrationTest {
     void rejectingKeepsTheAppointmentAndReleasesTheProposal() throws Exception {
         long id = approvedCardiology("08:00");
         long requestId = reschedule(id, hic, day, "10:00");
+        int historyBeforeRejecting = history(id);
 
         reject(requestId, admin, "{\"reason\": \"El especialista no tiene cupo ese día\"}")
                 .andExpect(status().isOk())
@@ -335,6 +344,8 @@ class RescheduleDecisionIntegrationTest {
         assertThat(reservationOf(cardioBlock, "10:00")).isEmpty();
         assertThat(reservationOf(cardioBlock, "10:30")).isEmpty();
         availability(cardiology, day).andExpect(jsonPath("$[*].startTime", hasItem("10:00")));
+        // D39: rechazar no escribe fila de historial; la cita no cambio.
+        assertThat(history(id)).isEqualTo(historyBeforeRejecting);
 
         // HU-028 CA-01: el paciente ve el rechazo, la propuesta y su franja vigente; puede volver a pedir.
         int before = history(id);
@@ -487,12 +498,14 @@ class RescheduleDecisionIntegrationTest {
     // ------------------------------------------------------------------ CA-06
 
     /**
-     * CA-06 (RF-19, D22): cada decision deja exactamente UNA fila de historial APPROVED, origen ADMIN,
-     * con el administrador como actor; al aprobar el motivo nombra la franja anterior y la nueva; al
-     * rechazar contiene el motivo enviado. El paciente ve "Administración" como actor.
+     * CA-06 ajustado a D39 (RF-19, refina D22): SOLO la aprobacion escribe historial, porque es la unica
+     * decision que cambia la cita (fecha, hora y sede); deja UNA fila APPROVED, origen ADMIN, con el
+     * administrador como actor y un motivo que nombra la franja anterior y la nueva. El rechazo NO toca
+     * la cita: su motivo vive en la solicitud ({@code decisionReason}), no en el historial, porque una
+     * fila "Aprobada · Motivo: <rechazo>" seria falsa. El paciente ve "Administración" como actor.
      */
     @Test
-    void eachDecisionIsRecordedOnceInTheHistory() throws Exception {
+    void onlyTheApprovalIsRecordedInTheHistory() throws Exception {
         long moved = general("08:00");
         long kept = general("10:00");
         long approveReq = reschedule(moved, icv, nextDay, "09:00");
@@ -504,7 +517,7 @@ class RescheduleDecisionIntegrationTest {
         reject(rejectReq, admin, "{\"reason\": \"Agenda cerrada\"}").andExpect(status().isOk());
 
         assertThat(history(moved)).isEqualTo(movedBefore + 1);
-        assertThat(history(kept)).isEqualTo(keptBefore + 1);
+        assertThat(history(kept)).as("D39: el rechazo no escribe historial").isEqualTo(keptBefore);
         Map<String, Object> approval = lastHistory(moved);
         assertThat(approval.get("code")).isEqualTo("APPROVED");
         assertThat(approval.get("source")).isEqualTo("ADMIN");
@@ -512,18 +525,43 @@ class RescheduleDecisionIntegrationTest {
         assertThat(approval.get("changed_at")).isNotNull();
         assertThat((String) approval.get("reason")).contains(day.toString()).contains("08:00").contains("HIC")
                 .contains(nextDay.toString()).contains("09:00").contains("ICV");
-        Map<String, Object> rejection = lastHistory(kept);
-        assertThat(rejection.get("code")).isEqualTo("APPROVED");
-        assertThat(rejection.get("source")).isEqualTo("ADMIN");
-        assertThat(((Number) rejection.get("actor_user_id")).longValue()).isEqualTo(adminId);
-        assertThat((String) rejection.get("reason")).contains("Agenda cerrada");
+        assertThat(data.count("SELECT COUNT(*) FROM appointment_status_history WHERE appointment_id = ?"
+                + " AND source = 'ADMIN'", kept)).as("ninguna fila ADMIN por el rechazo").isZero();
 
+        // El paciente lee el rechazo en la solicitud, no como una fila de la linea de tiempo.
         mvc.perform(get("/api/patient/appointments/" + kept).header(HttpHeaders.AUTHORIZATION, patient))
-                .andExpect(jsonPath("$.history[" + keptBefore + "].actorName").value("Administración"))
-                .andExpect(jsonPath("$.history[" + keptBefore + "].reason", containsString("Agenda cerrada")));
+                .andExpect(jsonPath("$.history.length()").value(keptBefore))
+                .andExpect(jsonPath("$.history[*].event").isEmpty())
+                .andExpect(jsonPath("$.lastReschedule.decisionReason").value("Agenda cerrada"));
+        mvc.perform(get("/api/patient/appointments/" + moved).header(HttpHeaders.AUTHORIZATION, patient))
+                .andExpect(jsonPath("$.history[" + movedBefore + "].actorName").value("Administración"))
+                .andExpect(jsonPath("$.history[" + movedBefore + "].reason",
+                        containsString(nextDay.toString())));
         mvc.perform(get("/api/admin/appointments/" + moved).header(HttpHeaders.AUTHORIZATION, admin))
                 .andExpect(jsonPath("$.history[" + movedBefore + "].source").value("ADMIN"))
                 .andExpect(jsonPath("$.lastReschedule.status").value("APPROVED"));
+    }
+
+    /**
+     * D39: la fila de una reprogramacion aprobada viaja con {@code event = 'RESCHEDULED'}, derivado sin
+     * columna nueva (repite el estado de la fila anterior). Las filas que si cambian de estado no lo
+     * llevan, y dos aprobaciones seguidas dejan dos eventos.
+     */
+    @Test
+    void anApprovedRescheduleCarriesTheRescheduledEvent() throws Exception {
+        long id = general("08:00");
+        approve(reschedule(id, hic, day, "09:00"), admin).andExpect(status().isOk());
+        approve(reschedule(id, hic, day, "11:00"), admin).andExpect(status().isOk());
+
+        mvc.perform(get("/api/patient/appointments/" + id).header(HttpHeaders.AUTHORIZATION, patient))
+                .andExpect(jsonPath("$.history.length()").value(3))
+                .andExpect(jsonPath("$.history[0].status").value("APPROVED"))
+                .andExpect(jsonPath("$.history[0].event").doesNotExist())
+                .andExpect(jsonPath("$.history[1].event").value("RESCHEDULED"))
+                .andExpect(jsonPath("$.history[2].event").value("RESCHEDULED"));
+        mvc.perform(get("/api/admin/appointments/" + id).header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.history[0].event").doesNotExist())
+                .andExpect(jsonPath("$.history[2].event").value("RESCHEDULED"));
     }
 
     private Map<String, Object> lastHistory(long appointmentId) {
@@ -547,8 +585,10 @@ class RescheduleDecisionIntegrationTest {
             assertThat(data.count("SELECT COUNT(*) FROM slot_reservations WHERE reschedule_request_id = ?",
                     requestId)).isZero();
             assertThat(data.count("SELECT COUNT(*) FROM slot_reservations WHERE appointment_id = ?", id)).isEqualTo(1);
+            // D39: solo la aprobacion escribe historial; si gano el rechazo, no hay fila ADMIN.
             assertThat(data.count("SELECT COUNT(*) FROM appointment_status_history WHERE appointment_id = ?"
-                    + " AND source = 'ADMIN'", id)).isEqualTo(1);
+                    + " AND source = 'ADMIN'", id))
+                    .isEqualTo("APPROVED".equals(requestStatus(requestId)) ? 1 : 0);
             mvc.perform(post("/api/patient/appointments/" + id + "/cancel").header(HttpHeaders.AUTHORIZATION, patient))
                     .andExpect(status().isOk());
         }

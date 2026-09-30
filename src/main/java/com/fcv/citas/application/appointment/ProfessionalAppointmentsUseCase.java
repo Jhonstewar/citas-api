@@ -12,6 +12,8 @@ import com.fcv.citas.application.appointment.AppointmentQueries.AppointmentView;
 import com.fcv.citas.application.shared.Ownership;
 import com.fcv.citas.domain.appointment.Appointment;
 import com.fcv.citas.domain.appointment.AppointmentRepository;
+import com.fcv.citas.domain.appointment.RescheduleRequestRepository;
+import com.fcv.citas.domain.appointment.ReservationHolder;
 import com.fcv.citas.domain.professional.Professional;
 import com.fcv.citas.domain.professional.ProfessionalRepository;
 import com.fcv.citas.domain.shared.InvalidRequestException;
@@ -25,6 +27,9 @@ import com.fcv.citas.domain.shared.SystemZone;
  * profesional responde igual que una inexistente, via {@link Ownership} (HU-021 CA-03, HU-005).
  * Cuando se puede cerrar lo decide solo {@link Appointment#isClosableAt} (D19); este caso de uso no
  * repite la regla.</p>
+ *
+ * <p>D38: cerrar la atencion tambien cierra, en la misma transaccion, la solicitud de reprogramacion
+ * {@code PENDING} de la cita y libera su retencion.</p>
  */
 public class ProfessionalAppointmentsUseCase {
 
@@ -45,14 +50,16 @@ public class ProfessionalAppointmentsUseCase {
 
     private final ProfessionalRepository professionals;
     private final AppointmentRepository appointments;
+    private final RescheduleRequestRepository reschedules;
     private final AppointmentQueries queries;
     private final TransactionRunner tx;
     private final Clock clock;
 
     public ProfessionalAppointmentsUseCase(ProfessionalRepository professionals, AppointmentRepository appointments,
-            AppointmentQueries queries, TransactionRunner tx, Clock clock) {
+            RescheduleRequestRepository reschedules, AppointmentQueries queries, TransactionRunner tx, Clock clock) {
         this.professionals = professionals;
         this.appointments = appointments;
+        this.reschedules = reschedules;
         this.queries = queries;
         this.tx = tx;
         this.clock = clock;
@@ -88,7 +95,7 @@ public class ProfessionalAppointmentsUseCase {
     /**
      * Una sola transaccion (CA-08): se bloquea la fila de la cita, se comprueba el titular, el dominio
      * decide la transicion y el adaptador guarda estado e historial juntos. Si algo falla, no queda
-     * nada. Las reservas NO se liberan: {@code COMPLETED} y {@code NO_SHOW} no liberan franjas.
+     * nada. La franja de la cita NO se libera: {@code COMPLETED} y {@code NO_SHOW} no liberan franjas.
      */
     private ProfessionalAppointment close(long userId, long appointmentId,
             BiFunction<Appointment, LocalDateTime, Appointment.Transition> closing) {
@@ -97,6 +104,15 @@ public class ProfessionalAppointmentsUseCase {
             Appointment appointment = Ownership.requireOwned(appointments.lockById(appointmentId),
                     Appointment::professionalId, professional.id(), NOT_FOUND);
             appointments.apply(closing.apply(appointment, SystemZone.now(clock)));
+            // D38 (como D18 para la cancelacion): sobre una cita cerrada la solicitud sin decidir no tiene
+            // salida —HU-031 CA-05 exige una cita APPROVED— y su franja quedaria retenida para siempre. Se
+            // cierra aqui, con el profesional como decisor, y su retencion se libera por el unico camino de
+            // liberacion (RN-09); la franja de la cita, que no se libera, no se toca. La solicitud se
+            // bloquea DESPUES de la cita (orden unico de bloqueo, ver RescheduleAppointmentUseCase).
+            reschedules.lockPendingByAppointment(appointmentId).ifPresent(pending -> {
+                reschedules.saveDecision(pending.cancelWithClosure(userId));
+                appointments.releaseReservations(ReservationHolder.ofRescheduleRequest(pending.id()));
+            });
             return null;
         });
         AppointmentView view = queries.findById(appointmentId).orElseThrow(() -> new NotFoundException(NOT_FOUND));

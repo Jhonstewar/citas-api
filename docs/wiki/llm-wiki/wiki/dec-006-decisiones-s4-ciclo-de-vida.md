@@ -2,9 +2,9 @@
 titulo: "Decisión 006 — Decisiones de S4 para el ciclo de vida de la cita, la cuenta y la UI"
 tipo: decision
 estado: Provisional
-actualizado: 2026-09-25
-fuentes: ["PRD.md §4-§6", "PLAN_RETOMA_S4.md §2", "[[sintesis-preguntas-abiertas]]", "citas-web/docs/diseno/PANTALLAS_OBLIGATORIAS.md"]
-tags: [decision, s4, ciclo-de-vida, reprogramacion, cuenta, aprobacion-delegada]
+actualizado: 2026-09-30
+fuentes: ["PRD.md §4-§6 y §RF-19 (textual, para D40)", "PLAN_RETOMA_S4.md §2, §4 F5 y F10, ▶ Dónde retomar", "[[sintesis-preguntas-abiertas]]", "citas-web/docs/diseno/PANTALLAS_OBLIGATORIAS.md", "citas-api/docs/wiki/scrum/HU-*.md (frontmatter)", "citas-api/docs/wiki/scrum/epicas/EP-008-operacion-administrativa-de-solicitudes.md", "evidencias/s4/loops/LOOP-02/iter-1-verifier.json, iter-2-verifier.json", "suites ejecutadas el 2026-09-30: backend 484/484, frontend 218/218"]
+tags: [decision, s4, ciclo-de-vida, reprogramacion, cuenta, aprobacion-delegada, estado-de-sesion]
 ---
 
 # Decisión 006 — Decisiones de S4
@@ -30,7 +30,7 @@ Origen: **U** = respondida por el usuario · **P** = provisional bajo delegació
 | D19 U | INC-018 · Desde cuándo se cierra como `COMPLETED`/`NO_SHOW` | Desde la **hora de inicio**, sin plazo máximo, aislado en un único punto de decisión (T-02 de HU-021) | Al terminar la franja o el día | Permite marcar la inasistencia sin esperar; el punto único permite cambiarlo sin tocar el caso de uso |
 | D20 P | INC-028 / INC-029 · Número de solicitudes y retirada | Una sin decidir por cita; tras la decisión se puede pedir otra. El paciente no retira la solicitud en S4 | Retirada explícita | `uq_reschedule_requests_active` (`V3:162`) ya impone una activa; retirar añade una transición sin RF que la pida |
 | D21 P | INC-031 · ¿Reprogramar a otra sede? | Sí, si el profesional atiende en ella | Misma sede obligatoria | RF-15 solo obliga a conservar profesional y especialidad |
-| D22 P | N3 · ¿La decisión sobre una reprogramación deja historial? | Sí: fila con estado `APPROVED`, origen `ADMIN` y motivo que nombra franja anterior y nueva | Sin historial, porque el estado no cambia | RF-19 pide trazar el cambio. Sin migración: `appointment_status_history` guarda solo el estado nuevo (`V3:115`) |
+| ~~D22 P~~ **SUPERADA por D39** | N3 · ¿La decisión sobre una reprogramación deja historial? | ~~Sí, las dos decisiones~~ → **solo la aprobación** escribe fila; el rechazo no toca la cita (ver D39) | Sin historial, porque el estado no cambia | Se justificó en «RF-19 pide trazar el cambio», pero eso venía de una **reformulación de RF-19 en EP-008**, no del PRD: RF-19 audita «todo cambio de estado de cita» y el rechazo no cambia ninguno. Corregido en **D40** |
 | D23 P | INC-036 · Reprogramación cuya franja propuesta ya pasó | Aprobar responde 409; el ADMIN rechaza con motivo | Aprobarla igual | Igual que D12 y RN-06 |
 | D24 P | N6 · Filtros de la bandeja sobre una reprogramación | Por la **franja propuesta** | Por la franja actual | Es lo que el ADMIN decide |
 | D25 P | INC-006 · Campos editables del perfil | Nombres, apellidos y teléfono. Fijos: email y documento | Todo editable | El email es la credencial de login y el documento es identidad única (`users`, `V1`) |
@@ -116,6 +116,137 @@ D29) y HU-032 (por D22) deben revisar su matriz en la verificación final de S4.
 `tokens.css:27` dice 4,1:1 y está mal. Como borde cumple de sobra (WCAG 1.4.11 exige 3:1) y el
 texto deshabilitado está exento, así que solo hay que corregir el comentario.
 
+## Estado real de S4 al pausarse (2026-09-25) y al retomarse (2026-09-30)
+
+Esta sección existe porque el plan **no** se puede leer literalmente: sus casillas dicen más de lo
+que se hizo. Todo lo de abajo se comprobó el 2026-09-30 contra los ficheros reales.
+
+### S4 cerró cero HU
+
+**HECHO**, leído del frontmatter de los 33 `HU-*.md` de `citas-api/docs/wiki/scrum/`:
+
+| Estado | Nº | Cuáles |
+|---|---|---|
+| `Completada` | **16** | HU-001, 002, 003, 004, 010, 013, 014, 015, 017, 018, 019, 023, 024, 025, 030, 032 |
+| `En validación` | 5 | HU-005, 011, 016, 022, 029 — deuda heredada de S3 |
+| `Aprobada`, con código escrito y **sin verificación independiente** | 11 | HU-006, 007, 008, 009, 012, 020, 021, 026, 027, 028, 031 |
+| `En desarrollo` | 1 | HU-033, viva por diseño (artefacto vivo) |
+
+Esas 16 son **exactamente** las mismas que ya estaban cerradas al empezar S4 (§1 de
+`PLAN_RETOMA_S4.md`). Es decir: S4 escribió mucho código y no cerró ninguna historia. Las 11
+`Aprobada` tienen implementación y suites en verde, pero nadie las contrastó HU por HU contra sus
+criterios ni llenó su matriz de evidencia; eso es justamente F10. **`Aprobada` con código no es
+`Completada`.**
+
+### DEFECTO DE DOCUMENTO — las casillas de F10 estaban `[x]` y F10 no se ejecutó (saneado el 2026-09-30)
+
+Las siete casillas de la fase F10 de `PLAN_RETOMA_S4.md` aparecían marcadas. No lo estaban
+porque se hiciera el trabajo: **todo el archivo se escribió en un único commit (`bc13adc`)**, que
+incluye a la vez las casillas marcadas y la sección "▶ Dónde retomar" que lista F10 como
+pendiente. Pruebas de que F10 no corrió:
+
+- ninguna HU pasó a `Completada` en S4 (tabla de arriba), así que la verificación HU por HU no ocurrió;
+- `EVIDENCIAS_S4.md` solo contiene la §1 de LOOP_01: no hay guía de prueba manual en navegador con
+  los tres roles;
+- [[log]] no tiene ninguna entrada `lint` posterior al 2026-09-23 (la última es la del cierre de F11 de S3);
+- [[datos-modelo-3fn]] (líneas 17-20) sigue afirmando que la comparación contra `database/reference/`
+  **sigue pendiente**;
+- la **única** casilla de F10 que sí se cumplió es la última: el push y el merge a `main`.
+
+El error iba **en los dos sentidos**: F4, F6 y F7 estaban **sin marcar** aunque su código está
+escrito, como decía el Registro de avance. Verificado endpoint por endpoint y ruta por ruta:
+`ProfessionalAppointmentController` (agenda, `complete`, `no-show`), `AdminEpsController`,
+`MeController` (`PUT /api/me`, afiliación), `PasswordRecoveryController`, `ResetPasswordUseCase:70`
+(revoca los refresh), `PasswordPolicyCompliant` (D29), `AuthFlowIntegrationTest` con
+`OutputCaptureExtension` (CA-09) y las rutas `perfil`, `/admin/eps` y `/restablecer-password`.
+
+**Saneado el 2026-09-30:** F10 desmarcada salvo el push/merge, cada casilla con la razón de por qué
+no está hecha; F4, F6 y F7 marcadas con la referencia que las prueba; nota de precedencia añadida al
+encabezado del §4 del plan.
+
+> **REGLA, para quien retome:** una casilla `[x]` en `PLAN_RETOMA_S4.md` significa "el código existe
+> y su suite estaba en verde", **no** "HU verificada ni cerrada" — eso es F10, que no ha corrido, y
+> por eso las 11 HU de S4 siguen en `Aprobada`. Si el plan se contradice consigo mismo, manda la
+> sección **"▶ Dónde retomar"**.
+
+### LOOP_02 quedó a medias
+
+`evidencias/s4/loops/LOOP-02/iter-1-verifier.json`: en la iteración 1 el Builder terminó, el
+`frontend-verifier` dio **PASS** (typecheck 0, lint 0, 212/212, build OK) y el `backend-verifier`
+quedó **INTERRUMPIDO** por la pausa del usuario — hay que ejecutarlo **entero** al retomar, no
+reanudarlo. El resultado registrado es `ITERATION_2_REQUIRED`, con el feedback ya convertido en
+decisión aquí mismo: **D38**, **D39** y tres correcciones de frontend (texto del aviso de rechazo
+sin botón de cancelar; el tipo `AdminAppointment` exige `cancellable`/`reschedulable` que el backend
+no emite).
+
+### `develop` se mergeó a `main` con F5, F8, F9 y F10 sin terminar
+
+Merge commits del 2026-09-25 `0ae5184` (raíz) y `016baae` (citas-api), ambos "Merge pull request #3
+from Jhonstewar/develop". Hoy `git rev-list --count origin/main..origin/develop` = **0** en los tres
+repos: están idénticos.
+
+**CONTRADICCIÓN con la convención del workspace.** `AGENTS.md:102` dice que "`main` solo recibe
+incrementos que el usuario declara estables", y `AGENTS.md:41` que `main` = estable. Hoy `main`
+contiene trabajo de S4 a medio verificar. Se deja anotado, no resuelto: qué hacer con `main` es una
+decisión del usuario, registrada como pregunta abierta en [[sintesis-preguntas-abiertas]].
+
+### Entorno al retomar
+
+Al abrir la sesión, Docker Desktop **no** estaba arrancado (`docker ps` fallaba con
+`open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`), así que ninguna
+cifra de backend se podía reverificar. **Se levantó ese mismo día** y a partir de ahí la suite corrió
+varias veces de verdad: 471 → 480 → **484**, siempre `BUILD SUCCESS`.
+
+> **Este párrafo estuvo obsoleto unas horas y causó un error real.** Mientras decía «Docker no está
+> arrancado», un agente lo leyó aquí y en `index.md` y lo propagó de buena fe a
+> [[contrato-rest-citas]] como reserva de «pruebas leídas, no ejecutadas», cuando ya se habían
+> ejecutado. **Un dato de entorno desactualizado en la wiki no se queda quieto: se copia.** Al cambiar
+> el entorno, actualiza estas páginas en el momento, no al cerrar el turno.
+
+Sigue pendiente, y es del usuario: el **`.env` de la raíz quedó atrás de `dafb0fa`**. No viaja en git,
+así que `COMPOSE_PROJECT_NAME` sigue valiendo `fcv-citas-training` y MySQL se publica en **3307**, no
+3308. Los volúmenes se crean como `fcv-citas-training_*` y se comparten con cualquier otra copia del
+laboratorio, que es el riesgo de [[riesgo-dos-copias-mismo-proyecto-docker]] — latente hoy porque solo
+hay una copia. Comprobable sin abrir el fichero, con `docker compose ls` y `docker port`.
+
+### Cierre del LOOP_02 (iteración 3) y la deriva respecto del PRD
+
+**El loop cerró en 3 iteraciones de 4.** La iteración 2 implementó D38 y D39; el `backend-verifier`
+dio **PASS al comportamiento** (43 criterios con evidencia, las cinco reglas innegociables cumplidas,
+y descartados **con prueba** los dos riesgos del §5 del plan) y **FAIL a la Definition of Done**,
+porque los documentos afirmaban lo contrario del código. La iteración 3 cerró ese FAIL.
+
+**Lección del loop, que vale más que las cifras.** El Verifier no se limitó a comprobar que la
+derivación de D39 funciona: verificó **la razón escrita** en el javadoc, y era **falsa**. Decía que la
+reprogramación aprobada es «la única escritura de historial que no pasa por `transitionTo`», y
+`bookGeneral` y `requestSpecialized` también construyen su `StatusChange` directamente. El invariante
+real: el historial se escribe solo por `AppointmentRepository.create` y `apply`; la fila de `create` es
+por contrato **la primera** de la cita, donde no hay anterior con la que comparar; y toda fila
+posterior viene de un `Transition`, que solo `Appointment` construye. Al simular la violación,
+`HistoryEventTest` y `HexagonalArchitectureTest` **seguían en verde**: la suite entera pasaba con la
+mentira dentro. **Una prueba verde no dice que el razonamiento sea correcto; solo dice que ese camino
+no se rompió.** Cerrado con `HistoryRowInvariantTest` (reflexión, sin lista que mantener) y
+`HistoryWritersArchitectureTest` (bytecode: quién puede componer una fila de historial).
+
+**D40 U — corregida una deriva respecto del PRD en EP-008.** Aprobación **directa del usuario**, no
+delegada. [[EP-008]] reformulaba RF-19 como «cada **decisión** se registra en el historial con actor y
+origen `ADMIN`», y `PRD.md` §RF-19 dice «**todo cambio de estado de cita** guarda: cita; estado nuevo;
+actor cuando existe; fuente `SYSTEM`, `USER` o `ADMIN`; fecha/hora; motivo opcional». Rechazar una
+reprogramación **no cambia el estado de la cita**, que sigue `APPROVED`, así que el PRD **nunca pidió**
+esa fila: la exigencia la había añadido la épica, y **fue la que justificó D22**. Se alinearon cinco
+textos —la regla y el criterio de completitud de EP-008, y el contexto, el alcance y la tarea T-03 de
+HU-031— citando RF-19 textualmente. **No se relajó ningún requisito: se volvió al PRD.** HU-030 no
+cambia, porque allí la decisión sí es un cambio de estado de la cita.
+
+**Estado de las HU tras el cierre:** HU-027, HU-028 y HU-031 pasan de `Aprobada` a `En validación` con
+matriz de evidencia rellenada. **Ninguna a `Completada`**: les faltan los criterios de frontend
+verificados uno a uno y la prueba manual en navegador de F10.
+
+**Queda abierto para F10:** la carrera «cerrar la atención» contra «decidir la reprogramación» que D38
+abre no tiene prueba concurrente; el aviso `CANCELLED` del frontend descarta `decisionReason` y deja al
+paciente sin explicación; HU-021 no menciona D38 en ninguna parte; y las matrices de HU-021, HU-026 y
+HU-029 siguen sin rellenar.
+
 ## Consecuencias
 
 - La reprogramación y la cancelación comparten un único camino de liberación de slots (D18).
@@ -136,4 +267,7 @@ texto deshabilitado está exento, así que solo hay que corregir el comentario.
 
 ## Historial
 
+- 2026-09-30 — añadida la sección "Estado real de S4": cero HU cerradas, las 11 `Aprobada` sin
+  verificar, el defecto de las casillas de F10, LOOP_02 a medias y el merge a `main` con S4 a medio
+  verificar. Ninguna decisión D15–D39 cambia.
 - 2026-09-25 — creada con D15–D30 al resolver el plan de S4.

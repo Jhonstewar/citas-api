@@ -23,14 +23,14 @@ public class PatientAppointmentsUseCase {
      * Cita con su historial y su ultima solicitud de reprogramacion; la usa el ADMIN (sin acciones del
      * paciente). {@code lastReschedule} es nulo si nunca hubo una.
      */
-    public record Detail(AppointmentView appointment, List<HistoryView> history, RescheduleView lastReschedule) {
+    public record Detail(AppointmentView appointment, List<HistoryEntry> history, RescheduleView lastReschedule) {
     }
 
     /**
      * {@code AppointmentDetail} del paciente (contrato S4): el detalle mas lo que el paciente puede
      * hacer ahora. Las banderas las decide el dominio, no el cliente ni el controlador.
      */
-    public record PatientDetail(AppointmentView appointment, List<HistoryView> history, boolean cancellable,
+    public record PatientDetail(AppointmentView appointment, List<HistoryEntry> history, boolean cancellable,
             boolean reschedulable, RescheduleView lastReschedule) {
     }
 
@@ -71,7 +71,9 @@ public class PatientAppointmentsUseCase {
         Appointment appointment = toDomain(view);
         LocalDateTime now = SystemZone.now(clock);
         return new PatientDetail(view,
-                queries.history(appointmentId).stream().map(PatientAppointmentsUseCase::forPatient).toList(),
+                // D39: el evento se deriva del historial ordenado; enmascarar al actor no lo altera.
+                HistoryEntry.derive(queries.history(appointmentId)).stream()
+                        .map(PatientAppointmentsUseCase::forPatient).toList(),
                 appointment.isCancellableAt(now),
                 appointment.isReschedulableAt(now, view.pendingReschedule()),
                 // HU-028: el motivo es el mismo dato que persistio el ADMIN (sin copia); ownership ya comprobado.
@@ -91,9 +93,11 @@ public class PatientAppointmentsUseCase {
      * El paciente ve quien decidio como rol, no como persona: el nombre del ADMIN es dato personal
      * del empleado y no le aporta nada (verificacion S3, F9). El ADMIN si ve el nombre completo.
      */
-    private static HistoryView forPatient(HistoryView h) {
+    private static HistoryEntry forPatient(HistoryEntry entry) {
+        HistoryView h = entry.change();
         return "ADMIN".equals(h.source())
-                ? new HistoryView(h.status(), h.statusName(), h.source(), "Administración", h.reason(), h.changedAt())
-                : h;
+                ? entry.withChange(new HistoryView(h.status(), h.statusName(), h.source(), "Administración",
+                        h.reason(), h.changedAt()))
+                : entry;
     }
 }

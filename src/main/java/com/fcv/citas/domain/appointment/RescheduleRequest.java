@@ -15,7 +15,9 @@ import com.fcv.citas.domain.shared.InvalidRequestException;
  * <p>Invariantes: nace {@code PENDING} sobre una cita {@code APPROVED} que aun no empezo y sin otra
  * solicitud sin decidir (D20); conserva profesional y especialidad (la franja nueva solo lleva dia,
  * horas y sede, D21); la franja propuesta es futura, distinta de la actual y no se cruza con ella. Solo
- * una {@code PENDING} se decide, y solo sobre una cita todavia {@code APPROVED} (CA-05 de HU-031).</p>
+ * una {@code PENDING} se decide, y solo sobre una cita todavia {@code APPROVED} (CA-05 de HU-031). Si la
+ * cita deja de estar {@code APPROVED} sin decision, la solicitud se cierra con ella: cancelada por el
+ * paciente (D18) o cerrada por el profesional (D38), nunca retenida sin salida.</p>
  *
  * <p>La ocupacion de slots (retener, convertir, liberar) no vive aqui sino en el libro unico
  * {@code slot_reservations} (dec-003); el caso de uso la ordena en la misma transaccion.</p>
@@ -37,12 +39,14 @@ public record RescheduleRequest(
     /** D37: motivo automatico cuando la solicitud se cierra porque el paciente cancela la cita (D18). */
     public static final String CANCELLED_WITH_APPOINTMENT = "Cita cancelada por el paciente";
 
-    /** Resultado de aprobar: la solicitud decidida y la cita movida con su fila de historial (D22). */
-    public record Approval(RescheduleRequest request, Appointment.Transition appointment) {
-    }
+    /** D38: motivo automatico cuando la solicitud se cierra porque el profesional cierra la atencion. */
+    public static final String CANCELLED_WITH_CLOSURE = "Cita cerrada por el profesional";
 
-    /** Resultado de rechazar: la solicitud decidida y la fila de historial de la cita, que no cambia (D22). */
-    public record Rejection(RescheduleRequest request, Appointment.Transition appointment) {
+    /**
+     * Resultado de aprobar: la solicitud decidida y la cita movida con su fila de historial (D22/D39).
+     * Rechazar no tiene analogo: no cambia la cita, asi que devuelve solo la solicitud.
+     */
+    public record Approval(RescheduleRequest request, Appointment.Transition appointment) {
     }
 
     public RescheduleRequest {
@@ -141,17 +145,20 @@ public record RescheduleRequest(
     }
 
     /**
-     * HU-031 CA-03 y CA-04 (RN-04): rechaza con motivo obligatorio; la cita queda intacta. Primero el
-     * estado (409) y despues el motivo (400), igual que {@link Appointment#reject}.
+     * HU-031 CA-03, CA-04 y CA-06 (RN-04, RN-10, D39): rechaza con motivo obligatorio. La cita NO se
+     * toca —ni su franja ni su historial—, asi que devuelve solo la solicitud decidida: el motivo vive
+     * en {@link #decisionReason()}, que es lo que el detalle del paciente muestra (HU-028). Escribir una
+     * fila {@code APPROVED}/ADMIN con el motivo del rechazo, como hacia D22 literal, rotulaba la linea
+     * de tiempo "Aprobada · Motivo: <rechazo>", que es falso. Primero el estado (409) y despues el
+     * motivo (400), igual que {@link Appointment#reject}.
      */
-    public Rejection reject(long adminUserId, Appointment appointment, String reason) {
+    public RescheduleRequest reject(long adminUserId, Appointment appointment, String reason) {
         requireDecidable(appointment);
         String normalized = normalizeReason(reason);
         if (normalized == null) {
             throw InvalidRequestException.field("reason", "El motivo del rechazo es obligatorio");
         }
-        return new Rejection(decide(RescheduleStatus.REJECTED, adminUserId, normalized),
-                appointment.recordRescheduleRejection(adminUserId, normalized));
+        return decide(RescheduleStatus.REJECTED, adminUserId, normalized);
     }
 
     /**
@@ -160,8 +167,25 @@ public record RescheduleRequest(
      * con el unico camino de liberacion ({@code ReservationHolder#ofAppointment}).
      */
     public RescheduleRequest cancelWithAppointment(long patientUserId) {
+        return closeWith(patientUserId, CANCELLED_WITH_APPOINTMENT);
+    }
+
+    /**
+     * D38: el profesional cierra la atencion ({@code COMPLETED} / {@code NO_SHOW}) con esta solicitud sin
+     * decidir. Igual que D18, pero el decisor es el profesional y el motivo lo dice: si no se cerrara
+     * aqui, la franja propuesta quedaria retenida sin salida, porque HU-031 CA-05 solo deja decidir
+     * sobre una cita {@code APPROVED}. Liberar su retencion lo hace el caso de uso con el unico camino
+     * de liberacion ({@code ReservationHolder#ofRescheduleRequest}: la cita conserva su franja, que
+     * {@code COMPLETED} y {@code NO_SHOW} no liberan).
+     */
+    public RescheduleRequest cancelWithClosure(long professionalUserId) {
+        return closeWith(professionalUserId, CANCELLED_WITH_CLOSURE);
+    }
+
+    /** D18 y D38 comparten transicion: {@code PENDING → CANCELLED} con decisor y motivo automatico (D37). */
+    private RescheduleRequest closeWith(long deciderUserId, String automaticReason) {
         requirePending();
-        return decide(RescheduleStatus.CANCELLED, patientUserId, CANCELLED_WITH_APPOINTMENT);
+        return decide(RescheduleStatus.CANCELLED, deciderUserId, automaticReason);
     }
 
     public boolean isPending() {

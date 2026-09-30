@@ -2,8 +2,8 @@
 titulo: "Síntesis — Preguntas abiertas del dominio"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-23
-fuentes: ["citas-api/docs/wiki/scrum/historias-de-usuario/", "PRD.md", "[[MODELO-DATOS-3FN]]"]
+actualizado: 2026-09-30
+fuentes: ["citas-api/docs/wiki/scrum/historias-de-usuario/", "PRD.md", "[[MODELO-DATOS-3FN]]", "PLAN_RETOMA_S4.md §4 F10"]
 tags: [sintesis, preguntas-abiertas, dominio]
 ---
 
@@ -137,6 +137,20 @@ correcto de hoy deje de serlo sin que nada avise. Ver [[datos-modelo-3fn]] y
 HU-027 y HU-031 existan, cualquier criterio que dependa de ellas es literalmente no verificable.
 Es la causa de que HU-022 y HU-029 queden abiertas.
 
+## Defecto de documento y preguntas abiertas al retomar S4 (2026-09-30)
+
+Salieron al bajar a esta máquina los commits de S4 y comprobar el estado real contra los ficheros.
+No son huecos del PRD como los de arriba: son huecos entre lo que los documentos del proyecto dicen
+y lo que pasó. El detalle y las pruebas están en
+[[dec-006-decisiones-s4-ciclo-de-vida]] § "Estado real de S4".
+
+| # | Pregunta | Estado |
+|---|---|---|
+| R1 | **Defecto verificado, no pregunta:** las 7 casillas de F10 de `PLAN_RETOMA_S4.md` estaban `[x]` y F10 no se ejecutó; el archivo entero se escribió en el commit `bc13adc`. Resultó estar mal **en los dos sentidos**: F4, F6 y F7 estaban sin marcar con su código escrito | **Cerrada el 2026-09-30.** Casillas saneadas contra el código real: F10 desmarcada salvo el push/merge, F4/F6/F7 marcadas con la referencia que las prueba, y nota de precedencia añadida al §4 |
+| R2 | `main` == `develop` en los tres repos desde el 2026-09-25 con S4 a medio verificar (F5, F8, F9 y F10 sin terminar), contra `AGENTS.md:102`. ¿Se acepta el estado, se revierte el merge, o se redefine qué significa "estable" para `main`? | **Resuelta el 2026-09-30:** el usuario decide **dejar `main` como está** —es un laboratorio y revertir un merge publicado añade más riesgo que valor— y que el próximo merge a `main` se haga solo al cerrar F10 |
+| R3 | ¿Cuáles de las **11 HU `Aprobada` con código escrito** resisten la verificación independiente? | **Parcialmente respondida el 2026-09-30** al cerrar F5: **3 de las 11** (HU-027, HU-028, HU-031) pasaron la verificación de backend con matriz completa y están en `En validación`; ninguna llegó a `Completada` porque les faltan los criterios de frontend uno a uno y la prueba manual en navegador. Las **8 restantes** siguen sin verificar. Docker ya no es el impedimento: las suites corren (484/484 y 218/218) |
+| R4 | La comparación del modelo 3FN propio contra `database/reference/` sigue pendiente desde S2, aunque su casilla de F10 esté marcada | Abierta — ver [[datos-modelo-3fn]] |
+
 ## Relacionado
 
 - [[dec-004-decisiones-s3-reserva]]
@@ -148,6 +162,10 @@ Es la causa de que HU-022 y HU-029 queden abiertas.
 
 ## Historial
 
+- 2026-09-30 — añadidas R1–R4 al retomar S4: el defecto de las casillas de F10, `main` con trabajo a
+  medio verificar, las 11 HU `Aprobada` sin verificación independiente y la comparación 3FN que
+  sigue pendiente. El mismo día se cerraron R1 (casillas saneadas) y R2 (el usuario deja `main` como
+  está); quedan abiertas R3 y R4, que dependen de F10.
 - 2026-09-23 (LINT) — E1, E2 y S3 marcadas como cerradas con cita a `V5` y `V6`; las preguntas de
   afiliación renumeradas `A1–A3` → `AF1–AF3` para deshacer la colisión con las `A1–A4` de
   autenticación.
@@ -155,3 +173,22 @@ Es la causa de que HU-022 y HU-029 queden abiertas.
 - 2026-09-17 — A1 precisada con la divergencia cliente/servidor; añadida S4 (refresh token en memoria JS) y la tabla D1–D4 de decisiones tomadas bajo aprobación delegada.
 - 2026-09-16 — añadidas A1–A4 del informe de especificación (40 incógnitas `INC-NNN` registradas en las épicas).
 - 2026-09-16 — creada al terminar la especificación Scrum (33 HU). E1 y E2 verificadas contra `V3__schedule_and_appointments.sql`.
+
+## Abiertas al cerrar el LOOP_02 de S4 (2026-09-30)
+
+Las destapó la verificación independiente de la reprogramación. Ninguna bloquea el cierre de F5; todas
+van a F10. Detalle y evidencia en `evidencias/s4/loops/LOOP-02/iter-2-verifier.json`.
+
+| # | Pregunta | Estado |
+|---|---|---|
+| R5 | La carrera **«cerrar la atención» contra «decidir la reprogramación»**, que D38 abre, no tiene prueba concurrente. Existe el caso secuencial y el argumento estructural es sólido —los tres caminos bloquean primero la cita y después la solicitud, un orden único que serializa sin interbloquear— pero la concurrencia concreta no está probada | Abierta. `NO VERIFICABLE` por falta de prueba, no fallo |
+| R6 | El aviso de una solicitud `CANCELLED` en el detalle del paciente **descarta `decisionReason`**, así que quien vea su reprogramación cancelada porque el profesional cerró la atención (D38) no recibe ninguna explicación. El texto visible no miente, calla. D37 creó ese dato justo «para que la solicitud no quede sin explicación en la bandeja **ni en el detalle**» | Abierta — defecto de completitud, gravedad media |
+| R7 | **HU-021 no menciona D38 en ninguna parte** —ni alcance, ni reglas, ni ningún CA— aunque cerrar la atención cancele la solicitud `PENDING` y libere su retención, que es un efecto observable de dos endpoints REST ya implementado y documentado en [[contrato-rest-citas]] | Abierta |
+| R8 | Las matrices de evidencia de **HU-021, HU-026 y HU-029** siguen sin rellenar; la de HU-029 es de S3 y afirma que la mitad de reprogramaciones «no existe», cuando ya existe con evidencia | Abierta hasta F10 |
+| R9 | El texto **«Su hora ya llegó»** que el paciente ve cuando no puede cancelar depende de que `cancellable === false` implique «la cita ya empezó». Hoy **está garantizado** (verificado contra `Appointment.isCancellableAt` y la tabla de transiciones), pero **ninguna prueba de frontend protege esa garantía**: si alguien añade una causa a `isCancellableAt`, el texto miente y las 218 pruebas siguen en verde | Abierta — riesgo de acoplamiento, no defecto |
+| R10 | La derivación de `RESCHEDULED` se apoya en un invariante de **aplicación** que el esquema no protege: `appointment_status_history` admite dos filas consecutivas con el mismo `status_id` por vías ajenas a la aplicación (SQL manual, semillas). Mientras solo escriba la aplicación se cumple, y `HistoryWritersArchitectureTest` lo fija sobre bytecode; un `INSERT` nativo escrito a mano no lo vería | Abierta — límite conocido, gravedad baja |
+| R11 | **HU-029 CA-06** se apoya en la regla de prefijo de `SecurityConfig` y en una prueba sobre otro endpoint: ninguna asevera 403/401 sobre `/api/admin/inbox` | Abierta — informativa |
+| R12 | **`HU-031:67`** («Cada decisión queda registrada con actor y origen `ADMIN`») no es falsa —el rechazo sí guarda decisor y origen, en `reschedule_requests`— pero invita a la lectura vieja de D22. Quedó fuera de los cinco textos que D40 autorizó alinear | Abierta — cosmética |
+
+- 2026-09-30 — añadidas R5–R12 al cerrar el LOOP_02. R1 y R2 quedaron cerradas ese mismo día; R3 pasó
+  a parcialmente respondida (3 de 11 HU verificadas); R4 sigue abierta.

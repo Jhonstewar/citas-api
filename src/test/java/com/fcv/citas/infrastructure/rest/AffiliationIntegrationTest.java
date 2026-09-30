@@ -226,6 +226,46 @@ class AffiliationIntegrationTest {
         assertThat(current(userId)).isOne();
     }
 
+    /**
+     * DELIBERADO, no un descuido: reenviar el plan que YA esta vigente responde 200 sin revalidar que
+     * siga siendo ofrecible, aunque el ADMIN haya desactivado despues el plan o su EPS.
+     *
+     * <p>Razon: la peticion no declara una afiliacion nueva —no crea ni cierra ninguna fila (CA-03,
+     * "mismo plan = sin cambios")— y HU-012 CA-04 exige el plan activo solo para una afiliacion
+     * <em>nueva</em>; HU-012 CA-05 exige ademas que una afiliacion ya declarada siga mostrando su EPS y
+     * su plan tras la desactivacion, que es exactamente lo que devuelve esta respuesta. Rechazar aqui
+     * con 422 convertiria una operacion idempotente en un error sobre datos que el usuario no eligio.
+     * El contraste esta en {@link #aRejectedChangeKeepsTheCurrentAffiliation}: cambiar a OTRO plan no
+     * ofrecible sigue siendo 422. Si algun dia se decide lo contrario, esta prueba es la que cambia.</p>
+     */
+    @Test
+    void repeatingTheCurrentPlanIsAcceptedEvenAfterThePlanOrItsEpsWasDeactivated() throws Exception {
+        long id = json.readTree(set(user, planA).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString()).get("id").asLong();
+
+        jdbc.update("UPDATE eps_plans SET active = FALSE WHERE id = ?", planA);
+        set(user, planA).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.plan.id").value(planA));
+
+        jdbc.update("UPDATE eps SET active = FALSE WHERE id = ?", epsId);
+        set(user, planA).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.plan.eps.id").value(epsId));
+
+        // Sin cambios: ni una fila nueva, ni una cerrada, ni otra vigente.
+        List<Map<String, Object>> rows = rows(userId);
+        assertThat(rows).hasSize(1);
+        assertThat(((Number) rows.get(0).get("id")).longValue()).isEqualTo(id);
+        assertThat(rows.get(0).get("eps_plan_id")).isEqualTo(planA);
+        assertThat(rows.get(0).get("ended_on")).isNull();
+        assertThat(current(userId)).isOne();
+        // Declarar un plan DISTINTO no ofrecible sigue siendo 422: la puerta solo se abre para el vigente.
+        set(user, planB).andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("INSURANCE_PLAN_UNAVAILABLE"));
+        assertThat(rows(userId)).hasSize(1);
+    }
+
     // ------------------------------------------------------------------ CA-07
 
     /** CA-07: no hay ruta a la afiliacion de otro; lo que hace un usuario nunca toca la del otro. */

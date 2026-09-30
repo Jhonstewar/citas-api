@@ -2,7 +2,7 @@
 id: HU-027
 tipo: historia-de-usuario
 titulo: "Solicitar la reprogramación de una cita aprobada"
-estado: Aprobada
+estado: En validación
 epica: "[[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]"
 requisitos: [RF-15]
 esfuerzo: "Alto"
@@ -170,35 +170,50 @@ La consecuencia directa es que mientras la solicitud está `PENDING` el sistema 
 
 ## Definition of Done
 
-- [ ] Los criterios CA-01 a CA-10 están validados con evidencia concreta.
-- [ ] Existe una migración Flyway versionada para la tabla de solicitudes de reprogramación, aplicada sobre el esquema existente sin pérdida de datos.
-- [ ] Está demostrado con una prueba que, con la solicitud en `PENDING`, la cita original conserva su franja y la franja propuesta está retenida al mismo tiempo (RN-10).
-- [ ] La retención de la nueva franja usa el mismo mecanismo de reserva que la creación de citas, de modo que RN-01 se cumple frente a peticiones concurrentes.
-- [ ] El agregado de solicitud de reprogramación vive en el dominio sin depender de Spring ni de JPA.
-- [ ] La creación de la solicitud, la retención de slots y la persistencia ocurren en una única transacción, sin resultados parciales.
+- [x] Los criterios CA-01 a CA-10 están validados con evidencia concreta.
+- [x] Existe una migración Flyway versionada para la tabla de solicitudes de reprogramación, aplicada sobre el esquema existente sin pérdida de datos.
+- [x] Está demostrado con una prueba que, con la solicitud en `PENDING`, la cita original conserva su franja y la franja propuesta está retenida al mismo tiempo (RN-10).
+- [x] La retención de la nueva franja usa el mismo mecanismo de reserva que la creación de citas, de modo que RN-01 se cumple frente a peticiones concurrentes.
+- [x] El agregado de solicitud de reprogramación vive en el dominio sin depender de Spring ni de JPA.
+- [x] La creación de la solicitud, la retención de slots y la persistencia ocurren en una única transacción, sin resultados parciales.
 - [ ] La pantalla de `citas-web` no permite seleccionar un profesional distinto del de la cita original.
-- [ ] Existen pruebas automatizadas de la solicitud válida, de la franja pasada, de la franja ocupada, de los dos slots consecutivos y del intento de cambio de profesional, y pasan.
-- [ ] El contrato del endpoint de solicitud de reprogramación está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
-- [ ] La trazabilidad de esta HU y de [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] está actualizada en `docs/wiki/scrum/`.
+- [x] Existen pruebas automatizadas de la solicitud válida, de la franja pasada, de la franja ocupada, de los dos slots consecutivos y del intento de cambio de profesional, y pasan.
+- [x] El contrato del endpoint de solicitud de reprogramación está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]].
+- [x] La trazabilidad de esta HU y de [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] está actualizada en `docs/wiki/scrum/`.
 
 ## Evidencia de validación
 
+Ejecución de referencia del **2026-09-30** (iteración 2 del LOOP_02 de S4): el `backend-verifier`, agente independiente que no escribió el código, reejecutó la suite completa de `citas-api` → **480 pruebas, 0 fallos, 0 errores, `BUILD SUCCESS`**, con `HexagonalArchitectureTest` 4/4 (`evidencias/s4/loops/LOOP-02/iter-2-verifier.json`). Abreviaturas: **RRIT** = `src/test/java/com/fcv/citas/infrastructure/rest/RescheduleRequestIntegrationTest.java`, **RRT** = `src/test/java/com/fcv/citas/domain/appointment/RescheduleRequestTest.java`.
+
+Lo de **frontend** queda en `Pendiente`: el `backend-verifier` lo clasificó `NO VERIFICABLE` porque `citas-web` está fuera de su repositorio, y el `frontend-verifier` dio PASS solo al alcance de la iteración 2, sin la prueba manual en navegador que pide la fase F10 del plan.
+
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| CA-10 | Pendiente | — | — |
-| DoD | Pendiente | — | — |
+| CA-01 | Cumple | RRIT:313 `onlyAnApprovedFutureAppointmentAdmitsARequest` (`REQUESTED`, `CANCELLED`, `REJECTED`, `COMPLETED` y `NO_SHOW` → 409 `INVALID_TRANSITION`, cero solicitudes y el detalle con `reschedulable: false`; `APPROVED` con fecha de ayer → 409 `APPOINTMENT_EXPIRED`); al final `heldSlots()` es 0 y el slot de las 10:00 no tiene titular; dominio RRT:74 | Cubre un estado más de los que enumera el criterio (`NO_SHOW`) |
+| CA-02 | Cumple | RRIT:285 `changingProfessionalOrSpecialtyIsRejectedAsANewAppointment` (otro profesional y otra especialidad → 422 `WRONG_FLOW`, cero solicitudes y cero retenciones; enviar el **mismo** profesional y especialidad sí se admite); RRIT:190 comprueba en `appointments` que la cita de la solicitud creada conserva `professional_id` y `specialty_id`; dominio RRT:103 | — |
+| CA-03 | Cumple | RRIT:190 `aValidRequestIsPendingAndHoldsBothSlotsAtOnce` (201 con `status = PENDING`, `previous.date/startTime/endTime/site` y `proposed.*`; y en `reschedule_requests`: `code = PENDING`, `previous_date`, `previous_start_time`, `previous_end_time`, `previous_site_id`, `proposed_start_time`, `proposed_site_id`, `requested_by_user_id` y `decided_at` nulo) | La "fecha y hora anterior registradas" que pide el criterio es posible desde `V10` (D31). Antes de esa migración el criterio no se cumplía literalmente; ver «Notas y decisiones» |
+| CA-04 | Cumple | RRIT:342 `heldSlotsAreNeitherOfferedNorBookable` (con la solicitud `PENDING`, la franja 09:00–10:00 desaparece de `/api/patient/availability` para otro paciente y reservarla directamente responde 409 `SLOT_TAKEN`; las dos filas siguen con `reservation_type = RESCHEDULE_REQUEST`) | La misma prueba cubre CA-03 de [[HU-022-buscar-disponibilidad-con-filtros]], que no tenía productor en S3 |
+| CA-05 | Cumple | RRIT:190, líneas 232–256: la cita sigue `APPROVED` a las 08:00 con su profesional y especialidad, el slot de las 08:00 es `APPOINTMENT` y el de las 10:00 es `RESCHEDULE_REQUEST` **al mismo tiempo**, y el detalle expone `pendingReschedule: true`, `reschedulable: false`, `cancellable: true` y `lastReschedule`; `history(id)` no cambia | La doble retención simultánea de RN-10 se asevera fila a fila, no por conteo |
+| CA-06 | Cumple | RRIT:371 `aProposedSlotInThePastIsRejected` (franja de ayer → 422 `PAST_TIME`, cero solicitudes y el slot de ayer sin titular); dominio RRT:89 | — |
+| CA-07 | Cumple | RRIT:389 `sixtyMinutesNeedsTwoConsecutiveFreeSlots` (sin slot siguiente → 422 `SLOT_NOT_AVAILABLE`; con el siguiente ocupado → 409 `SLOT_TAKEN` sin retener el primero; con los dos libres → 201 reteniendo 09:30 y 10:00 con `slot_order` 1 y 2); RRIT:422 `aProposalOverlappingTheCurrentSlotIsRejected` | Las dos mitades del criterio (rechazo y creación reteniendo ambos) están en la misma prueba |
+| CA-08 | Cumple | RRIT:444 `aTakenOrRetainedSlotCannotBeProposed` (franja ocupada por una `APPROVED` ajena y franja retenida por una `REQUESTED` ajena → 409 `SLOT_TAKEN`; cero solicitudes, cero retenciones y la cita ajena conserva sus dos reservas) | — |
+| CA-09 | Cumple | `V3__schedule_and_appointments.sql` crea `reschedule_requests` con su estado del catálogo y la franja propuesta; `V10__reschedule_previous_slot.sql` (D31) añade la franja **anterior** y la sede propuesta, obligatorias y con clave foránea a `sites`; `FlywayMigratesEmptySchemaTest#laReprogramacionGuardaLaFranjaAnteriorYLaSedePropuesta` arranca Flyway sobre un esquema vacío y comprueba en `information_schema` que las cinco columnas existen, son `NOT NULL` y tienen las dos FK | El arranque sin error lo demuestra toda la suite de integración, que levanta el contexto contra MySQL 8.4 |
+| CA-10 | Cumple | RRIT:474 `onlyOneUndecidedRequestPerAppointment` (con una `PENDING`, la segunda solicitud → 409 `RESCHEDULE_PENDING`, una sola solicitud y el slot propuesto sin titular; tras el **rechazo** se admite otra y tras la **aprobación** una tercera: tres solicitudes en total); `uq_reschedule_requests_active` (`V3__schedule_and_appointments.sql:162`) | Implementa D20 en los dos sentidos: el límite y la reapertura tras decidir |
+| DoD — CA-01 a CA-10 validados con evidencia concreta | Cumple | Filas CA-01 a CA-10 de esta tabla | Los diez son observables por API y base de datos |
+| DoD — Migración Flyway versionada, aplicada sobre el esquema existente sin pérdida de datos | Cumple | `V10__reschedule_previous_slot.sql`: añade las columnas como `NULL`, **rellena** las filas existentes con la franja actual de la cita y la sede de sus slots retenidos, y solo después las vuelve `NOT NULL` y añade las restricciones; ninguna migración previa se editó (el `backend-verifier` validó los checksums) | Hallazgo INFO n.º 8 del Verifier: la base de desarrollo `citas_fcv_training` está en V4 y Flyway aplicará V5–V10 al arrancar. Conviene saberlo antes de la prueba manual en navegador |
+| DoD — Prueba de que con la solicitud `PENDING` conviven la franja original y la retenida (RN-10) | Cumple | RRIT:190, líneas 240–243 (`holderOf(gpBlock, "08:00") = APPOINTMENT` y `holderOf(gpBlock, "10:00") = RESCHEDULE_REQUEST`, con una sola fila por la solicitud) | — |
+| DoD — La retención usa el mismo mecanismo de reserva que la creación de citas (RN-01 frente a concurrencia) | Cumple | `JpaAppointmentRepositoryAdapter#holdForReschedule` y `#reserveSlots` escriben en la misma tabla `slot_reservations`, cuya PK `slot_id` es la barrera (`V3…sql:200-208`); RRIT:559 `aRequestAndABookingRacingForTheSameSlotLetExactlyOneWin` (cinco franjas, una solicitud contra una reserva normal: exactamente una gana y la otra recibe 409 `SLOT_TAKEN`) | El Verifier inventarió las mutaciones del libro de slots y confirmó que `ReservationHolder.Kind` sigue teniendo tres valores, sin caminos divergentes |
+| DoD — El agregado vive en el dominio sin depender de Spring ni de JPA | Cumple | `domain/appointment/RescheduleRequest.java`, `RescheduleStatus.java` y el puerto `RescheduleRequestRepository.java`; `HexagonalArchitectureTest` (cero imports de Spring o JPA en `domain/` y `application/`, 4/4); RRT (12 pruebas sin framework) | — |
+| DoD — Creación, retención y persistencia en una única transacción, sin resultados parciales | Cumple | `RescheduleAppointmentUseCase#request` (todo el cuerpo en `tx.inTransaction`, con `appointments.lockById` y `reschedules.lockPendingByAppointment` antes de decidir); RRIT:543 `aFailureHoldingTheSlotRollsBackTheRequest` (fallo simulado en `holdForReschedule` → 500, cero solicitudes y el slot sin titular) | — |
+| DoD — La pantalla de `citas-web` no permite seleccionar un profesional distinto del de la cita original | Pendiente | Existe `citas-web/src/pages/patient/ReschedulePage.tsx` y la suite de frontend está en verde (218/218, typecheck 0, oxlint 0, build OK, reejecutada por el `frontend-verifier`) | `NO VERIFICABLE` para el `backend-verifier` (otro repositorio) y sin verificación criterio a criterio del `frontend-verifier` para esta pantalla. Falta además la prueba manual en navegador de F10 |
+| DoD — Pruebas de solicitud válida, franja pasada, franja ocupada, dos slots consecutivos y cambio de profesional, y pasan | Cumple | RRIT (18 pruebas de integración) y RRT (12 de dominio); suite completa 480/480, `BUILD SUCCESS`, reejecutada por el `backend-verifier` | — |
+| DoD — El contrato del endpoint está reflejado en la documentación de [[HU-033-publicar-contrato-rest-documentado]] | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md`: tipo `RescheduleRequest`, los campos aditivos `pendingReschedule` y `lastReschedule`, la fila `POST /api/patient/appointments/{id}/reschedule` con su cuerpo y sus códigos de error, la migración `V10` (D31) y la aclaración de que **pedir no escribe historial** | Los defectos que el `backend-verifier` encontró en ese documento afectan a la **decisión** (HU-031) y a D38, no a este endpoint |
+| DoD — Trazabilidad de esta HU y de [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] actualizada | Cumple | Esta matriz, el historial de validación y la nota que registra D31 como resolución de la divergencia de esquema; EP-007 enlaza la HU y no mantiene estados por historia | — |
 
 ## Historial de validación
 
+- 2026-09-30 — Estado `En validación` (skill `scrum-spec-orchestrator`, paso 10): se registra la matriz de evidencia recolectada del repositorio y de la verificación independiente del `backend-verifier` en la iteración 2 del LOOP_02 de S4 (480/480, `BUILD SUCCESS`). Los diez criterios cumplen. **No pasa a `Completada`:** la DoD de la pantalla de `citas-web` queda en `Pendiente` porque el `backend-verifier` no puede verificar otro repositorio y el `frontend-verifier` solo cubrió el alcance de la iteración 2, sin la prueba manual en navegador de F10.
+- 2026-09-30 — La divergencia de esquema anotada el 2026-09-25 (CA-03 y CA-09 piden la franja anterior y V3 no la guardaba) queda **resuelta por D31** con la migración `V10`. Ningún criterio se reescribió: la nota de «Notas y decisiones» se actualiza para registrar qué salida se tomó. Bajo la **aprobación delegada** de S4 (D15); el usuario puede revertirlo.
 - 2026-09-25 — Se añade CA-10 por D20 (una solicitud sin decidir por cita; tras la decisión se admite otra), que ningún criterio cubría; la DoD pasa a CA-01 a CA-10. Ningún criterio existente se reescribe. Queda anotada en notas una divergencia entre CA-03 / CA-09 y el esquema V3 que no resuelve ninguna decisión.
 - 2026-09-25 — Aprobada por **aprobación delegada** del usuario para S4 (D15, PLAN_RETOMA_S4.md). Alcance en `PLAN_RETOMA_S4.md` §3 (bloque «Ciclo de vida del paciente», fase F5 / LOOP_02) y decisiones D15–D30 en [[dec-006-decisiones-s4-ciclo-de-vida]]. El usuario puede devolverla a `Pendiente de aprobación`.
 - Sesión S2 — HU creada en estado `Borrador`.
@@ -209,5 +224,5 @@ La consecuencia directa es que mientras la solicitud está `PENDING` el sistema 
 - **Resuelta (D20, provisional bajo delegación):** INC-029 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): el paciente **no retira** su solicitud en S4; si ya no la quiere, puede cancelar la cita ([[HU-026-cancelar-una-cita-futura]], D18).
 - **Resuelta (D21, provisional bajo delegación):** INC-031 (ver [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]]): la nueva franja **puede estar en otra sede** si el profesional atiende en ella (RN-07); RF-15 solo obliga a conservar profesional y especialidad ([[dec-006-decisiones-s4-ciclo-de-vida]]). CA-02 no se amplía.
 - **Resuelta (D18, respondida por el usuario):** N1 — si el paciente cancela la cita mientras la solicitud está `PENDING`, la solicitud pasa a `CANCELLED` y se liberan las dos franjas en la misma transacción. Lo verifica CA-09 de [[HU-026-cancelar-una-cita-futura]].
-- **Divergencia con el esquema, sin decisión que la cubra:** `reschedule_requests` existe desde `V3__schedule_and_appointments.sql` (T-02 no crea tabla y CA-09 se valida con V3), pero solo guarda la franja **propuesta** (`proposed_date`, `proposed_start_time`, `proposed_end_time`); **no tiene columnas de fecha y hora anterior**. CA-03 y CA-09 piden la "fecha y hora anterior registradas" en la solicitud. Mientras la solicitud está `PENDING` la franja anterior es la de la cita, y tras aprobarla D22 la deja escrita en el motivo del historial; pero literalmente CA-03 y CA-09 no se cumplen con V3. No se reescriben en silencio: al implementar F5 hay que elegir entre ajustar ambos criterios a "la anterior se obtiene de la cita mientras está `PENDING` y queda en el historial al aprobar (D22)", o añadir columnas con una migración (el plan prevé escalamiento humano ante cualquier migración).
+- **Divergencia con el esquema, resuelta por D31 (provisional bajo delegación):** `reschedule_requests` existe desde `V3__schedule_and_appointments.sql` (T-02 no crea la tabla), pero V3 solo guardaba la franja **propuesta** y sin sede, de modo que CA-03 y CA-09 —que piden la fecha y hora **anterior** registradas en la solicitud— no se cumplían literalmente. De las dos salidas anotadas el 2026-09-25 se eligió la segunda: **`V10__reschedule_previous_slot.sql`** añade `previous_date`, `previous_start_time`, `previous_end_time`, `previous_site_id` y `proposed_site_id`, obligatorias y con clave foránea a `sites` (D31 en [[dec-006-decisiones-s4-ciclo-de-vida]]; la sede propuesta la exige además D21). Ningún criterio se reescribió: con V10 ambos se cumplen tal como estaban redactados. La franja anterior se guarda al pedir la reprogramación, que es la única forma de conservarla después de que [[HU-031-aprobar-o-rechazar-reprogramacion]] mueva la cita.
 - El estado `PENDING` proviene del catálogo fijo de estados de reprogramación de RF-05 y no se define aquí.
