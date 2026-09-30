@@ -167,8 +167,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -181,8 +180,14 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "8a3fd0243c58f3b0",
+  "active": "8f87b23930071754",
   "lastOpenFiles": [
+    "llm-wiki/wiki/sed1ptsvq",
+    "llm-wiki/wiki/sedc3orxt",
+    "llm-wiki/wiki/sedMzYt1K",
+    "llm-wiki/wiki/index.md.tmp.15132.f5c139608d27",
+    "llm-wiki/wiki/_tmp_nonul.md",
+    "llm-wiki/wiki/contrato-rest-citas.md.tmp.15132.b45359daefe4",
     "scrum/sedr65wX0"
   ]
 }
