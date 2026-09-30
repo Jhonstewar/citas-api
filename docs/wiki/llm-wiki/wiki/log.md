@@ -263,3 +263,12 @@ PASS en 2 iteraciones (la 2 eliminó copias residuales en SlotAllocator y Profes
 
 ## [2026-09-30] learn | F9 cerrada y F10 parcial: 3FN vs referencia, verificación sin FAIL, huecos de prueba cerrados
 Backend 513, frontend 248. Decisiones delegadas: HU-021 CA-03 acepta 404; HU-001..004 siguen Completada con nota D29/D36. Pendiente: matrices de HU y prueba manual en navegador. Preguntas C1–C6 en [[datos-modelo-3fn]].
+
+## [2026-09-30] learn | Planificación S5–S6 (n8n): D-A clave de API, D-B túnel, D-H workflows `jhonNuñez-`
+Plan en `PLAN_S5_S6_N8N.md`. Sin código aún; falta EP-010. Los borradores n8n existentes apuntan a endpoints inexistentes y no se tocan. Preguntas en [[sintesis-preguntas-abiertas]].
+
+## [2026-09-30] learn | EP-010 y HU-034..036 especificadas en Borrador
+Fase B del plan S5–S6. Ninguna aprobada; esperan al usuario. Preguntas INC-041…INC-046 en EP-010. HU-035 obliga a tocar código de casos de uso de HU ya entregadas (HU-026/030/031): lo cubre su CA-12.
+
+## [2026-09-30] learn | Flujos n8n creados con el MCP: WF-001 `9vNgFpXjjAkwse7o`, WF-002 `7XF4DTWA11YViP42`, WF-003 `BRksx12kTEtI5r2l`
+Prefijo `jhonNuñez-`, inactivos y en modo prueba. Data Table `iqNu0V8hyF7mXAau`. Probados con datos fijados (ejecuciones 39–44); sin API, sin Gmail ni auth real. Usuario autorizó continuar sin cerrar S4; las HU-034..036 siguen en Borrador. Detalle en `PLAN_S5_S6_N8N.md` §8b.

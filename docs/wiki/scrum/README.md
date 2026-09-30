@@ -40,8 +40,9 @@ Repositorios independientes con ramas `main` (estable) y `develop` (trabajo).
 | [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] | Ciclo de vida de las citas del paciente | RF-13, RF-14, RF-15 | 4 |
 | [[EP-008-operacion-administrativa-de-solicitudes]] | Operación administrativa de solicitudes | RF-12, RF-15, RF-18 | 3 |
 | [[EP-009-trazabilidad-y-contrato-rest]] | Trazabilidad y contrato REST | RF-19, RF-20 | 2 |
+| [[EP-010-automatizaciones-n8n]] | Automatizaciones n8n (`Borrador`) | PRD §10, RF-19, RF-20 | 3 |
 
-**Total: 9 épicas, 33 historias de usuario.**
+**Total: 10 épicas, 36 historias de usuario.**
 
 ## Candidatas a aprobación para S2
 
@@ -71,6 +72,8 @@ Cada sprint es un incremento funcional comprobable, no una caja de tiempo. No se
 | Sprint 6 | El administrador desbloquea la agenda resolviendo las solicitudes especializadas | [[HU-029-consultar-bandeja-administrativa]], [[HU-030-aprobar-o-rechazar-cita-especializada]] |
 | Sprint 7 | El paciente cancela y reprograma sin perder su cita original, y el administrador resuelve la reprogramación | [[HU-026-cancelar-una-cita-futura]], [[HU-027-solicitar-reprogramacion-de-cita-aprobada]], [[HU-031-aprobar-o-rechazar-reprogramacion]], [[HU-028-decidir-sobre-cita-tras-rechazo-de-reprogramacion]] |
 | Sprint 8 | El profesional consulta su agenda del día y cierra el resultado de cada atención | [[HU-020-consultar-agenda-de-citas-aprobadas]], [[HU-021-registrar-cierre-de-atencion]] |
+| Sprint 9 (propuesto, S5) | n8n lee con clave dedicada las citas `APPROVED` próximas y el flujo de recordatorios WF-001 queda validado | [[HU-034-consultar-citas-para-automatizacion]], WF-001 de [[HU-036-versionar-y-documentar-los-flujos-n8n]] |
+| Sprint 10 (propuesto, S6) | Spring publica eventos de cambio de estado y WF-002 (y WF-003 opcional) notifica por correo; flujos versionados con riesgos por escrito | [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]], resto de [[HU-036-versionar-y-documentar-los-flujos-n8n]] |
 
 Notas de ordenación:
 
@@ -102,8 +105,9 @@ Notas de ordenación:
 | RF-16 | [[HU-020-consultar-agenda-de-citas-aprobadas]] |
 | RF-17 | [[HU-021-registrar-cierre-de-atencion]] |
 | RF-18 | [[HU-029-consultar-bandeja-administrativa]] |
-| RF-19 | [[HU-032-auditar-cambios-de-estado-de-cita]] |
-| RF-20 | [[HU-033-publicar-contrato-rest-documentado]] |
+| RF-19 | [[HU-032-auditar-cambios-de-estado-de-cita]], [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] (complementa la auditoría, no la sustituye) |
+| RF-20 | [[HU-033-publicar-contrato-rest-documentado]], [[HU-034-consultar-citas-para-automatizacion]], [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]], [[HU-036-versionar-y-documentar-los-flujos-n8n]] (contrato de automatización y evento) |
+| PRD §10 | [[HU-034-consultar-citas-para-automatizacion]], [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]], [[HU-036-versionar-y-documentar-los-flujos-n8n]] |
 
 ## Estados documentales
 
@@ -140,7 +144,7 @@ Ninguna de estas incógnitas impide empezar: cada historia afectada las registra
 
 Según PRD §9: historia clínica, facturación real, pagos, diagnósticos y tratamientos, datos reales de FCV, integración con sistemas clínicos, CI/CD obligatorio, SMS y WhatsApp, y SMTP obligatorio para la recuperación de contraseña.
 
-Las automatizaciones n8n de S5 y S6 (recordatorios, notificación de cambio de estado y resumen operativo diario) se añaden después sin modificar el núcleo funcional y se versionan en `citas-api/automations/n8n/`.
+Las automatizaciones n8n de S5 y S6 (recordatorios, notificación de cambio de estado y resumen operativo diario) se añaden después sin modificar el núcleo funcional y se versionan en `citas-api/automations/n8n/`. Su especificación es [[EP-010-automatizaciones-n8n]].
 
 ## Alcance de S3 (aprobación delegada del 2026-09-18)
 
@@ -247,3 +251,21 @@ La iteración 2 del LOOP_02 terminó con el comportamiento del backend en **PASS
 **Deriva respecto del PRD, corregida con aprobación directa del usuario (2026-09-30).** Cinco textos decían que **cada decisión** de ADMIN sobre una reprogramación se registra en el historial: «Contexto y descripción», la viñeta de «Alcance» y la tarea T-03 de [[HU-031-aprobar-o-rechazar-reprogramacion]], y en [[EP-008-operacion-administrativa-de-solicitudes]] la regla de RF-19 y la casilla del criterio de completitud. **RF-19 no dice eso:** dice «Todo cambio de estado de cita guarda: cita; estado nuevo; actor cuando existe; fuente `SYSTEM`, `USER` o `ADMIN`; fecha/hora; motivo opcional» (`PRD.md` §RF-19). Rechazar una reprogramación no cambia el estado de la cita —sigue `APPROVED`—, de modo que RF-19 nunca pidió una fila para el rechazo: la exigencia la había introducido la épica al reformular el requisito, y fue la que justificó D22. Los cinco textos se alinearon citando RF-19 y registrando D39 como la decisión que lo respeta. **No se relajó ningún requisito: se volvió al PRD.** [[HU-030-aprobar-o-rechazar-cita-especializada]] no cambia, porque allí la decisión sí cambia el estado de la cita.
 
 Estado global tras esta iteración: 16 `Completada`, 8 `Aprobada`, 8 `En validación` y 1 `En desarrollo`.
+
+## EP-010 — Automatizaciones n8n (especificada el 2026-09-30, sin aprobar)
+
+Se especificaron [[EP-010-automatizaciones-n8n]] y sus tres historias, todas en `Borrador`. **Ninguna está `Aprobada`**: solo el usuario las aprueba. Fuente: `PLAN_S5_S6_N8N.md` (raíz), PRD §8–§10 y RF-19, `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`.
+
+| HU | Título | Esfuerzo | Estado |
+|---|---|---|---|
+| [[HU-034-consultar-citas-para-automatizacion]] | Consultar citas para automatización (clave dedicada, `/api/automation/**`) | Alto | `Borrador` |
+| [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] | Publicar eventos de cambio de estado a n8n | Alto | `Borrador` |
+| [[HU-036-versionar-y-documentar-los-flujos-n8n]] | Versionar y documentar los flujos n8n | Medio | `Borrador` |
+
+**Decididas por el usuario (2026-09-30):** D-A (clave de API dedicada de solo lectura, cabecera `X-Automation-Key`, cadena de seguridad propia), D-B (túnel temporal), D-H (workflows nuevos con prefijo `jhonNuñez-`, paths de webhook sin ñ).
+
+**Propuesta vigente, pendiente de confirmar** (también preguntas abiertas): D-C (ventana de 24 h revisada cada hora), D-D (anti-duplicado en Data Table de n8n), D-E (eventos: aprobación/rechazo de especializada, aprobación/rechazo de reprogramación, cancelación), D-F (entrega *best-effort* sin *outbox*), D-G (WF-003 bonus), D-I (webhook a demanda además del Schedule en WF-001 y WF-003).
+
+**Precondición:** la épica depende de que S4 esté cerrada o de que el usuario autorice expresamente abrir S5. Varias HU de las que depende siguen en `En validación` o `En desarrollo` (HU-026, HU-027, HU-028, HU-031, HU-033).
+
+Las incógnitas INC-041 a INC-046 están en la épica.

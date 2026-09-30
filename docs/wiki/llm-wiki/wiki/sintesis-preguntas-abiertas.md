@@ -192,3 +192,25 @@ van a F10. Detalle y evidencia en `evidencias/s4/loops/LOOP-02/iter-2-verifier.j
 
 - 2026-09-30 — añadidas R5–R12 al cerrar el LOOP_02. R1 y R2 quedaron cerradas ese mismo día; R3 pasó
   a parcialmente respondida (3 de 11 HU verificadas); R4 sigue abierta.
+
+## S5–S6 (n8n): decisiones y preguntas abiertas al planificar (2026-09-30)
+
+Plan completo en `PLAN_S5_S6_N8N.md` (raíz). Nada está implementado; ninguna HU de EP-010 existe todavía.
+
+**Decididas por el usuario (directas, no delegadas):**
+
+- **DECISIÓN D-A:** n8n se autentica contra la API con una **clave dedicada de solo lectura** en `/api/automation/**`
+  (cabecera `X-Automation-Key`, cadena de seguridad propia), no con una cuenta ADMIN.
+- **DECISIÓN D-B:** n8n es remoto y la API local, así que para la demo se usa un **túnel temporal**.
+- **DECISIÓN D-H:** los workflows se crean **de cero** con prefijo `jhonNuñez-` porque la instancia n8n es compartida; los
+  tres borradores existentes (`6Ks5HWdXadUSBW7o`, `Cu7kjdPURjE8LnTp`, `OJqkZkMKhoJJTcXc`) no se tocan.
+- **PREFERENCIA:** el `.env` lleva tres variables de webhook, una por flujo (`N8N_WEBHOOK_WF001_URL`, `…WF002_URL`,
+  `…WF003_URL`), más `N8N_WEBHOOK_SECRET` y `AUTOMATION_API_KEY`.
+
+**HECHO verificado:** ocho HU (023, 025, 026, 027, 028, 030, 031, 032) sacan el correo de su alcance y lo remiten a PRD §10;
+el backend no tiene puerto de eventos, cliente HTTP saliente ni endpoint legible sin JWT de persona. Por la regla
+«sin HU aprobada no se implementa», hace falta la épica EP-010.
+
+**Abiertas:** ventana del recordatorio (D-C, propuesta 24 h) · anti-duplicado en Data Table o columna (D-D) · si la cita
+general auto-aprobada notifica (D-E) · entrega *best-effort* u *outbox* (D-F) · si WF-003 entra (D-G) · webhooks a demanda
+en WF-001/003 (D-I) · qué hacer con un día sin citas en WF-003 · S5 no debería abrirse con S4 en F10 sin autorización expresa.
