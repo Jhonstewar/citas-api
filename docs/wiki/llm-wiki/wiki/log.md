@@ -272,3 +272,6 @@ Fase B del plan S5–S6. Ninguna aprobada; esperan al usuario. Preguntas INC-041
 
 ## [2026-09-30] learn | Flujos n8n creados con el MCP: WF-001 `9vNgFpXjjAkwse7o`, WF-002 `7XF4DTWA11YViP42`, WF-003 `BRksx12kTEtI5r2l`
 Prefijo `jhonNuñez-`, inactivos y en modo prueba. Data Table `iqNu0V8hyF7mXAau`. Probados con datos fijados (ejecuciones 39–44); sin API, sin Gmail ni auth real. Usuario autorizó continuar sin cerrar S4; las HU-034..036 siguen en Borrador. Detalle en `PLAN_S5_S6_N8N.md` §8b.
+
+## [2026-09-30] learn | Runbook de ejecución S5–S6 y datos de conexión del MCP de n8n
+Creado `PLAN_EJECUCION_S5_S6.md` (raíz). HECHO verificado en el código: los casos de uso que aprueban, rechazan y cancelan ya releen el detalle tras `tx.inTransaction`, ese es el punto para publicar el evento de WF-002, sin tocar esquema ni `citas-web`. HECHO de entorno: el MCP de n8n se conecta con `claude mcp add --transport http n8n https://impulso-n8n.aiacademy.com.co/mcp-server/http` y se autentica desde `/mcp`. DECISIÓN: las HU de EP-010 **no** se aprueban por inferencia; hace falta la frase explícita del usuario (se revirtió un registro de aprobación escrito por error). Los JSON de los flujos aún no están versionados: se exportan en la Fase 4.

@@ -28,6 +28,7 @@ Historia cronológica: [[log]].
   código). Una casilla `[x]` significa "código escrito y suite verde", **no** "HU verificada": eso es
   F10 y no ha corrido. Si el plan se contradice, manda la sección "▶ Dónde retomar". Detalle y
   pruebas en [[dec-006-decisiones-s4-ciclo-de-vida]] § "Estado real de S4"
+- **S5–S6 (n8n) planificada el 2026-09-30, sin implementar.** Diagnóstico y contratos en `PLAN_S5_S6_N8N.md` y pasos ejecutables en `PLAN_EJECUCION_S5_S6.md` (raíz). Épica y HU en `Borrador`: [[EP-010-automatizaciones-n8n]], [[HU-034-consultar-citas-para-automatizacion]], [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]], [[HU-036-versionar-y-documentar-los-flujos-n8n]]; esperan la frase de aprobación del usuario. Decisiones tomadas y preguntas abiertas en [[sintesis-preguntas-abiertas]] § "S5–S6 (n8n)". Los tres flujos de n8n ya existen (inactivos, con prefijo `jhonNuñez-`), pero el backend de automatización no existe todavía.
 - **Ramas:** `origin/main` y `origin/develop` están **idénticos** en los tres repos desde el merge
   del 2026-09-25, así que `main` contiene S4 a medio verificar. Contradecía `AGENTS.md:102`; el
   usuario decidió el 2026-09-30 **dejarlo así** y hacer el próximo merge a `main` solo al cerrar F10
