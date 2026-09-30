@@ -114,6 +114,11 @@ public record Appointment(
      * toca y queda solo en la solicitud. El estado sigue {@code APPROVED}, asi que la fila repite el
      * estado de la anterior y de ahi se deriva {@link HistoryEvent#RESCHEDULED} al leerla. No pasa por
      * {@link #transitionTo}: no es un cambio de estado. La llama {@link RescheduleRequest#approve}.
+     *
+     * <p>Es la UNICA productora de {@link Transition} que repite el estado. Si dejara de repetirlo, o si
+     * apareciera otra escritura de historial que lo repita sobre una cita ya existente, cae
+     * {@code HistoryRowInvariantTest}: lee antes {@link HistoryEvent#between}, porque esa fila se
+     * rotularia "Reprogramada" sin serlo (D39).</p>
      */
     Transition rescheduleTo(TimeSlot target, long adminUserId, String trace) {
         requireApprovedForReschedule();
