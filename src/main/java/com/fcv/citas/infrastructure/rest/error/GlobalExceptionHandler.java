@@ -18,8 +18,21 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.http.MediaType;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingRequestCookieException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import java.util.stream.Collectors;
 
 import com.fcv.citas.domain.auth.InvalidCredentialsException;
 import com.fcv.citas.domain.shared.BusinessRuleException;
@@ -72,6 +85,82 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         return ResponseEntity.badRequest().body(problem(HttpStatus.BAD_REQUEST, "Datos inválidos",
                 "El cuerpo de la petición falta o no es un JSON válido"));
+    }
+
+    /**
+     * Red de seguridad para los errores de framework (404, 405, 406, 415, cabeceras/cookies ausentes,
+     * tipos incompatibles...) que {@link ResponseEntityExceptionHandler} resuelve con {@code title}
+     * y {@code detail} en ingles. Se conservan el codigo HTTP y las cabeceras ({@code Allow},
+     * {@code Accept}); solo se reescriben los textos, sin citar el valor recibido.
+     */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
+            HttpStatusCode statusCode, WebRequest request) {
+        ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        if (response != null && response.getBody() instanceof ProblemDetail problem) {
+            problem.setTitle(titleFor(statusCode));
+            problem.setDetail(detailFor(ex, statusCode));
+        }
+        return response;
+    }
+
+    private static String titleFor(HttpStatusCode status) {
+        return switch (status.value()) {
+            case 400 -> "Datos inválidos";
+            case 401 -> "No autenticado";
+            case 403 -> "Acceso denegado";
+            case 404 -> "No encontrado";
+            case 405 -> "Método no permitido";
+            case 406 -> "Formato no aceptable";
+            case 409 -> "Conflicto";
+            case 413 -> "Petición demasiado grande";
+            case 415 -> "Tipo de contenido no soportado";
+            case 503 -> "Servicio no disponible";
+            default -> status.is4xxClientError() ? "Petición inválida" : "Error interno";
+        };
+    }
+
+    private static String detailFor(Exception ex, HttpStatusCode status) {
+        if (ex instanceof HttpRequestMethodNotSupportedException) {
+            return "El método HTTP no está permitido para este recurso";
+        }
+        if (ex instanceof HttpMediaTypeNotSupportedException unsupported) {
+            String supported = unsupported.getSupportedMediaTypes().stream()
+                    .map(MediaType::toString).collect(Collectors.joining(", "));
+            return supported.isEmpty()
+                    ? "El tipo de contenido de la petición no es compatible"
+                    : "El tipo de contenido de la petición no es compatible; use " + supported;
+        }
+        if (ex instanceof HttpMediaTypeNotAcceptableException) {
+            return "El servidor no puede responder en el formato solicitado en la cabecera Accept";
+        }
+        if (ex instanceof NoResourceFoundException || ex instanceof NoHandlerFoundException) {
+            return "El recurso solicitado no existe";
+        }
+        if (ex instanceof MissingRequestHeaderException header) {
+            return "Falta la cabecera obligatoria «" + header.getHeaderName() + "»";
+        }
+        if (ex instanceof MissingRequestCookieException cookie) {
+            return "Falta la cookie obligatoria «" + cookie.getCookieName() + "»";
+        }
+        if (ex instanceof ServletRequestBindingException) {
+            return "Falta un dato obligatorio de la petición";
+        }
+        if (ex instanceof MissingServletRequestPartException part) {
+            return "Falta la parte obligatoria «" + part.getRequestPartName() + "» de la petición";
+        }
+        if (ex instanceof HandlerMethodValidationException) {
+            return "La petición contiene parámetros inválidos";
+        }
+        if (ex instanceof TypeMismatchException) {
+            return "Un parámetro de la petición tiene un formato inválido";
+        }
+        return switch (status.value()) {
+            case 400 -> "La petición no es válida";
+            case 413 -> "La petición supera el tamaño permitido";
+            case 503 -> "El servicio no está disponible en este momento";
+            default -> status.is4xxClientError() ? "No se pudo procesar la petición" : "Ocurrió un error inesperado";
+        };
     }
 
     @ExceptionHandler(UnknownDocumentTypeException.class)

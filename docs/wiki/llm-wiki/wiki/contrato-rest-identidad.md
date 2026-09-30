@@ -43,7 +43,7 @@ Cada entrada de este documento se contrastó contra el código: `AuthController.
 | Formato | JSON UTF-8 en petición y respuesta. `Content-Type: application/json`. |
 | Nulos | Jackson omite las propiedades nulas (`default-property-inclusion: non_null`): un campo ausente equivale a nulo. |
 | Zona horaria | `America/Bogota` en Jackson, Hibernate y la conexión MySQL. |
-| Idioma | Los errores de los flujos de identidad van en español: locale fijo `es_CO` (`spring.web.locale-resolver: fixed`) y `Accept-Language` se ignora. Excepciones en inglés: la cabecera `WWW-Authenticate` del 401, el 403 del preflight CORS y los errores que Spring genera fuera de los manejadores propios (ver "Formato de error uniforme" y "Preguntas abiertas"). |
+| Idioma | Los errores de los flujos de identidad van en español: locale fijo `es_CO` (`spring.web.locale-resolver: fixed`) y `Accept-Language` se ignora. Desde F9 también van en español la cabecera `WWW-Authenticate` del 401 y los errores de framework (404/405/415, cabeceras o cookies ausentes). Única excepción en inglés: el 403 del preflight CORS (`Invalid CORS request`, texto plano de Spring). |
 | Autenticación | `Authorization: Bearer <accessToken>`. La API es *stateless* (`SessionCreationPolicy.STATELESS`): sin sesión de servidor. Desde D36 hay **una** cookie, `fcv_refresh`, que solo transporta el refresh token hacia `/api/auth` (ver §S4 "refresh token en cookie"). |
 | CSRF | Deshabilitado de forma consciente: el access token va en cabecera, y la única cookie es `HttpOnly; SameSite=Strict; Path=/api/auth` con CORS de orígenes exactos (justificación en `SecurityConfig`). |
 | Refresh token | Desde D36 viaja SOLO en la cookie `HttpOnly` `fcv_refresh`; NUNCA en el cuerpo, la ruta ni la cadena de consulta (HU-003 CA-08). |
@@ -104,15 +104,15 @@ de `citas-web` solo renueva ante 401.
 | Origen | `detail` | Cabecera |
 |---|---|---|
 | Filtro de seguridad: falta el access token | `Se requiere un access token válido` | `WWW-Authenticate: Bearer` |
-| Filtro de seguridad: token mal formado, mal firmado, caducado o de otro emisor | `Se requiere un access token válido` | `WWW-Authenticate: Bearer error="invalid_token", error_description="…", error_uri="…"` |
+| Filtro de seguridad: token mal formado, mal firmado, caducado o de otro emisor | `Se requiere un access token válido` | `WWW-Authenticate: Bearer error="invalid_token", error_description="El access token es inválido o ha expirado"` |
 | Caso de uso de login | `Credenciales inválidas` | — |
 | Caso de uso de refresh | `La sesión no es válida o ha expirado` | — |
 
-El cuerpo es idéntico en todos los casos del filtro, pero la cabecera no. La pone el
-`BearerTokenAuthenticationEntryPoint` estándar de Spring (RFC 6750), al que delega
-`ProblemJsonSecurityHandlers`, y su `error_description` va **en inglés** y deja ver el motivo del
-rechazo: `Jwt expired at …`, `Invalid signature`, `The iss claim is not valid`, `Malformed token`.
-Ver la pregunta abierta al final.
+El cuerpo es idéntico en todos los casos del filtro. **Desde F9** la cabecera la compone
+`ProblemJsonSecurityHandlers.wwwAuthenticate` a mano (RFC 6750), con un texto fijo en español y solo el
+código de error estándar; ya no la pone el `BearerTokenAuthenticationEntryPoint` de Spring, cuyo
+`error_description` iba en inglés y revelaba el motivo (`Jwt expired at …`, `Invalid signature`).
+Con `invalid_request` el texto es «La petición de autenticación no es válida» (`FrameworkErrorsSpanishIntegrationTest`).
 
 El `403` lo produce el mismo manejador de la cadena de seguridad, con `detail: "No tiene permisos
 para realizar esta operación"`.
@@ -387,9 +387,9 @@ El titular sale siempre del token: no hay forma de editar el perfil de otro (HU-
   la afiliación mostrada **no** se filtra por activo: una afiliación a un plan o EPS ya desactivados
   se sigue mostrando (HU-012 CA-05). `ended_on` = hoy en America/Bogota. Dos cambios simultáneos
   del mismo usuario se serializan (bloqueo de la fila del usuario).
-- **Divergencia con HU-009 CA-03:** el CA pide 409 al repetir el plan ya registrado; este contrato
-  (acordado y ya implementado en el frontend) responde **200 sin cambios**. En ambos casos no se crea
-  un segundo registro. Queda para que la verificación y el usuario decidan si el CA se reescribe.
+- **HU-009 CA-03 (resuelta el 2026-09-30):** el CA original pedía 409 al repetir el plan vigente; el
+  código y este contrato responden **200 sin cambios** y el usuario reescribió el CA para exigir el
+  200 (manda el código). Ya no es una divergencia abierta; no se crea un segundo registro.
 - V9 sustituye `uq_affiliations_user_plan` por `uq_affiliations_user_plan_current
   (user_id, eps_plan_id, current_marker)` (D32): se puede volver a un plan ya usado.
 
@@ -528,18 +528,23 @@ no puedan divergir.
 - ~~**INC-001 — política de contraseña**~~: cerrada por D29 e implementada el 2026-09-25 (§S4).
 - El access token no es revocable durante sus 15 minutos; el logout revoca el refresh, no el
   access. Pendiente de confirmación (ver [[sintesis-preguntas-abiertas]]).
-- Errores que Spring genera por su cuenta fuera de los manejadores propios conservan título y
-  detalle en inglés: `415 Unsupported Media Type` por un `Content-Type` no soportado; y, **con
-  token válido**, `404 Not Found` en una ruta inexistente y `405 Method Not Allowed` en un método
-  no soportado. Sin token, esos dos dan el `401` de la cadena de seguridad. No afectan a los
-  flujos de identidad.
-- **`WWW-Authenticate` con motivo en inglés.** El `error_description` del 401 distingue un token
-  caducado de uno falsificado y va en inglés. Es el comportamiento estándar de RFC 6750 y el
-  cuerpo sigue siendo uniforme. ¿Se deja así, o se emite solo `Bearer error="invalid_token"`? Es
-  una decisión, no un defecto.
+- ~~Errores de framework en inglés~~: **resuelto en F9** (2026-09-30). `GlobalExceptionHandler`
+  reescribe `title` y `detail` de 404, 405, 415 y de cabeceras, cookies y partes ausentes, en
+  español, con el mismo código HTTP y sin `code`; detalle en [[contrato-rest-citas]] § F9. Sin
+  token, una ruta o método inexistente sigue dando el 401/403 de la cadena de seguridad.
+- ~~`WWW-Authenticate` con motivo en inglés~~: **resuelto en F9**. Ya no se distingue el motivo del
+  rechazo: `Bearer error="invalid_token", error_description="El access token es inválido o ha
+  expirado"`. Decisión tomada al implementar: texto fijo en español y nada del decodificador JWT.
+- **Abierta, menor:** el 403 del preflight CORS de un origen no permitido sigue siendo texto plano
+  en inglés; lo escribe `DefaultCorsProcessor` antes de llegar a los manejadores propios.
 
 ## Historial
 
+- 2026-09-30 — F9 (S4): verificado el corte S4 de identidad contra `MeController` y
+  `PasswordRecoveryController` (rutas, cuerpos, códigos y mensajes coinciden); `WWW-Authenticate` y
+  los errores de framework pasan a español; HU-009 CA-03 deja de ser divergencia. Confirmado que
+  `PUT /api/me/affiliation` sin `insurancePlanId` da 400 con `fieldErrors.insurancePlanId` = «Seleccione
+  el plan de EPS».
 - 2026-09-25 — implementados en `citas-api` D36 (refresh token en cookie `fcv_refresh`, CORS con
   credenciales), D29 (política de contraseña en el servidor) y la recuperación de contraseña
   (HU-006/HU-007, D27, D34). Cambian `login`, `refresh` y `logout`: el refresh token sale del

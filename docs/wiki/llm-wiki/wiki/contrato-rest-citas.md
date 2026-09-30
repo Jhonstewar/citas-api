@@ -23,8 +23,8 @@ Los campos nulos se omiten del JSON (`default-property-inclusion: non_null`): `r
 - **Prefijo por rol** (HU-005): `/api/admin/**` → `ADMIN`, `/api/professional/**` →
   `PROFESSIONAL`, `/api/patient/**` → `USER`. `/api/catalogs/**` y `/api/me` → cualquier rol
   autenticado, **con una excepción**: `/api/catalogs/insurance-plans` es público desde HU-009
-  (`SecurityConfig.java:69` la declara `permitAll` **antes** del `authenticated()` de
-  `/api/catalogs/**` de la línea 76). Cualquier otra ruta no declarada → denegada.
+  (`SecurityConfig.java:81` la declara `permitAll` **antes** del `authenticated()` de
+  `/api/catalogs/**` de la línea 92). Cualquier otra ruta no declarada → denegada.
 - **Ownership:** un recurso ajeno responde **404** (no revela que existe).
 
 ### Códigos de error
@@ -64,7 +64,7 @@ HistoryEntry    { status, statusName, source: 'SYSTEM'|'USER'|'ADMIN'|'PROFESSIO
                   actorName: string | null, reason: string | null, changedAt,
                   event?: 'RESCHEDULED' }   // aditivo en S4 (D39); ver abajo cuándo viaja
 AppointmentDetail Appointment & { history: HistoryEntry[] }
-AdminAppointment  AppointmentDetail & { patient: PatientRef }
+AdminAppointment  Appointment & { history, patient: PatientRef, lastReschedule? }  // sin cancellable/reschedulable (F9)
 ```
 
 `status` ∈ `REQUESTED | APPROVED | REJECTED | CANCELLED | COMPLETED | NO_SHOW`.
@@ -178,7 +178,7 @@ inactivas o no asignadas. Buscar no retiene nada.
 Aprobar conserva las reservas de slots; rechazar las borra en la misma transacción (RN-09).
 Cada transición escribe una fila de historial en la misma transacción (HU-032): creación general
 → `SYSTEM` sin actor, solicitud especializada → `USER`, decisión → `ADMIN` con motivo si rechaza.
-En el detalle del **paciente**, `actorName` de las entradas `ADMIN` es "Administración" (no el nombre del empleado); el ADMIN ve el nombre real. El historial no tiene rutas de escritura. En S4 la bandeja incluirá `type: 'RESCHEDULE_REQUEST'`.
+En el detalle del **paciente**, `actorName` de las entradas `ADMIN` es "Administración" (no el nombre del empleado); el ADMIN ve el nombre real. El historial no tiene rutas de escritura. Desde S4 la bandeja incluye también `type: 'RESCHEDULE_REQUEST'` (ver § S4).
 
 ## S4 — ciclo de vida, agenda del profesional y EPS (acordado el 2026-09-25, antes de implementar)
 
@@ -465,6 +465,102 @@ CA-03, contra este contrato. Ninguna forma acordada cambia; lo que el acuerdo no
 - **Búsqueda (HU-022 CA-03):** sin cambios de código: `JdbcAvailabilityQueries` ya excluía cualquier
   fila de `slot_reservations`; ahora hay productor y prueba.
 
+## Verificación contra el código — corte S4 (F9, 2026-09-30)
+
+Contraste de esta página con los controladores reales (`infrastructure/rest/appointment/*`,
+`admin/AdminEpsController`). **Ninguna ruta, método, cuerpo ni código HTTP de § S4 diverge del
+código.** Índice verificado de los endpoints de S4 de este repositorio (todos tienen prueba de
+integración en `src/test/.../infrastructure/rest/`):
+
+| Método y ruta | Rol | Cuerpo | Éxito | Controlador |
+|---|---|---|---|---|
+| `POST /api/patient/appointments/{id}/cancel` | USER | `{ reason? }`, opcional | 200 `AppointmentDetail` | `PatientAppointmentController` |
+| `POST /api/patient/appointments/{id}/reschedule` | USER | `{ siteId, date, startTime, reason?, professionalId?, specialtyId? }`, **obligatorio** | 201 `RescheduleRequest` | ídem |
+| `GET /api/professional/appointments?from&to&siteId?` | PROFESSIONAL | — | 200 `ProfessionalAppointment[]` | `ProfessionalAppointmentController` |
+| `POST /api/professional/appointments/{id}/complete` · `/no-show` | PROFESSIONAL | — | 200 `ProfessionalAppointment` | ídem |
+| `GET /api/admin/inbox?type&siteId&professionalId&specialtyId&date` | ADMIN | — | 200 `InboxEntry[]` | `AdminAppointmentController` |
+| `POST /api/admin/reschedules/{id}/approve` | ADMIN | — | 200 `AdminAppointment` | ídem |
+| `POST /api/admin/reschedules/{id}/reject` | ADMIN | `{ reason }`: opcional en HTTP, obligatorio en el dominio | 200 `AdminAppointment` | ídem |
+| `GET /api/admin/summary` | ADMIN | — | 200 `{ pendingRequests, activeProfessionals, activeSpecialties, appointmentsToday, pendingReschedules }` | ídem |
+| `GET/POST /api/admin/eps`, `GET/PUT/DELETE /api/admin/eps/{id}`, `PATCH /api/admin/eps/{id}/status` | ADMIN | `{ code, name }` / `{ name }` / `{ active }` | 200 · 201 · 204 | `AdminEpsController` |
+| `GET/POST /api/admin/eps/{id}/plans`, `PUT/DELETE /api/admin/eps-plans/{id}`, `PATCH /api/admin/eps-plans/{id}/status` | ADMIN | `{ code, name, regimeCode }` / `{ name, regimeCode }` / `{ active }` | 200 · 201 · 204 | ídem |
+
+Validación de los cuerpos de EPS (Bean Validation, `400` con `fieldErrors` y **sin** `code`):
+`code` obligatorio ≤ 20 (EPS) o ≤ 30 (plan), `name` obligatorio ≤ 160, `regimeCode` obligatorio
+("Seleccione el régimen"); `PATCH …/status` exige `active`.
+
+### Ejemplos
+
+`POST /api/patient/appointments/57/reschedule` con
+`{ "siteId": 2, "date": "2026-10-05", "startTime": "09:00" }` → **201**:
+
+```json
+{ "id": 9, "appointmentId": 57, "status": "PENDING", "statusName": "Pendiente",
+  "previous": { "date": "2026-10-01", "startTime": "08:00", "endTime": "08:30", "site": { "id": 1, "code": "HIC", "name": "…" } },
+  "proposed": { "date": "2026-10-05", "startTime": "09:00", "endTime": "09:30", "site": { "id": 2, "code": "ICV", "name": "…" } },
+  "createdAt": "2026-09-30T10:15:00" }
+```
+
+Error de transición (409, `code` estable; `title` y `detail` en español):
+
+```json
+{ "type": "about:blank", "title": "Conflicto", "status": 409,
+  "detail": "Esta cita ya tiene una reprogramación pendiente de decisión",
+  "instance": "/api/patient/appointments/57/reschedule", "code": "RESCHEDULE_PENDING" }
+```
+
+Cierre antes de hora (`POST /api/professional/appointments/57/complete`) → 409
+`APPOINTMENT_NOT_STARTED`, `detail`: "La cita aún no ha empezado: se puede cerrar desde su hora de
+inicio". `DELETE /api/admin/eps/3` con planes → 409 `EPS_REFERENCED`, `detail`: "La EPS tiene planes
+registrados: desactívela en lugar de borrarla".
+
+### Códigos `code` verificados en el código (S4)
+
+`INVALID_TRANSITION`, `APPOINTMENT_EXPIRED`, `APPOINTMENT_NOT_STARTED`, `RESCHEDULE_PENDING`,
+`SLOT_TAKEN` (409; lo lanza el adaptador de persistencia al chocar con la PK del libro de slots),
+`CONCURRENT_CHANGE` (409; red de seguridad del `GlobalExceptionHandler`), `EPS_REFERENCED`,
+`PLAN_REFERENCED`, `DUPLICATE`, `SAME_SLOT`, `WRONG_FLOW`, `SLOT_NOT_AVAILABLE`, `PAST_TIME`,
+`SITE_NOT_ASSIGNED`, `PROFESSIONAL_INACTIVE`, `SPECIALTY_INACTIVE`, `SPECIALTY_NOT_ASSIGNED`,
+`NOT_FOUND` (404), `VALIDATION` (400). Estado HTTP por tipo de excepción:
+`InvalidRequestException` → 400, `NotFoundException` → 404, `ConflictException` → 409,
+`BusinessRuleException` → 422.
+
+### Errores de framework (F9): ahora en español
+
+Antes de F9, los errores que genera Spring fuera de los manejadores propios salían con `title` y
+`detail` en inglés. Ahora `GlobalExceptionHandler.handleExceptionInternal` los reescribe: mismo
+código HTTP, mismas cabeceras (`Allow`, `Accept`), sin citar el valor recibido y **sin `code`**.
+
+| Situación | Estado | `title` | `detail` |
+|---|---|---|---|
+| Ruta inexistente con token válido | 404 | No encontrado | El recurso solicitado no existe |
+| Método no soportado con token válido | 405 | Método no permitido | El método HTTP no está permitido para este recurso |
+| `Content-Type` no soportado | 415 | Tipo de contenido no soportado | El tipo de contenido de la petición no es compatible; use application/json |
+| Cabecera o cookie obligatoria ausente | 400 | Datos inválidos | Falta la cabecera (o cookie) obligatoria «…» |
+| Parámetro de consulta ausente o de tipo inválido | 400 | Datos inválidos | Falta el parámetro obligatorio «…» / El parámetro «…» tiene un formato inválido (con `code: VALIDATION`) |
+
+Sin token, una ruta o método inexistente responde el 401 o 403 de la cadena de seguridad, no 404 ni
+405 (`denyAll` para lo no declarado). La cabecera `WWW-Authenticate` del 401 también va ya en
+español (ver [[contrato-rest-identidad]]). Prueba: `FrameworkErrorsSpanishIntegrationTest`.
+
+### Divergencias y puntos abiertos hallados en F9
+
+1. **HU-009 CA-03: cerrada, no abierta.** El criterio pedía 409 y el contrato responde 200
+   idempotente (`PUT /api/me/affiliation` con el plan vigente). El usuario reescribió CA-03 el
+   2026-09-30 para exigir el 200, así que hoy contrato y criterio coinciden. Ver
+   [[contrato-rest-identidad]].
+2. **Corregido en esta página:** `AdminAppointment` se declaraba como `AppointmentDetail & patient`,
+   pero el código (`AdminAppointmentResponse`) no emite `cancellable` ni `reschedulable`; la bandeja
+   decía que "incluirá" `RESCHEDULE_REQUEST` cuando ya lo incluye; las referencias a `SecurityConfig`
+   estaban desplazadas (`:81` y `:92`).
+3. **Abierta, menor:** `reason` de `reject` (cita y reprogramación) y de `cancel` no lleva Bean
+   Validation: el 400 por motivo vacío o > 500 sale del dominio con `code: VALIDATION` y
+   `fieldErrors.reason`, mientras que los DTO con Bean Validation (EPS, planes, `PUT /api/me`) dan
+   `fieldErrors` **sin** `code`. El cliente debe decidir por `status` y `fieldErrors`, no por `code`,
+   en los 400.
+4. **Abierta, menor:** el 400 por cuerpo ausente o ilegible no lleva `code` (asimetría del cuerpo de
+   § F5).
+
 ## Relacionado
 
 - [[contrato-rest-identidad]]
@@ -475,6 +571,7 @@ CA-03, contra este contrato. Ninguna forma acordada cambia; lo que el acuerdo no
 
 ## Historial
 
+- 2026-09-30 — F9 (S4): verificado el corte S4 contra los controladores reales (índice, ejemplos, códigos), documentados los errores de framework ya en español y las divergencias halladas; corregidos `AdminAppointment`, la bandeja y las referencias a `SecurityConfig`.
 - 2026-09-30 — LOOP_02 iteración 3: **alineado con el código lo que el `backend-verifier` marcó como
   gravedad ALTA** (el contrato afirmaba lo contrario del código y el frontend consumía un campo sin
   contrato). Cuatro correcciones, todas verificadas contra los ficheros y las pruebas que se citan:
