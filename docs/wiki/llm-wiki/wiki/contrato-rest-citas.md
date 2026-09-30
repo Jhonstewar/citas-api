@@ -2,8 +2,8 @@
 titulo: "Contrato REST — Catálogos, profesionales, agenda y citas (S3)"
 tipo: contrato
 estado: Vigente
-actualizado: 2026-09-25
-fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032", "[[dec-004-decisiones-s3-reserva]]"]
+actualizado: 2026-09-30
+fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032", "[[dec-004-decisiones-s3-reserva]]", "[[dec-006-decisiones-s4-ciclo-de-vida]] D18, D22, D37, D38, D39", "código de citas contrastado el 2026-09-30 (LOOP_02 iter. 3)"]
 tags: [contrato, rest, s3, citas]
 ---
 
@@ -61,12 +61,28 @@ Appointment     { id, status, statusName, date, startTime, endTime, durationMinu
                   site: SiteRef, professional: ProfessionalRef, specialty: SpecialtyRef,
                   rejectionReason: string | null, createdAt }
 HistoryEntry    { status, statusName, source: 'SYSTEM'|'USER'|'ADMIN'|'PROFESSIONAL',
-                  actorName: string | null, reason: string | null, changedAt }
+                  actorName: string | null, reason: string | null, changedAt,
+                  event?: 'RESCHEDULED' }   // aditivo en S4 (D39); ver abajo cuándo viaja
 AppointmentDetail Appointment & { history: HistoryEntry[] }
 AdminAppointment  AppointmentDetail & { patient: PatientRef }
 ```
 
 `status` ∈ `REQUESTED | APPROVED | REJECTED | CANCELLED | COMPLETED | NO_SHOW`.
+
+**`HistoryEntry.event`** (aditivo, S4 · D39). Aparece **solo** en la fila cuyo `status` repite el de
+la fila anterior, y esa fila solo puede ser la de una **reprogramación aprobada**: mueve fecha, hora
+y sede sin mover el estado (`APPROVED` → `APPROVED`), así que sin el campo la línea de tiempo diría
+"Aprobada" dos veces. En **cualquier otra fila no viaja en el JSON**, porque es nula y los nulos se
+omiten (`default-property-inclusion: non_null`). Lo emiten `GET /api/patient/appointments/{id}`
+(`AppointmentDetail.history[]`) y `GET /api/admin/appointments/{id}` (`AdminAppointment.history[]`),
+ambos desde el mismo cuerpo (`infrastructure/rest/appointment/AppointmentResponses.java:62-63`). El
+backend lo **deriva** al leer, sin columna ni migración nueva: la regla vive en el dominio
+(`domain/appointment/HistoryEvent.java:48`, `between` = `previous != null && previous == current`) y
+la aplica la capa de aplicación sobre el historial ya ordenado
+(`application/appointment/HistoryEntry.java:28`). El orden es parte de la regla. Prueba que lo fija:
+`RescheduleDecisionIntegrationTest:551` — con dos aprobaciones seguidas, `history[0].event` no existe
+y `history[1].event` = `history[2].event` = `"RESCHEDULED"`, y el detalle del ADMIN deriva lo mismo
+sobre la misma cita.
 
 ## Catálogos — cualquier rol autenticado (HU-010)
 
@@ -184,6 +200,7 @@ AppointmentDetail + { lastReschedule: RescheduleRequest | null, // la más recie
                       cancellable: boolean,                     // futura y no terminal (D16, D17)
                       reschedulable: boolean }                  // APPROVED, futura y sin PENDING (D20)
 AdminAppointment  + { lastReschedule: RescheduleRequest | null }
+HistoryEntry      + { event?: 'RESCHEDULED' }                 // aditivo (D39); declarado arriba
 ProfessionalAppointment { id, status, statusName, date, startTime, endTime, durationMinutes,
                     site: SiteRef, specialty: SpecialtyRef,
                     patient: { fullName, documentType, documentNumber },  // mínimo de RF-16: sin email ni teléfono
@@ -191,6 +208,11 @@ ProfessionalAppointment { id, status, statusName, date, startTime, endTime, dura
 Eps               { id, code, name, active, planCount }
 EpsPlan           { id, epsId, code, name, active, regime: { code, name } }
 ```
+
+`HistoryEntry.event` es el único tipo ampliado en S4 que se declara **fuera** de este bloque: vive
+con los demás campos de `HistoryEntry` en § "Tipos compartidos", junto al párrafo que fija cuándo
+viaja y en qué dos endpoints; aquí solo se lista para que los **cuatro** tipos que S4 amplía
+(`Appointment`, `AppointmentDetail`, `AdminAppointment`, `HistoryEntry`) se vean juntos.
 
 ### Nuevos códigos de error
 
@@ -226,11 +248,28 @@ cerrar una no `APPROVED`, y decidir una solicitud que ya no está `PENDING`.
 | Método | Ruta | Cuerpo / query | Respuesta |
 |---|---|---|---|
 | GET | `/api/professional/appointments` | `from`, `to` obligatorios (máx. 62 días; día = `from`=`to`), `siteId` opcional | `ProfessionalAppointment[]` solo `APPROVED` y propias, por fecha y hora |
-| POST | `/api/professional/appointments/{id}/complete` | — | 200 `ProfessionalAppointment` · 404 si no es suya · 409 `INVALID_TRANSITION` / `APPOINTMENT_NOT_STARTED` |
-| POST | `/api/professional/appointments/{id}/no-show` | — | igual |
+| POST | `/api/professional/appointments/{id}/complete` | — | 200 `ProfessionalAppointment` · 404 si no es suya · 409 `INVALID_TRANSITION` / `APPOINTMENT_NOT_STARTED` — **cancela la reprogramación `PENDING`** (D38) |
+| POST | `/api/professional/appointments/{id}/no-show` | — | igual, con `NO_SHOW` |
 
-El cierre escribe historial con origen `PROFESSIONAL` y actor en la misma transacción. Las
-reservas **no** se liberan (`COMPLETED` y `NO_SHOW` tienen `releases_slots = false`).
+El cierre escribe historial con origen `PROFESSIONAL` y actor en la misma transacción. La franja de
+la **propia cita no se libera**: `COMPLETED` y `NO_SHOW` no liberan slots
+(`releasesSlots()` solo es `true` para `REJECTED` y `CANCELLED`,
+`domain/appointment/AppointmentStatus.java:44-46`; `appointment_statuses.releases_slots` de V4 debe
+coincidir, y `S3DebtIntegrationTest:205` lo comprueba estado por estado).
+
+**D38 — cerrar cancela la reprogramación pendiente.** Si la cita tiene una solicitud `PENDING`, los
+dos endpoints de cierre la pasan a `CANCELLED` **en la misma transacción**, con el **profesional**
+como decisor y `decisionReason = "Cita cerrada por el profesional"`, y **liberan su retención** por
+el único camino de liberación (`ReservationHolder.ofRescheduleRequest`, que no toca la franja de la
+cita). Así la franja propuesta vuelve a ofrecerse en `GET /api/patient/availability`. Sin esto la
+retención quedaría sin salida, porque HU-031 CA-05 solo deja decidir sobre una cita `APPROVED`
+(`application/appointment/ProfessionalAppointmentsUseCase.java:112-115`,
+`domain/appointment/RescheduleRequest.java:181-183`). El efecto **no** se ve en la respuesta del
+cierre —`ProfessionalAppointment` no lleva la solicitud— sino en el detalle de la cita:
+`pendingReschedule` pasa a `false` y `lastReschedule.status` a `CANCELLED`. Por D39 el cierre añade
+**una sola** fila de historial, la del propio cierre. Pruebas:
+`ProfessionalAgendaIntegrationTest:520` (`complete`), `:550` (`no-show`) y `:569` (si liberar la
+retención falla, todo vuelve atrás: cita `APPROVED`, solicitud `PENDING`, retención intacta).
 
 ### Administración — ADMIN (HU-029, HU-031, HU-012)
 
@@ -260,8 +299,12 @@ InboxEntry = { type: 'APPOINTMENT_REQUEST', appointment: AdminAppointment }
 - **Aprobar** reprogramación: bajo bloqueo, borra las reservas `APPOINTMENT` antiguas y convierte
   las `RESCHEDULE_REQUEST` en `APPOINTMENT` de la cita **actualizando la fila** (no se borra y se
   reinserta, para no abrir hueco). Mueve fecha, hora y sede de la cita; la solicitud pasa a
-  `APPROVED`. Historial `ADMIN` con estado `APPROVED` y motivo que nombra las dos franjas (D22).
-- **Rechazar**: libera la retención y la cita queda intacta. Historial igual, con el motivo.
+  `APPROVED`. Historial `ADMIN` con estado `APPROVED` y motivo que nombra las dos franjas (D22), que
+  al leerse viaja con `event: 'RESCHEDULED'` (D39).
+- **Rechazar**: libera la retención y la cita queda intacta. **No escribe ninguna fila de
+  historial** (D39, que refina D22): el motivo vive solo en `lastReschedule.decisionReason`. Lo
+  acordado el 2026-09-25 decía aquí "Historial igual, con el motivo"; **se corrigió el 2026-09-30**
+  contra el código — evidencia en § "Implementado en F5".
 - Desactivar una EPS o un plan los retira de `GET /api/catalogs/insurance-plans` sin tocar las
   afiliaciones existentes (HU-012 CA-05).
 
@@ -306,7 +349,11 @@ acordada. Lo que el acuerdo no fijaba:
 - **Cierre:** la cita ajena y la inexistente responden igual (404 `NOT_FOUND`), antes de mirar el
   estado. Primero el estado (409 `INVALID_TRANSITION`) y después la hora (409
   `APPOINTMENT_NOT_STARTED`). La respuesta 200 es el `ProfessionalAppointment` ya cerrado, con
-  `closable: false`.
+  `closable: false`. **Añadido en el LOOP_02 (D38):** si la cita tiene una reprogramación `PENDING`,
+  el cierre la cancela y libera su retención en la misma transacción (decisor = el profesional,
+  motivo `"Cita cerrada por el profesional"`), sin liberar la franja de la propia cita; el detalle y
+  la evidencia están en § "Profesional — PROFESSIONAL". La solicitud se bloquea **después** de la
+  cita, el mismo orden único de bloqueo que usan cancelar y decidir.
 - **EPS y planes:** el `code` se normaliza a mayúsculas y los espacios a `_` (igual que
   especialidades). Los nombres son únicos sin distinguir mayúsculas ni tildes (collation
   `utf8mb4_0900_ai_ci`, V9). `POST /api/admin/eps/{id}/plans` y `GET …/plans` sobre una EPS
@@ -332,6 +379,30 @@ CA-03, contra este contrato. Ninguna forma acordada cambia; lo que el acuerdo no
   acepta `professionalId` y `specialtyId` **opcionales** que el frontend no envía. Si llegan y difieren
   de los de la cita → **422 `WRONG_FLOW`** ("cambiar de profesional o especialidad es una cita nueva"),
   que es lo que exige HU-027 CA-02. Iguales o ausentes → se ignoran.
+- **Cuerpo obligatorio frente a cuerpo opcional — asimetría entre los cuatro endpoints con cuerpo de
+  S4** (verificado el 2026-09-30, anotación del LOOP_02 iter. 3). `POST …/{id}/reschedule` es el
+  **único** que **exige** cuerpo: su parámetro es `@RequestBody RescheduleBody`, sin
+  `required = false` (`infrastructure/rest/appointment/PatientAppointmentController.java:91`). Los
+  otros tres lo declaran `@RequestBody(required = false)`: `…/{id}/cancel`
+  (`PatientAppointmentController.java:78`), `POST /api/admin/appointments/{id}/reject` y
+  `POST /api/admin/reschedules/{id}/reject` (`AdminAppointmentController.java:82` y `:98`).
+  Consecuencias observables, distintas en cada uno:
+  - **reprogramar sin cuerpo** (o con JSON mal formado) → **400 antes de aplicar ninguna regla**, ni
+    ownership ni estado: lo corta el conversor de mensajes. `title` = "Datos inválidos", `detail` =
+    "El cuerpo de la petición falta o no es un JSON válido", y **sin `code` ni `fieldErrors`**, así
+    que el frontend no puede distinguirlo por `code`
+    (`infrastructure/rest/error/GlobalExceptionHandler.java:70-75`, que redefine
+    `handleHttpMessageNotReadable` para no devolver el ProblemDetail genérico de Spring en inglés);
+  - **cancelar sin cuerpo** → **200**: equivale a no dar motivo (aclaración 2);
+  - **cualquiera de los dos `reject` sin cuerpo** → **400 con `fieldErrors.reason`**, el mismo error
+    que `{ "reason": "" }`, porque el motivo es obligatorio y se valida en el dominio
+    (`domain/appointment/Appointment.java:179-181` y `domain/appointment/RescheduleRequest.java:158-160`);
+    en el rechazo de una reprogramación el estado se comprueba **antes**, así que una solicitud ya
+    decidida da 409 y no 400.
+
+  Es una asimetría real entre endpoints hermanos, no un detalle de forma: el cliente que envía `{}` o
+  ningún cuerpo a `reschedule` recibe un 400 sin `code`. Si alguna vez conviene igualarlos, el cambio
+  es de una línea, pero **hoy el contrato es este**.
 - **Orden de errores al pedir:** 400 `VALIDATION` (`fieldErrors.siteId/date/startTime`, `reason` > 500)
   → 404 → 409 `INVALID_TRANSITION` / `APPOINTMENT_EXPIRED` / `RESCHEDULE_PENDING` → 422 `WRONG_FLOW` →
   las reglas de franja de la reserva, por el **mismo** código (`SlotAllocator`: `SPECIALTY_INACTIVE`,
@@ -349,11 +420,33 @@ CA-03, contra este contrato. Ninguna forma acordada cambia; lo que el acuerdo no
   `NOT_FOUND`. Orden: 404 → 409 `INVALID_TRANSITION` (solicitud no `PENDING` o cita no `APPROVED`,
   también al **rechazar**, HU-031 CA-05) → al aprobar, 409 `APPOINTMENT_EXPIRED` (D23) → al rechazar,
   400 `fieldErrors.reason`. `CONCURRENT_CHANGE` solo aparece como red de seguridad (interbloqueo).
-- **Historial (D22):** aprobar escribe `APPROVED`/`ADMIN` con `reason` =
-  `"Reprogramación aprobada: de 2026-10-01 08:00–09:00 (HIC) a 2026-10-02 09:00–09:30 (ICV)"`;
-  rechazar escribe `APPROVED`/`ADMIN` con `reason` = el motivo enviado, tal cual.
-- **`RescheduleRequest.decisionReason`:** `REJECTED` → el motivo; `APPROVED` → se omite (nulo);
-  `CANCELLED` por D18 → `"Cita cancelada por el paciente"` (D37), con el paciente como decisor.
+- **Historial (D22, refinado por D39):** **solo aprobar** escribe fila, porque es la única decisión
+  que cambia la cita: `APPROVED`/`ADMIN` con `reason` =
+  `"Reprogramación aprobada: de 2026-10-01 08:00–09:00 (HIC) a 2026-10-02 09:00–09:30 (ICV)"`
+  (`domain/appointment/RescheduleRequest.java:141-144`) y `event: 'RESCHEDULED'` al leerla.
+  **Rechazar no añade ninguna fila a `history[]`** —ni una entrada `ADMIN` ni de ningún otro origen—:
+  la cita no se toca, así que el motivo del rechazo viaja **solo** en
+  `lastReschedule.decisionReason`, que es lo que pinta el aviso de HU-028
+  (`application/appointment/RescheduleAppointmentUseCase.java:140-149`,
+  `domain/appointment/RescheduleRequest.java:155-162`). Las cancelaciones automáticas de D18 y D38
+  tampoco escriben fila propia. Prueba: `RescheduleDecisionIntegrationTest:508`
+  (`onlyTheApprovalIsRecordedInTheHistory`), que además comprueba que el paciente lee el rechazo en
+  `lastReschedule.decisionReason` y que `history[*].event` va vacío en esa cita.
+  > **CORRECCIÓN del 2026-09-30 (LOOP_02, iteración 3).** Hasta hoy esta línea decía «rechazar
+  > escribe `APPROVED`/`ADMIN` con `reason` = el motivo enviado, tal cual». Era cierto cuando se
+  > escribió (F5, 2026-09-25) y dejó de serlo al aplicarse **D39** en la iteración 2 del LOOP_02, sin
+  > que la página se actualizara: el contrato publicado afirmaba lo contrario del código. **D39
+  > supersede a D22** en este punto. El `backend-verifier` lo marcó como gravedad **ALTA** porque el
+  > frontend ya consume `event` y `decisionReason` y se quedaba sin contrato de referencia.
+- **`RescheduleRequest.decisionReason`:** `REJECTED` → el motivo enviado; `APPROVED` → se omite
+  (nulo); `CANCELLED` → el motivo automático de quien la cerró, y el decisor es ese mismo actor:
+  - `"Cita cancelada por el paciente"` cuando el paciente cancela la cita (D18/D37), decisor = el
+    paciente;
+  - `"Cita cerrada por el profesional"` cuando el profesional cierra la atención como `COMPLETED` o
+    `NO_SHOW` (**D38**), decisor = el profesional.
+
+  Las dos cadenas son constantes del dominio (`domain/appointment/RescheduleRequest.java:40` y `:43`)
+  y ninguna otra las produce.
 - **Bandeja:** `type` desconocido → 400 `VALIDATION` (`fieldErrors.type`). Orden estable por la franja
   de la entrada (la **propuesta** en una reprogramación), después tipo e id. En la entrada
   `RESCHEDULE_REQUEST`, `appointment` trae la franja **actual** y su `lastReschedule` es la propia
@@ -372,6 +465,21 @@ CA-03, contra este contrato. Ninguna forma acordada cambia; lo que el acuerdo no
 
 ## Historial
 
+- 2026-09-30 — LOOP_02 iteración 3: **alineado con el código lo que el `backend-verifier` marcó como
+  gravedad ALTA** (el contrato afirmaba lo contrario del código y el frontend consumía un campo sin
+  contrato). Cuatro correcciones, todas verificadas contra los ficheros y las pruebas que se citan:
+  (1) rechazar una reprogramación **no** escribe historial —se corrigen las **dos** frases que decían
+  lo contrario, la del acuerdo y la de «Implementado en F5»— y el motivo viaja solo en
+  `lastReschedule.decisionReason` (D39 supersede a D22); (2) `HistoryEntry` declara
+  `event?: 'RESCHEDULED'` con la regla exacta de cuándo viaja y en qué dos endpoints; (3)
+  `decisionReason` incorpora `"Cita cerrada por el profesional"` (D38) junto al de D18/D37; (4)
+  `/complete` y `/no-show` documentan que cancelan la reprogramación `PENDING` y liberan su retención
+  en la misma transacción, sin liberar la franja de la propia cita. Las pruebas que se citan no están
+  solo leídas: la suite del backend corrió **entera y en verde** ese mismo día, una vez por el Builder
+  y otra por el `backend-verifier`. Dos remates del mismo día: `HistoryEntry + { event?: … }` se lista
+  también entre los tipos ampliados de S4 (la regla sigue en § "Tipos compartidos") y se documenta la
+  **asimetría del cuerpo** de los cuatro endpoints con cuerpo — solo `reschedule` lo exige, y sin él
+  responde 400 sin `code`.
 - 2026-09-25 — F5 (LOOP_02): reprogramación implementada. Añadida la subsección «Implementado en F5»
   con V10, el cuerpo opcional `professionalId`/`specialtyId` (422 `WRONG_FLOW`), el cruce con la
   franja actual (422 `SLOT_NOT_AVAILABLE`), el orden de errores, el texto del historial (D22), el

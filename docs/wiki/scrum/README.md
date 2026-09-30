@@ -199,7 +199,7 @@ El usuario **delegó la aprobación de S4** (D15) y respondió directamente D18 
 | [[HU-026-cancelar-una-cita-futura]] | Cancelar una cita futura | Medio | F3 (CA-09 en F5) | D16, D17, D18 |
 | [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] | Solicitar la reprogramación de una cita aprobada | Alto | F5 | D18, D20, D21 |
 | [[HU-028-decidir-sobre-cita-tras-rechazo-de-reprogramacion]] | Decidir sobre la cita tras el rechazo | Medio | F5 | D17, D20 |
-| [[HU-031-aprobar-o-rechazar-reprogramacion]] | Aprobar o rechazar una reprogramación | Alto | F5 | D18, D21, D22, D23 |
+| [[HU-031-aprobar-o-rechazar-reprogramacion]] | Aprobar o rechazar una reprogramación | Alto | F5 | D18, D21, D22 → **D39**, D23 |
 
 **Ampliada sin cambiar de estado:** [[HU-009-registrar-afiliacion-a-eps-y-plan]] sigue `Aprobada`; su primer corte fue aprobación directa del usuario y el segundo corte —consultar, cambiar y quitar la afiliación desde el perfil, fase F6, D26— se añade por aprobación delegada.
 
@@ -216,12 +216,12 @@ El usuario **delegó la aprobación de S4** (D15) y respondió directamente D18 
 
 **Criterios ajustados o añadidos al aprobar** (cada uno con su línea de historial en la HU):
 
-- Ajustados a una decisión: HU-006 CA-05 (D27), HU-007 CA-08 (D29), HU-021 CA-04 (D19), HU-031 CA-06 (D22) y CA-07 (D18).
+- Ajustados a una decisión: HU-006 CA-05 (D27), HU-007 CA-08 (D29), HU-021 CA-04 (D19), HU-031 CA-06 (D22; **reescrito el 2026-09-30 para ejecutar D39**, que refina D22) y CA-07 (D18).
 - Añadidos porque la decisión no tenía ningún criterio verificable: HU-009 CA-09 y CA-10 (D26), HU-012 CA-09 (D28), HU-026 CA-09 (D18), HU-027 CA-10 (D20), HU-031 CA-09 (D23).
 
 **Divergencias anotadas y sin resolver** (no se reescribieron en silencio; hay que decidirlas antes de implementar la fase indicada):
 
-- HU-027 CA-03 y CA-09 piden la "fecha y hora anterior" en la solicitud, y `reschedule_requests` (V3) no tiene esas columnas (F5).
+- HU-027 CA-03 y CA-09 piden la "fecha y hora anterior" en la solicitud, y `reschedule_requests` (V3) no tiene esas columnas (F5). **Resuelta por D31:** la migración `V10` las añade y ningún criterio se reescribió.
 - HU-009: `uq_affiliations_user_plan` (V2) impide volver a un plan que ya se tuvo, algo que D26 no contempla (F6).
 - HU-012: la DoD pide nombre único de EPS y plan, y V2 impone unicidad por código (F6).
 - HU-007: `PLAN_RETOMA_S4.md` F7 revoca los refresh tokens al restablecer, pero ninguna decisión D15–D30 lo registra y la HU lo tiene fuera de alcance (F7).
@@ -230,3 +230,20 @@ El usuario **delegó la aprobación de S4** (D15) y respondió directamente D18 
 **Decisiones que afectan a HU ya `Completada`:** D29 obliga a revisar la matriz de [[HU-001-registrar-cuenta-de-usuario]], y D22 a revisar [[HU-032-auditar-cambios-de-estado-de-cita]]. No se reabren aquí: se revisan en la verificación de F10.
 
 Estado global tras esta aprobación: ninguna de las 33 HU queda en `Borrador` —16 `Completada`, 11 `Aprobada`, 5 `En validación` y 1 `En desarrollo`—. Ninguna HU de S4 está `Completada`: el cierre exige matriz de evidencia completa y verificación independiente (F10).
+
+## Verificación del LOOP_02 de S4 — reprogramación (2026-09-30)
+
+La iteración 2 del LOOP_02 terminó con el comportamiento del backend en **PASS limpio** (480 pruebas, 0 fallos, `BUILD SUCCESS`, suite reejecutada por el `backend-verifier`, que no escribió el código) y con **FAIL por Definition of Done documental**: [[HU-031-aprobar-o-rechazar-reprogramacion]] seguía redactada en D22 mientras el código implementaba D39 a propósito, y tres matrices de evidencia estaban vacías. La iteración 3 corrige la documentación, sin tocar código.
+
+| HU | Estado | Qué cumple | Qué queda |
+|---|---|---|---|
+| [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] | `En validación` | CA-01 a CA-10 y toda la DoD de backend, con matriz completa | La DoD de la pantalla de `citas-web`, en `Pendiente`: sin verificación criterio a criterio ni prueba manual en navegador (F10) |
+| [[HU-028-decidir-sobre-cita-tras-rechazo-de-reprogramacion]] | `En validación` | CA-01 a CA-06 y la DoD de backend y de contrato | La DoD del flujo de `citas-web`, en `Pendiente`: el `frontend-verifier` dejó abiertos dos defectos del propio aviso (el de una solicitud `CANCELLED` por D38 no muestra el motivo; se pierde el foco al cerrarlo) |
+| [[HU-031-aprobar-o-rechazar-reprogramacion]] | `En validación` | CA-01 a CA-09, con **CA-06 reescrito para ejecutar D39**, y la DoD de backend, de contrato REST y de trazabilidad | Solo la DoD de la pantalla de ADMIN, en `Pendiente` |
+| [[HU-032-auditar-cambios-de-estado-de-cita]] | `Completada` (sin cambio) | Los ocho criterios siguen en `Cumple` | Su ítem de DoD «contrato del historial reflejado» estuvo obsoleto (el contrato no declaraba `event?: 'RESCHEDULED'`) y volvió a `Cumple` cuando el agente del contrato lo alineó el mismo día. Reabrir una HU cerrada es decisión del usuario |
+
+**Ninguna pasa a `Completada`.** El `backend-verifier` fue explícito en que no procede cerrarlas en esta iteración. Con el contrato REST y CA-06 ya alineados con D38 y D39, lo que falta es de interfaz y de verificación: el `frontend-verifier` solo cubrió el alcance de su iteración 2, dejó defectos de producto abiertos y no existe la prueba manual en navegador con los tres roles que pide F10. Dos límites más quedan anotados en las matrices: la carrera «cerrar la atención» contra «decidir la reprogramación» que abre D38 no tiene prueba concurrente, y la derivación del evento `RESCHEDULED` se apoya en un invariante que el esquema no protege.
+
+**Deriva respecto del PRD, corregida con aprobación directa del usuario (2026-09-30).** Cinco textos decían que **cada decisión** de ADMIN sobre una reprogramación se registra en el historial: «Contexto y descripción», la viñeta de «Alcance» y la tarea T-03 de [[HU-031-aprobar-o-rechazar-reprogramacion]], y en [[EP-008-operacion-administrativa-de-solicitudes]] la regla de RF-19 y la casilla del criterio de completitud. **RF-19 no dice eso:** dice «Todo cambio de estado de cita guarda: cita; estado nuevo; actor cuando existe; fuente `SYSTEM`, `USER` o `ADMIN`; fecha/hora; motivo opcional» (`PRD.md` §RF-19). Rechazar una reprogramación no cambia el estado de la cita —sigue `APPROVED`—, de modo que RF-19 nunca pidió una fila para el rechazo: la exigencia la había introducido la épica al reformular el requisito, y fue la que justificó D22. Los cinco textos se alinearon citando RF-19 y registrando D39 como la decisión que lo respeta. **No se relajó ningún requisito: se volvió al PRD.** [[HU-030-aprobar-o-rechazar-cita-especializada]] no cambia, porque allí la decisión sí cambia el estado de la cita.
+
+Estado global tras esta iteración: 16 `Completada`, 8 `Aprobada`, 8 `En validación` y 1 `En desarrollo`.
