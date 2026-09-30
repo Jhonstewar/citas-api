@@ -37,6 +37,9 @@ import com.fcv.citas.domain.shared.SystemZone;
  * barrera de PK que la reserva; aprobar libera la franja antigua y CONVIERTE la retencion en
  * ocupacion de la cita actualizando las filas (sin borrar y reinsertar, RN-01); rechazar libera la
  * retencion por el unico camino de liberacion.</p>
+ *
+ * <p><b>Historial</b> (D39): solo aprobar escribe una fila, porque es la unica decision que cambia la
+ * cita. Rechazar deja el motivo en la solicitud y nada mas.</p>
  */
 public class RescheduleAppointmentUseCase {
 
@@ -129,16 +132,17 @@ public class RescheduleAppointmentUseCase {
     }
 
     /**
-     * HU-031 CA-03/CA-04: rechaza con motivo obligatorio; la cita queda intacta y la retencion se libera
-     * (RN-09, RN-10). 404 · 409 {@code INVALID_TRANSITION} · 400 sin motivo.
+     * HU-031 CA-03/CA-04/CA-06: rechaza con motivo obligatorio; la cita queda intacta y la retencion se
+     * libera (RN-09, RN-10). D39: no se escribe historial, porque la cita no cambia; el motivo queda en
+     * la solicitud y el detalle del paciente lo lee de ahi (HU-028). 404 · 409
+     * {@code INVALID_TRANSITION} · 400 sin motivo.
      */
     public Detail reject(long adminUserId, long requestId, String reason) {
         long appointmentId = tx.inTransaction(() -> {
             Locked locked = lock(requestId);
-            RescheduleRequest.Rejection rejection = locked.request().reject(adminUserId, locked.appointment(), reason);
+            RescheduleRequest rejected = locked.request().reject(adminUserId, locked.appointment(), reason);
             appointments.releaseReservations(ReservationHolder.ofRescheduleRequest(requestId));
-            appointments.apply(rejection.appointment());
-            reschedules.saveDecision(rejection.request());
+            reschedules.saveDecision(rejected);
             return locked.appointment().id();
         });
         return admin.detail(appointmentId);

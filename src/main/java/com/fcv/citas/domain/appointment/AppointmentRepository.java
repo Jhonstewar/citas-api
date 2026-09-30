@@ -32,7 +32,8 @@ public interface AppointmentRepository {
     /**
      * RN-09: UNICO camino de liberacion de franjas. Borra las filas de {@code slot_reservations} del
      * titular (ver {@link ReservationHolder}), con lo que los slots vuelven a ofrecerse. Lo usan
-     * cancelar y rechazar una cita, rechazar una reprogramacion y, al aprobarla, liberar la franja antigua.
+     * cancelar y rechazar una cita, rechazar una reprogramacion, cerrar la atencion con una solicitud
+     * {@code PENDING} (D38) y, al aprobar una reprogramacion, liberar la franja antigua. No hay otro.
      */
     void releaseReservations(ReservationHolder holder);
 

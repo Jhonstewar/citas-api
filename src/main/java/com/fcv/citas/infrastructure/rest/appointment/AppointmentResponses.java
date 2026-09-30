@@ -9,9 +9,11 @@ import com.fcv.citas.application.appointment.AppointmentQueries.AppointmentView;
 import com.fcv.citas.application.appointment.AppointmentQueries.HistoryView;
 import com.fcv.citas.application.appointment.AppointmentQueries.RescheduleView;
 import com.fcv.citas.application.appointment.AppointmentQueries.TimeSlotView;
+import com.fcv.citas.application.appointment.HistoryEntry;
 import com.fcv.citas.application.appointment.PatientAppointmentsUseCase.PatientAppointment;
 import com.fcv.citas.application.appointment.PatientAppointmentsUseCase.PatientDetail;
 import com.fcv.citas.application.shared.Refs.PatientRef;
+import com.fcv.citas.domain.appointment.HistoryEvent;
 import com.fcv.citas.application.shared.Refs.PersonRef;
 import com.fcv.citas.application.shared.Refs.SiteRef;
 import com.fcv.citas.application.shared.Refs.SpecialtyRef;
@@ -53,15 +55,20 @@ public final class AppointmentResponses {
         }
     }
 
+    /**
+     * {@code HistoryEntry} del contrato. {@code event} (D39) solo viaja en la fila de una reprogramacion
+     * aprobada, la unica que repite el estado de la anterior; en las demas es {@code null} y no se emite.
+     */
     public record HistoryResponse(String status, String statusName, String source, String actorName, String reason,
-            LocalDateTime changedAt) {
+            LocalDateTime changedAt, HistoryEvent event) {
 
-        public static HistoryResponse from(HistoryView h) {
+        public static HistoryResponse from(HistoryEntry entry) {
+            HistoryView h = entry.change();
             return new HistoryResponse(h.status(), h.statusName(), h.source(), h.actorName(), h.reason(),
-                    h.changedAt());
+                    h.changedAt(), entry.event());
         }
 
-        static List<HistoryResponse> all(List<HistoryView> history) {
+        static List<HistoryResponse> all(List<HistoryEntry> history) {
             return history.stream().map(HistoryResponse::from).toList();
         }
     }
@@ -88,7 +95,7 @@ public final class AppointmentResponses {
             SpecialtyRef specialty, String rejectionReason, LocalDateTime createdAt, boolean pendingReschedule,
             List<HistoryResponse> history, PatientRef patient, RescheduleResponse lastReschedule) {
 
-        public static AdminAppointmentResponse from(AppointmentView v, List<HistoryView> history,
+        public static AdminAppointmentResponse from(AppointmentView v, List<HistoryEntry> history,
                 RescheduleView lastReschedule) {
             return new AdminAppointmentResponse(v.id(), v.status(), v.statusName(), v.date().toString(),
                     time(v.startTime()), time(v.endTime()), v.durationMinutes(), v.site(), v.professional(),

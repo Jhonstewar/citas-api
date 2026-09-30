@@ -1,8 +1,10 @@
 package com.fcv.citas.infrastructure.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -146,6 +148,37 @@ class ProfessionalAgendaIntegrationTest {
     /** Cita APPROVED de ayer: ya empezo y ya termino (cerrable, D19). */
     private long pastApproved(S3TestData.Professional prof) {
         return seed(prof, hic, LocalDate.now(SystemZone.ZONE).minusDays(1), "08:00", "APPROVED");
+    }
+
+    /**
+     * D38: solicitud {@code PENDING} sembrada por SQL sobre la cita, con su retencion en el libro unico.
+     * Se siembra porque la API no admite pedir reprogramacion de una cita que ya empezo (RN-10).
+     */
+    private long seedPendingReschedule(long appointmentId, LocalDate previousDate, LocalDate proposedDate,
+            String proposedStart, long heldSlotId) {
+        LocalTime start = LocalTime.parse(proposedStart);
+        jdbc.update("""
+                INSERT INTO reschedule_requests (appointment_id, status_id, requested_by_user_id,
+                    previous_date, previous_start_time, previous_end_time, previous_site_id,
+                    proposed_date, proposed_start_time, proposed_end_time, proposed_site_id)
+                VALUES (?, (SELECT id FROM reschedule_statuses WHERE code = 'PENDING'), ?, ?, '08:00', '08:30', ?,
+                        ?, ?, ?, ?)
+                """, appointmentId, patientId, previousDate, hic, proposedDate, start, start.plusMinutes(30), hic);
+        long requestId = jdbc.queryForObject("SELECT id FROM reschedule_requests WHERE appointment_id = ?",
+                Long.class, appointmentId);
+        jdbc.update("INSERT INTO slot_reservations (slot_id, reservation_type, reschedule_request_id, slot_order)"
+                + " VALUES (?, 'RESCHEDULE_REQUEST', ?, 1)", heldSlotId, requestId);
+        return requestId;
+    }
+
+    private Map<String, Object> rescheduleRow(long requestId) {
+        return jdbc.queryForMap("SELECT rs.code, r.decided_by_user_id, r.decision_reason, r.decided_at"
+                + " FROM reschedule_requests r JOIN reschedule_statuses rs ON rs.id = r.status_id WHERE r.id = ?",
+                requestId);
+    }
+
+    private int heldRows(long requestId) {
+        return data.count("SELECT COUNT(*) FROM slot_reservations WHERE reschedule_request_id = ?", requestId);
     }
 
     /** Cita APPROVED que empezo hace un minuto y cuya franja no ha terminado (HU-021 CA-04). */
@@ -472,6 +505,83 @@ class ProfessionalAgendaIntegrationTest {
 
         assertThat(status).isGreaterThanOrEqualTo(400);
         assertThat(statusOf(id)).isEqualTo("APPROVED");
+        assertThat(history(id)).isEqualTo(before);
+    }
+
+    // ================================================================== D38
+
+    /**
+     * D38 (igual que D18 para la cancelacion): cerrar la atencion con una reprogramacion {@code PENDING}
+     * la cierra en la MISMA transaccion —decisor el profesional, motivo automatico— y libera su
+     * retencion, que si no quedaria retenida sin salida (HU-031 CA-05 exige una cita {@code APPROVED}).
+     * La franja de la propia cita NO se libera y, por D39, no hay fila de historial extra.
+     */
+    @Test
+    void closingTheCareCancelsThePendingRescheduleAndReleasesItsHold() throws Exception {
+        LocalDate yesterday = LocalDate.now(SystemZone.ZONE).minusDays(1);
+        long ownBlock = data.block(profA.id(), hic, yesterday, "08:00", "09:00");
+        long id = pastApproved(profA);
+        data.reserve(data.slotId(ownBlock, "08:00"), id, 1);
+        long futureBlock = data.block(profA.id(), hic, monday, "09:00", "10:00");
+        long requestId = seedPendingReschedule(id, yesterday, monday, "09:00", data.slotId(futureBlock, "09:00"));
+        int before = history(id);
+
+        close(id, "complete", tokenA).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        Map<String, Object> request = rescheduleRow(requestId);
+        assertThat(request.get("code")).isEqualTo("CANCELLED");
+        assertThat(((Number) request.get("decided_by_user_id")).longValue()).isEqualTo(profA.userId());
+        assertThat(request.get("decision_reason")).isEqualTo("Cita cerrada por el profesional");
+        assertThat(request.get("decided_at")).isNotNull();
+        assertThat(heldRows(requestId)).as("la retencion se libera").isZero();
+        assertThat(data.count("SELECT COUNT(*) FROM slot_reservations WHERE appointment_id = ?", id))
+                .as("COMPLETED no libera la franja de la cita").isOne();
+        assertThat(history(id)).as("D39: solo la fila del cierre").isEqualTo(before + 1);
+        // La franja propuesta vuelve a ofrecerse: el unico camino de liberacion la devolvio al catalogo.
+        mvc.perform(get("/api/patient/availability?specialtyId=" + general + "&date=" + monday)
+                .header(HttpHeaders.AUTHORIZATION, patient))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].startTime", hasItem("09:00")));
+    }
+
+    /** D38 con la otra salida del cierre: NO_SHOW tambien cierra la solicitud y libera la retencion. */
+    @Test
+    void markingNoShowAlsoCancelsThePendingReschedule() throws Exception {
+        LocalDate yesterday = LocalDate.now(SystemZone.ZONE).minusDays(1);
+        long id = pastApproved(profA);
+        long futureBlock = data.block(profA.id(), hic, monday, "09:00", "10:00");
+        long requestId = seedPendingReschedule(id, yesterday, monday, "09:30", data.slotId(futureBlock, "09:30"));
+
+        close(id, "no-show", tokenA).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("NO_SHOW"));
+
+        assertThat(rescheduleRow(requestId).get("code")).isEqualTo("CANCELLED");
+        assertThat(rescheduleRow(requestId).get("decision_reason")).isEqualTo("Cita cerrada por el profesional");
+        assertThat(heldRows(requestId)).isZero();
+    }
+
+    /**
+     * D38 CA-08 (atomicidad): si liberar la retencion falla, no queda la cita cerrada con la solicitud
+     * viva ni al reves. Todo vuelve atras: cita APPROVED, solicitud PENDING, retencion intacta.
+     */
+    @Test
+    void aFailureReleasingTheHoldRollsBackTheClosure() throws Exception {
+        LocalDate yesterday = LocalDate.now(SystemZone.ZONE).minusDays(1);
+        long id = pastApproved(profA);
+        long futureBlock = data.block(profA.id(), hic, monday, "09:00", "10:00");
+        long requestId = seedPendingReschedule(id, yesterday, monday, "09:00", data.slotId(futureBlock, "09:00"));
+        int before = history(id);
+        doThrow(new IllegalStateException("fallo simulado al liberar la retención"))
+                .when(appointmentRepository).releaseReservations(any());
+
+        assertThat(close(id, "complete", tokenA).andReturn().getResponse().getStatus())
+                .isGreaterThanOrEqualTo(500);
+
+        assertThat(statusOf(id)).isEqualTo("APPROVED");
+        assertThat(rescheduleRow(requestId).get("code")).isEqualTo("PENDING");
+        assertThat(rescheduleRow(requestId).get("decided_at")).isNull();
+        assertThat(heldRows(requestId)).isOne();
         assertThat(history(id)).isEqualTo(before);
     }
 

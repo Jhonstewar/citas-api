@@ -166,11 +166,15 @@ public class UseCaseConfig {
                 queries, admin, tx, clock);
     }
 
-    /** HU-020 y HU-021: agenda de citas aprobadas y cierre de atencion del profesional. */
+    /**
+     * HU-020 y HU-021: agenda de citas aprobadas y cierre de atencion del profesional. Necesita las
+     * solicitudes de reprogramacion porque cerrar la atencion cierra la {@code PENDING} de la cita (D38).
+     */
     @Bean
     ProfessionalAppointmentsUseCase professionalAppointmentsUseCase(ProfessionalRepository professionals,
-            AppointmentRepository appointments, AppointmentQueries queries, TransactionRunner tx, Clock clock) {
-        return new ProfessionalAppointmentsUseCase(professionals, appointments, queries, tx, clock);
+            AppointmentRepository appointments, RescheduleRequestRepository reschedules, AppointmentQueries queries,
+            TransactionRunner tx, Clock clock) {
+        return new ProfessionalAppointmentsUseCase(professionals, appointments, reschedules, queries, tx, clock);
     }
 
     /** HU-012: CRUD de EPS y planes (D28, D33). */

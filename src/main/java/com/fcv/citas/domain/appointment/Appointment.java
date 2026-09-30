@@ -108,9 +108,11 @@ public record Appointment(
     }
 
     /**
-     * HU-031 CA-01: la reprogramacion aprobada mueve ESTA cita (mismo id, profesional y especialidad) a
-     * la franja nueva, incluida la sede (D21). El estado sigue {@code APPROVED}, pero queda una fila de
-     * historial {@code APPROVED}/ADMIN con el motivo que nombra las dos franjas (D22). No pasa por
+     * HU-031 CA-01 y CA-06 (D22 refinada por D39): la reprogramacion aprobada mueve ESTA cita (mismo id,
+     * profesional y especialidad) a la franja nueva, incluida la sede (D21). Es la UNICA decision sobre
+     * una reprogramacion que escribe historial, porque es la unica que cambia la cita; el rechazo no la
+     * toca y queda solo en la solicitud. El estado sigue {@code APPROVED}, asi que la fila repite el
+     * estado de la anterior y de ahi se deriva {@link HistoryEvent#RESCHEDULED} al leerla. No pasa por
      * {@link #transitionTo}: no es un cambio de estado. La llama {@link RescheduleRequest#approve}.
      */
     Transition rescheduleTo(TimeSlot target, long adminUserId, String trace) {
@@ -119,16 +121,6 @@ public record Appointment(
                 target.date(), target.startTime(), target.endTime());
         return new Transition(moved, new StatusChange(AppointmentStatus.APPROVED, adminUserId, AuditSource.ADMIN,
                 trace));
-    }
-
-    /**
-     * HU-031 CA-06 (D22): el rechazo de una reprogramacion deja la cita intacta y una fila de historial
-     * {@code APPROVED}/ADMIN con el motivo enviado. La llama {@link RescheduleRequest#reject}.
-     */
-    Transition recordRescheduleRejection(long adminUserId, String reason) {
-        requireApprovedForReschedule();
-        return new Transition(this, new StatusChange(AppointmentStatus.APPROVED, adminUserId, AuditSource.ADMIN,
-                reason));
     }
 
     private void requireApprovedForReschedule() {

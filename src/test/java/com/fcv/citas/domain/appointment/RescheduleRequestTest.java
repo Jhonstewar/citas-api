@@ -143,25 +143,30 @@ class RescheduleRequestTest {
         Appointment stillApproved = appointment(AppointmentStatus.APPROVED, DAY.plusDays(1), "08:00", "09:00");
         assertThat(code(() -> expired.approve(ADMIN, stillApproved, later, String::valueOf)))
                 .isEqualTo("ConflictException:APPOINTMENT_EXPIRED");
-        assertThat(expired.reject(ADMIN, stillApproved, "Ya pasó").request().status())
+        assertThat(expired.reject(ADMIN, stillApproved, "Ya pasó").status())
                 .isEqualTo(RescheduleStatus.REJECTED);
     }
 
+    /**
+     * CA-04 y D39: rechazar exige motivo y devuelve SOLO la solicitud decidida. No produce ninguna
+     * transicion de la cita: el rechazo no la toca, asi que no hay nada que escribir en su historial.
+     */
     @Test
-    void rejectingNeedsAReasonAndKeepsTheAppointment() {
+    void rejectingNeedsAReasonAndDoesNotTouchTheAppointment() {
         assertThat(code(() -> pending().reject(ADMIN, approved(), "  "))).isEqualTo("InvalidRequestException:VALIDATION");
         assertThat(code(() -> pending().reject(ADMIN, approved(), null))).isEqualTo("InvalidRequestException:VALIDATION");
-        RescheduleRequest.Rejection rejection = pending().reject(ADMIN, approved(), " Sin cupo ");
-        assertThat(rejection.request().status()).isEqualTo(RescheduleStatus.REJECTED);
-        assertThat(rejection.request().decisionReason()).isEqualTo("Sin cupo");
-        assertThat(rejection.appointment().appointment()).isEqualTo(approved());
-        assertThat(rejection.appointment().change().reason()).isEqualTo("Sin cupo");
-        assertThat(rejection.appointment().change().source()).isEqualTo(AuditSource.ADMIN);
+        RescheduleRequest rejected = pending().reject(ADMIN, approved(), " Sin cupo ");
+        assertThat(rejected.status()).isEqualTo(RescheduleStatus.REJECTED);
+        assertThat(rejected.decidedByUserId()).isEqualTo(ADMIN);
+        assertThat(rejected.decisionReason()).isEqualTo("Sin cupo");
+        // El motivo queda en la solicitud y en ningun otro sitio (HU-031 CA-06 ajustado a D39).
+        assertThat(rejected.previous()).isEqualTo(approved().slot());
+        assertThat(rejected.proposed()).isEqualTo(pending().proposed());
     }
 
     @Test
     void onlyAPendingRequestOnAnApprovedAppointmentIsDecided() {
-        RescheduleRequest decided = pending().reject(ADMIN, approved(), "No").request();
+        RescheduleRequest decided = pending().reject(ADMIN, approved(), "No");
         assertThat(code(() -> decided.approve(ADMIN, approved(), NOW, String::valueOf)))
                 .isEqualTo("ConflictException:INVALID_TRANSITION");
         // Estado antes que motivo: sobre una ya decidida el problema es la transicion.
@@ -179,5 +184,24 @@ class RescheduleRequestTest {
         assertThat(cancelled.decidedByUserId()).isEqualTo(PATIENT);
         assertThat(cancelled.decisionReason()).isEqualTo("Cita cancelada por el paciente");
         assertThatThrownBy(() -> cancelled.cancelWithAppointment(PATIENT)).isInstanceOf(ConflictException.class);
+    }
+
+    /**
+     * D38: el profesional cierra la atencion con la solicitud sin decidir. Queda {@code CANCELLED} con
+     * el profesional como decisor y su propio motivo automatico, distinto del de D37, para que la
+     * bandeja explique por que se cerro. Una ya decidida no se vuelve a cerrar.
+     */
+    @Test
+    void cancellingWithTheClosureOfTheAppointmentRecordsTheProfessional() {
+        long professional = 42L;
+        RescheduleRequest cancelled = pending().cancelWithClosure(professional);
+        assertThat(cancelled.status()).isEqualTo(RescheduleStatus.CANCELLED);
+        assertThat(cancelled.decidedByUserId()).isEqualTo(professional);
+        assertThat(cancelled.decisionReason()).isEqualTo("Cita cerrada por el profesional");
+        assertThat(cancelled.decisionReason()).isNotEqualTo(RescheduleRequest.CANCELLED_WITH_APPOINTMENT);
+        assertThat(code(() -> cancelled.cancelWithClosure(professional)))
+                .isEqualTo("ConflictException:INVALID_TRANSITION");
+        // La franja propuesta se conserva: liberar su retencion es cosa del caso de uso (RN-09).
+        assertThat(cancelled.proposed()).isEqualTo(pending().proposed());
     }
 }
