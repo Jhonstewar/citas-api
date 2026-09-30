@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Objects;
 
+import com.fcv.citas.domain.schedule.AgendaRules;
 import com.fcv.citas.domain.shared.ConflictException;
 import com.fcv.citas.domain.shared.InvalidRequestException;
 
@@ -174,7 +175,7 @@ public record Appointment(
      * comparacion temporal de la cita: cancelar, aprobar, reprogramar y cerrar la comparten.
      */
     public boolean hasStartedAt(LocalDateTime now) {
-        return !startsAt().isAfter(now);
+        return AgendaRules.hasStarted(startsAt(), now);
     }
 
     /** HU-030 CA-02 y CA-03 (RN-04): rechazo con motivo obligatorio. */

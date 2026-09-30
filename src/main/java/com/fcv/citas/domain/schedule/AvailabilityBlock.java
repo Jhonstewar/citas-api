@@ -21,7 +21,7 @@ public record AvailabilityBlock(
         LocalTime startTime,
         LocalTime endTime) {
 
-    public static final int SLOT_MINUTES = 30;
+    public static final int SLOT_MINUTES = AgendaRules.SLOT_MINUTES;
 
     public AvailabilityBlock {
         Objects.requireNonNull(date, "date");
@@ -39,7 +39,7 @@ public record AvailabilityBlock(
     }
 
     private static void requireGrid(LocalTime time, String field) {
-        if (time.getMinute() % SLOT_MINUTES != 0 || time.getSecond() != 0 || time.getNano() != 0) {
+        if (!AgendaRules.isOnGrid(time)) {
             throw InvalidRequestException.field(field, "Las horas van en intervalos de 30 minutos (:00 o :30)");
         }
     }
@@ -60,7 +60,7 @@ public record AvailabilityBlock(
 
     /** RN-06: el bloque ya empezo (o termino) en el instante dado, hora local del sistema. */
     public boolean hasStartedAt(LocalDateTime now) {
-        return !LocalDateTime.of(date, startTime).isAfter(now);
+        return AgendaRules.hasStarted(LocalDateTime.of(date, startTime), now);
     }
 
     /**
@@ -68,10 +68,6 @@ public record AvailabilityBlock(
      * entera en este bloque (RN-05; D9: los 2 slots de 60 min son del mismo bloque).
      */
     public boolean canHost(LocalTime start, int slots) {
-        if (start.getMinute() % SLOT_MINUTES != 0 || start.getSecond() != 0 || start.isBefore(startTime)) {
-            return false;
-        }
-        LocalTime end = start.plusMinutes((long) SLOT_MINUTES * slots);
-        return !end.isAfter(endTime) && end.isAfter(start);
+        return AgendaRules.fits(startTime, endTime, start, slots);
     }
 }

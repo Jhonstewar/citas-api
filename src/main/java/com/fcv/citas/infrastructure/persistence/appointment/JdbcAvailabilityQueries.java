@@ -13,11 +13,16 @@ import com.fcv.citas.application.appointment.AvailabilityQueries;
 import com.fcv.citas.application.shared.Refs.PersonRef;
 import com.fcv.citas.application.shared.Refs.SiteRef;
 import com.fcv.citas.application.shared.Refs.SpecialtyRef;
+import com.fcv.citas.domain.schedule.AgendaRules;
 
 /**
  * Oferta reservable (HU-022) en una sola consulta (D14). {@code s1} es el primer slot; para 60 min
- * se exige {@code s2}, el slot que empieza 30 min despues en el MISMO bloque (RN-05, D9), y
+ * se exige {@code s2}, el slot que empieza un slot despues en el MISMO bloque (RN-05, D9), y
  * ninguno de los dos puede tener fila en {@code slot_reservations} (RN-01).
+ *
+ * <p>La regla de encaje (slots consecutivos dentro del bloque) es {@link AgendaRules#fits}; este SQL
+ * solo la aplica por eficiencia, con el tamano de slot tomado de {@link AgendaRules#SLOT_MINUTES}, y
+ * {@code SearchBookingEquivalenceIntegrationTest} comprueba que oferta y dominio coinciden.</p>
  */
 @Component
 class JdbcAvailabilityQueries implements AvailabilityQueries {
@@ -33,9 +38,9 @@ class JdbcAvailabilityQueries implements AvailabilityQueries {
             JOIN professional_sites psi ON psi.professional_id = p.id AND psi.site_id = b.site_id
             JOIN sites si ON si.id = b.site_id AND si.active
             LEFT JOIN availability_slots s2 ON s2.availability_block_id = b.id
-                 AND s2.start_time = ADDTIME(s1.start_time, '00:30:00')
+                 AND s2.start_time = ADDTIME(s1.start_time, SEC_TO_TIME(:slotSeconds))
             WHERE NOT EXISTS (SELECT 1 FROM slot_reservations r WHERE r.slot_id = s1.id)
-              AND (sp.duration_minutes = 30 OR (s2.id IS NOT NULL
+              AND (sp.duration_minutes = :slotMinutes OR (s2.id IS NOT NULL
                    AND NOT EXISTS (SELECT 1 FROM slot_reservations r2 WHERE r2.slot_id = s2.id)))
               AND (b.block_date > :today OR (b.block_date = :today AND s1.start_time > :nowTime))
             """;
@@ -94,6 +99,8 @@ class JdbcAvailabilityQueries implements AvailabilityQueries {
                 .addValue("type", appointmentType)
                 .addValue("site", siteId)
                 .addValue("professional", professionalId)
+                .addValue("slotMinutes", AgendaRules.SLOT_MINUTES)
+                .addValue("slotSeconds", AgendaRules.SLOT_MINUTES * 60)
                 .addValue("today", now.toLocalDate())
                 .addValue("nowTime", now.toLocalTime().withNano(0));
     }

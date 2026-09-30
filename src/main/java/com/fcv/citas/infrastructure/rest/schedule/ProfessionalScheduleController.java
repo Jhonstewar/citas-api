@@ -27,6 +27,7 @@ import com.fcv.citas.application.schedule.ManageScheduleUseCase;
 import com.fcv.citas.application.schedule.ManageScheduleUseCase.BlockCommand;
 import com.fcv.citas.application.schedule.ScheduleQueries.BlockView;
 import com.fcv.citas.application.shared.Refs.SiteRef;
+import com.fcv.citas.domain.schedule.AgendaRules;
 import com.fcv.citas.domain.shared.SystemZone;
 import com.fcv.citas.infrastructure.rest.CurrentUser;
 import com.fcv.citas.infrastructure.rest.appointment.AppointmentResponses;
@@ -90,7 +91,7 @@ class ProfessionalScheduleController {
 
     /** {@code editable} = futuro y sin reservas: lo mismo que exige el caso de uso para editar. */
     private static BlockResponse response(BlockView b, LocalDateTime now) {
-        boolean future = LocalDateTime.of(b.date(), b.startTime()).isAfter(now);
+        boolean future = !AgendaRules.hasStarted(LocalDateTime.of(b.date(), b.startTime()), now);
         return new BlockResponse(b.id(), b.date().toString(), AppointmentResponses.time(b.startTime()),
                 AppointmentResponses.time(b.endTime()), b.site(), future && !b.reserved(),
                 b.slots().stream().map(s -> new SlotResponse(s.id(), AppointmentResponses.time(s.startTime()),

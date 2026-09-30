@@ -3,6 +3,7 @@ package com.fcv.citas.domain.catalog;
 import java.util.Locale;
 import java.util.Objects;
 
+import com.fcv.citas.domain.schedule.AgendaRules;
 import com.fcv.citas.domain.shared.ConflictException;
 import com.fcv.citas.domain.shared.InvalidRequestException;
 
@@ -22,7 +23,7 @@ public record Specialty(
         boolean active) {
 
     public static final String GENERAL_MEDICINE_CODE = "MEDICINA_GENERAL";
-    public static final int SLOT_MINUTES = 30;
+    public static final int SLOT_MINUTES = AgendaRules.SLOT_MINUTES;
 
     public Specialty {
         if (code == null || code.isBlank()) {

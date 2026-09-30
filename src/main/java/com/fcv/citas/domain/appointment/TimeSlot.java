@@ -6,6 +6,8 @@ import java.time.LocalTime;
 import java.util.Objects;
 import java.util.function.IntFunction;
 
+import com.fcv.citas.domain.schedule.AgendaRules;
+
 /**
  * Franja concreta de una cita: dia, horas y sede ({@code TimeSlot} del contrato S4). La sede forma
  * parte de la franja porque una reprogramacion puede cambiarla (D21).
@@ -27,7 +29,7 @@ public record TimeSlot(LocalDate date, LocalTime startTime, LocalTime endTime, i
 
     /** Misma regla de "ya empezo" que {@link Appointment#hasStartedAt}: el inicio no es posterior a ahora. */
     public boolean hasStartedAt(LocalDateTime now) {
-        return !startsAt().isAfter(now);
+        return AgendaRules.hasStarted(startsAt(), now);
     }
 
     /** Misma franja: mismo dia, misma hora de inicio y misma sede ({@code SAME_SLOT}). */

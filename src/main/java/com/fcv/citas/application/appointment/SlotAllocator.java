@@ -12,6 +12,7 @@ import com.fcv.citas.domain.catalog.Specialty;
 import com.fcv.citas.domain.catalog.SpecialtyRepository;
 import com.fcv.citas.domain.professional.Professional;
 import com.fcv.citas.domain.professional.ProfessionalRepository;
+import com.fcv.citas.domain.schedule.AgendaRules;
 import com.fcv.citas.domain.schedule.AvailabilityBlock;
 import com.fcv.citas.domain.schedule.BlockRepository;
 import com.fcv.citas.domain.shared.BusinessRuleException;
@@ -70,7 +71,7 @@ final class SlotAllocator {
         if (!professional.worksAt(siteId)) {
             throw new BusinessRuleException("SITE_NOT_ASSIGNED", "El profesional no atiende en esa sede");
         }
-        if (!LocalDateTime.of(date, start).isAfter(SystemZone.now(clock))) {
+        if (AgendaRules.hasStarted(LocalDateTime.of(date, start), SystemZone.now(clock))) {
             throw new BusinessRuleException("PAST_TIME", "No se pueden reservar franjas en el pasado");
         }
         // Serializa la reserva con la edicion/borrado de la agenda del mismo profesional: sin esto,
