@@ -293,8 +293,10 @@ class ProfessionalAgendaIntegrationTest {
 
         List<String> fields = new ArrayList<>();
         item.fieldNames().forEachRemaining(fields::add);
+        // `pendingReschedule` es un booleano de la CITA (D38), no un dato del paciente: se enumera aqui
+        // para que la lista siga siendo cerrada, pero no amplia la proyeccion de D35 / RF-16.
         assertThat(fields).containsExactlyInAnyOrder("id", "status", "statusName", "date", "startTime", "endTime",
-                "durationMinutes", "site", "specialty", "patient", "closable");
+                "durationMinutes", "site", "specialty", "patient", "pendingReschedule", "closable");
         List<String> patientFields = new ArrayList<>();
         item.get("patient").fieldNames().forEachRemaining(patientFields::add);
         assertThat(patientFields).containsExactlyInAnyOrder("fullName", "documentType", "documentNumber");
@@ -511,10 +513,41 @@ class ProfessionalAgendaIntegrationTest {
     // ================================================================== D38
 
     /**
+     * D38 en la agenda: el profesional no puede cerrar a ciegas. La cita con una solicitud de
+     * reprogramacion sin decidir llega con {@code pendingReschedule} en {@code true} y la que no tiene
+     * ninguna, en {@code false}; el campo viaja siempre, para que el dialogo de confirmacion pueda
+     * advertir que cerrar la atencion tambien cancela la solicitud (simetria con D18, donde al paciente
+     * si se le avisa antes de cancelar). Es un booleano de la cita: no toca la proyeccion de D35.
+     */
+    @Test
+    void theAgendaReportsWhetherTheAppointmentHasAPendingRescheduleRequest() throws Exception {
+        long withRequest = seed(profA, hic, monday, "08:00", "APPROVED");
+        long withoutRequest = seed(profA, hic, monday, "10:00", "APPROVED");
+        long proposedBlock = data.block(profA.id(), hic, monday.plusDays(1), "09:00", "10:00");
+        seedPendingReschedule(withRequest, monday, monday.plusDays(1), "09:00",
+                data.slotId(proposedBlock, "09:00"));
+
+        JsonNode body = agendaBody(tokenA, "from=" + monday + "&to=" + monday);
+
+        assertThat(ids(body)).containsExactly(withRequest, withoutRequest);
+        assertThat(body.get(0).get("pendingReschedule").asBoolean()).as("con solicitud PENDING").isTrue();
+        assertThat(body.get(1).get("pendingReschedule").asBoolean()).as("sin solicitud").isFalse();
+        // El paciente ve exactamente lo mismo sobre la misma cita: las dos proyecciones no divergen.
+        mvc.perform(get("/api/patient/appointments/" + withRequest).header(HttpHeaders.AUTHORIZATION, patient))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingReschedule").value(true));
+    }
+
+    /**
      * D38 (igual que D18 para la cancelacion): cerrar la atencion con una reprogramacion {@code PENDING}
      * la cierra en la MISMA transaccion —decisor el profesional, motivo automatico— y libera su
      * retencion, que si no quedaria retenida sin salida (HU-031 CA-05 exige una cita {@code APPROVED}).
      * La franja de la propia cita NO se libera y, por D39, no hay fila de historial extra.
+     *
+     * <p>La respuesta 200 llega ya con {@code pendingReschedule} en {@code false}, porque el caso de uso
+     * relee la vista DESPUES del commit y la solicitud ya quedo decidida. El fake del frontend modela
+     * ese {@code false}: si el caso de uso dejara de releer la vista tras el commit, sin esta asercion la
+     * suposicion compartida entre los dos repos no la sostendria ninguna prueba.</p>
      */
     @Test
     void closingTheCareCancelsThePendingRescheduleAndReleasesItsHold() throws Exception {
@@ -527,7 +560,8 @@ class ProfessionalAgendaIntegrationTest {
         int before = history(id);
 
         close(id, "complete", tokenA).andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.pendingReschedule").value(false));
 
         Map<String, Object> request = rescheduleRow(requestId);
         assertThat(request.get("code")).isEqualTo("CANCELLED");
@@ -545,7 +579,11 @@ class ProfessionalAgendaIntegrationTest {
                 .andExpect(jsonPath("$[*].startTime", hasItem("09:00")));
     }
 
-    /** D38 con la otra salida del cierre: NO_SHOW tambien cierra la solicitud y libera la retencion. */
+    /**
+     * D38 con la otra salida del cierre: NO_SHOW tambien cierra la solicitud y libera la retencion, y su
+     * respuesta 200 tambien llega con {@code pendingReschedule} en {@code false} (ver la hermana
+     * {@link #closingTheCareCancelsThePendingRescheduleAndReleasesItsHold}).
+     */
     @Test
     void markingNoShowAlsoCancelsThePendingReschedule() throws Exception {
         LocalDate yesterday = LocalDate.now(SystemZone.ZONE).minusDays(1);
@@ -554,7 +592,8 @@ class ProfessionalAgendaIntegrationTest {
         long requestId = seedPendingReschedule(id, yesterday, monday, "09:30", data.slotId(futureBlock, "09:30"));
 
         close(id, "no-show", tokenA).andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("NO_SHOW"));
+                .andExpect(jsonPath("$.status").value("NO_SHOW"))
+                .andExpect(jsonPath("$.pendingReschedule").value(false));
 
         assertThat(rescheduleRow(requestId).get("code")).isEqualTo("CANCELLED");
         assertThat(rescheduleRow(requestId).get("decision_reason")).isEqualTo("Cita cerrada por el profesional");

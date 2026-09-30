@@ -1,6 +1,9 @@
 package com.fcv.citas.infrastructure.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,6 +39,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -43,6 +47,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fcv.citas.domain.auth.RefreshTokenHasher;
+import com.fcv.citas.domain.auth.RefreshTokenRepository;
 
 /**
  * HU-006 y HU-007 contra la API real, con la exposicion de laboratorio APAGADA (valor por
@@ -72,6 +77,9 @@ class PasswordRecoveryIntegrationTest {
     private JdbcTemplate jdbc;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    /** Espia sobre el adaptador real: solo se altera en la prueba de atomicidad del restablecimiento. */
+    @MockitoSpyBean
+    private RefreshTokenRepository refreshTokenRepository;
 
     @AfterEach
     void cleanUp() {
@@ -354,6 +362,40 @@ class PasswordRecoveryIntegrationTest {
             mvc.perform(post("/api/auth/refresh").cookie(new Cookie("fcv_refresh", cookie)))
                     .andExpect(status().isUnauthorized());
         }
+    }
+
+    /**
+     * D34 + HU-007: la revocacion de las familias de refresh vive DENTRO de la transaccion del
+     * restablecimiento, no despues. Si falla, no queda un estado a medias: la contraseña sigue siendo
+     * la anterior, el token sigue sin consumir y las sesiones abiertas siguen vivas.
+     *
+     * <p>Protege contra la regresion de sacar {@code refreshTokens.revokeAllForUser(...)} fuera de
+     * {@code tx.inTransaction} en {@code ResetPasswordUseCase}: entonces la contraseña quedaria
+     * cambiada y el token consumido pese al fallo, y estas aserciones fallarian.</p>
+     */
+    @Test
+    void aFailureRevokingTheRefreshFamiliesRollsBackTheWholeReset() throws Exception {
+        String email = uniqueEmail();
+        long userId = register(email);
+        String openSession = refreshCookie(login(email, OLD_PASSWORD).andExpect(status().isOk()).andReturn());
+        String oldHash = passwordHash(userId);
+        String token = seedToken(userId, Duration.ofMinutes(30));
+        doThrow(new IllegalStateException("fallo simulado al revocar las familias de refresh"))
+                .when(refreshTokenRepository).revokeAllForUser(anyLong(), any(), any());
+
+        reset(token, NEW_PASSWORD).andExpect(status().isInternalServerError());
+
+        assertThat(passwordHash(userId)).as("la contraseña no cambio").isEqualTo(oldHash);
+        assertThat(tokenRow(token).get("used_at")).as("el token no se consumio").isNull();
+        assertThat(jdbc.queryForList("SELECT revoked_at FROM refresh_tokens WHERE user_id = ?", userId))
+                .as("las familias de refresh siguen vivas")
+                .hasSize(1).allSatisfy(row -> assertThat(row.get("revoked_at")).isNull());
+        // Y el sistema sigue siendo el de antes: entra la contraseña vieja y no la nueva, la sesion
+        // abierta sigue renovando y el token de restablecimiento se puede volver a presentar.
+        login(email, NEW_PASSWORD).andExpect(status().isUnauthorized());
+        login(email, OLD_PASSWORD).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/refresh").cookie(new Cookie("fcv_refresh", openSession)))
+                .andExpect(status().isOk());
     }
 
     /** CA-09: ni el token ni la contraseña nueva llegan al log, ni al acertar ni al fallar. */

@@ -29,16 +29,23 @@ import com.fcv.citas.infrastructure.rest.CurrentUser;
 @RequestMapping("/api/professional/appointments")
 class ProfessionalAppointmentController {
 
-    /** {@code ProfessionalAppointment} del contrato S4 (sin email ni telefono del paciente, D35). */
+    /**
+     * {@code ProfessionalAppointment} del contrato S4 (sin email ni telefono del paciente, D35).
+     *
+     * <p>{@code pendingReschedule} (siempre presente) es un dato de la CITA, no del paciente: el
+     * profesional necesita saber antes de cerrar que hay una solicitud sin decidir, porque cerrar la
+     * atencion la cancela en la misma transaccion (D38). No amplia la proyeccion reducida de D35 /
+     * RF-16, que sigue limitada a {@code fullName}, {@code documentType} y {@code documentNumber}.</p>
+     */
     record ProfessionalAppointmentResponse(long id, String status, String statusName, String date,
             String startTime, String endTime, int durationMinutes, SiteRef site, SpecialtyRef specialty,
-            ProfessionalPatientRef patient, boolean closable) {
+            ProfessionalPatientRef patient, boolean pendingReschedule, boolean closable) {
 
         static ProfessionalAppointmentResponse from(ProfessionalAppointment a) {
             AppointmentView v = a.appointment();
             return new ProfessionalAppointmentResponse(v.id(), v.status(), v.statusName(), v.date().toString(),
                     AppointmentResponses.time(v.startTime()), AppointmentResponses.time(v.endTime()),
-                    v.durationMinutes(), v.site(), v.specialty(), a.patient(), a.closable());
+                    v.durationMinutes(), v.site(), v.specialty(), a.patient(), v.pendingReschedule(), a.closable());
         }
     }
 
