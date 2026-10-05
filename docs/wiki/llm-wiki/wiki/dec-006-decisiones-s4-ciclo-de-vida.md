@@ -123,6 +123,8 @@ que se hizo. Todo lo de abajo se comprobó el 2026-09-30 contra los ficheros rea
 
 ### S4 cerró cero HU
 
+> **Superado el 2026-10-04.** Esta sección es la foto del 2026-09-30. Tras F10 hay 25 `Completada`, 7 `En validación`, 1 `En desarrollo` y 3 `Borrador`; ver § "Cierre de F10" más abajo. Se conserva como historia.
+
 **HECHO**, leído del frontmatter de los 33 `HU-*.md` de `citas-api/docs/wiki/scrum/`:
 
 | Estado | Nº | Cuáles |
@@ -229,7 +231,7 @@ no se rompió.** Cerrado con `HistoryRowInvariantTest` (reflexión, sin lista qu
 `HistoryWritersArchitectureTest` (bytecode: quién puede componer una fila de historial).
 
 **D40 U — corregida una deriva respecto del PRD en EP-008.** Aprobación **directa del usuario**, no
-delegada. [[EP-008]] reformulaba RF-19 como «cada **decisión** se registra en el historial con actor y
+delegada. [[EP-008-operacion-administrativa-de-solicitudes]] reformulaba RF-19 como «cada **decisión** se registra en el historial con actor y
 origen `ADMIN`», y `PRD.md` §RF-19 dice «**todo cambio de estado de cita** guarda: cita; estado nuevo;
 actor cuando existe; fuente `SYSTEM`, `USER` o `ADMIN`; fecha/hora; motivo opcional». Rechazar una
 reprogramación **no cambia el estado de la cita**, que sigue `APPROVED`, así que el PRD **nunca pidió**
@@ -246,6 +248,29 @@ verificados uno a uno y la prueba manual en navegador de F10.
 abre no tiene prueba concurrente; el aviso `CANCELLED` del frontend descarta `decisionReason` y deja al
 paciente sin explicación; HU-021 no menciona D38 en ninguna parte; y las matrices de HU-021, HU-026 y
 HU-029 siguen sin rellenar.
+
+## Cierre de F10 (2026-10-04)
+
+**HECHO** (verificado contra los ficheros el 2026-10-04): frontmatter de los 36 `HU-*.md` = 25 `Completada`,
+7 `En validación` (HU-005, 007, 009, 011, 012, 022, 028), HU-033 `En desarrollo` y 3 `Borrador`
+(HU-034..036). Suites tras F10: backend **521/521** (513 + 8) y frontend **256/256** (248 + 8).
+Las 8 pruebas de backend están en `SpecialtyAdminIntegrationTest` (+21 líneas), `BookingIntegrationTest`
+(+29) y `FlywayV10BackfillTest` (archivo nuevo, 4 `@Test`); las 8 de frontend en
+`citas-web/src/recoveryAndReschedule.test.tsx` (nuevo, 8 casos). **Sin cambios de producción.**
+`citas_fcv_migrations_v10_check` es el esquema desechable de `FlywayV10BackfillTest`
+(`FlywayV10BackfillTest.java:26`), no una base del proyecto. Las cifras 521 y 256 las aportó el cierre
+de F10; esta página solo verificó que las pruebas existen y suman 8 + 8.
+
+**Decisiones directas del usuario (2026-10-04), no delegadas:**
+
+| Decisión | Efecto | Alternativa descartada |
+|---|---|---|
+| **HU-009 CA-03 = 200 idempotente** al repetir el plan vigente (confirma D26) | contrato y criterio coinciden; ya no es divergencia ([[contrato-rest-citas]], [[contrato-rest-identidad]]) | 409, como pedía el criterio original |
+| Se **confirman** las reescrituras de **HU-012 CA-03**, **HU-008 DoD de ownership** y **HU-006 DoD de migración** | dejan de ser textos provisionales del agente | volver a la redacción previa |
+| **HU-012 CA-02 = EPS inexistente 404 `NOT_FOUND`** | respaldado por `aPlanOfAMissingEpsIsNotFound` (HU-012, matriz) | 400/422 |
+| **HU-032 CA-07 solo por API**; la pantalla de admin para el historial queda **fuera de alcance** | se cumple con `JdbcAppointmentQueries#history` | construir la pantalla |
+
+**Queda abierto:** ver [[sintesis-preguntas-abiertas]] § "Tras F10 (2026-10-04)".
 
 ## Consecuencias
 
@@ -267,6 +292,7 @@ HU-029 siguen sin rellenar.
 
 ## Historial
 
+- 2026-10-04 — añadida "Cierre de F10": estado y cifras tras F10, decisiones directas del usuario sobre HU-009/012/008/006/032 y aviso de que "Estado real de S4" quedó superado. Enlace roto `[[EP-008]]` corregido en el LINT.
 - 2026-09-30 — añadida la sección "Estado real de S4": cero HU cerradas, las 11 `Aprobada` sin
   verificar, el defecto de las casillas de F10, LOOP_02 a medias y el merge a `main` con S4 a medio
   verificar. Ninguna decisión D15–D39 cambia.

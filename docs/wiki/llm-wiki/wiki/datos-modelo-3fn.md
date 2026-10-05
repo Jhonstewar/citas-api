@@ -66,8 +66,8 @@ inserta la afiliación en la misma transacción que la cuenta — ver
 
 ### Cómo se prueba el esquema
 
-- **Desde cero.** `FlywayMigratesEmptySchemaTest` crea un esquema desechable, aplica V1–V7 sobre
-  él, valida y cuenta 24 tablas; después lo borra. Así una migración que solo funcione sobre una
+- **Desde cero.** `FlywayMigratesEmptySchemaTest` crea un esquema desechable, aplica V1–V10 sobre
+  él (`containsExactly("1".."10")`, línea 116), valida y cuenta 24 tablas; después lo borra. Así una migración que solo funcione sobre una
   base ya migrada no pasa desapercibida.
 - **Base propia de pruebas.** Las pruebas de integración usan `citas_fcv_training_test`, no la
   base de desarrollo `citas_fcv_training`. La crea `scripts/init-test-db.ps1` en la raíz, y el
@@ -250,6 +250,7 @@ usuario no las ha confirmado, pero ya no son huecos del esquema.
 
 ## Historial
 
+- 2026-10-04 — C5 reconfirmada: `database/reference/` tiene `README_DB.md`, `erd.mmd` y el ERD, y **no** `db.sql`. Nota de entorno: `FlywayV10BackfillTest` usa el esquema desechable `citas_fcv_migrations_v10_check` (`FlywayV10BackfillTest.java:26`); no es una base de trabajo.
 - 2026-09-30 — **F10: comparación real contra `database/reference/`** (`erd.mmd` y `README_DB.md`;
   `db.sql` no existe). Equivalencias, diferencias justificadas con decisiones existentes,
   evaluación 3FN y anti doble reserva. Preguntas nuevas C1–C6.

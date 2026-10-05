@@ -2,7 +2,7 @@
 titulo: "Síntesis — Preguntas abiertas del dominio"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-30
+actualizado: 2026-10-04
 fuentes: ["citas-api/docs/wiki/scrum/historias-de-usuario/", "PRD.md", "[[MODELO-DATOS-3FN]]", "PLAN_RETOMA_S4.md §4 F10"]
 tags: [sintesis, preguntas-abiertas, dominio]
 ---
@@ -118,6 +118,12 @@ hace ninguna llamada de escritura.
 
 ## Defectos de especificación que salieron al cerrar S3 (2026-09-23)
 
+> **Actualizado en el LINT del 2026-10-04** (la tabla es historia): **S1 cerrada** por `V8` (nombre único
+> de especialidad; ver [[dec-006-decisiones-s4-ciclo-de-vida]]). **S3 mitigada**: `AgendaRules` es la fuente
+> única de la agenda (LOOP_03) y `SearchBookingEquivalenceIntegrationTest` compara búsqueda y reserva, pero
+> la búsqueda conserva su propia codificación SQL de la regla de duración, así que sigue como pregunta
+> F10-1 en "Tras F10". **S2**: no se re-verificó en este LINT y se deja como está.
+
 Los tres aparecieron al exigir evidencia HU por HU, no al escribir el código: son casos donde una
 Definition of Done pide algo que la implementación no cumple, y por eso su HU **no** cerró.
 Verificados contra el esquema y el código, no deducidos.
@@ -162,6 +168,7 @@ y lo que pasó. El detalle y las pruebas están en
 
 ## Historial
 
+- 2026-10-04 — añadida "Tras F10" (F10-1..F10-6), R3 respondida, S1/S3 de S3 anotadas como cerrada/mitigada (LINT y LEARN del cierre de F10).
 - 2026-09-30 — añadidas R1–R4 al retomar S4: el defecto de las casillas de F10, `main` con trabajo a
   medio verificar, las 11 HU `Aprobada` sin verificación independiente y la comparación 3FN que
   sigue pendiente. El mismo día se cerraron R1 (casillas saneadas) y R2 (el usuario deja `main` como
@@ -192,6 +199,29 @@ van a F10. Detalle y evidencia en `evidencias/s4/loops/LOOP-02/iter-2-verifier.j
 
 - 2026-09-30 — añadidas R5–R12 al cerrar el LOOP_02. R1 y R2 quedaron cerradas ese mismo día; R3 pasó
   a parcialmente respondida (3 de 11 HU verificadas); R4 sigue abierta.
+
+## Tras F10 (2026-10-04)
+
+Estado verificado contra los ficheros; decisiones en [[dec-006-decisiones-s4-ciclo-de-vida]] § "Cierre
+de F10". **R3 queda respondida**: hoy no hay ninguna HU `Aprobada`; son 25 `Completada` y 7 `En validación`.
+
+**Cerradas por decisión directa del usuario:** HU-009 CA-03 = 200 idempotente (D26); reescrituras de
+HU-012 CA-03, HU-008 DoD de ownership y HU-006 DoD de migración; HU-012 CA-02 = 404 `NOT_FOUND`; HU-032 CA-07
+solo por API (pantalla de historial para ADMIN fuera de alcance).
+
+**Abiertas:**
+
+| # | Pregunta | Detalle |
+|---|---|---|
+| F10-1 | HU-022: la búsqueda tiene su **propia codificación SQL** de la regla de duración, atada solo por `SearchBookingEquivalenceIntegrationTest` (`:90`, `searchOffersExactlyWhatTheDomainAndTheBookingAccept`). ¿Basta la prueba de equivalencia o se unifica? | Reformulación de S3 de arriba. Decide el usuario |
+| F10-2 | La carrera «cerrar la atención» contra «decidir la reprogramación» sigue **sin prueba concurrente** (= R5; [[dec-006-decisiones-s4-ciclo-de-vida]] ya lo declara) | `NO VERIFICABLE`, no fallo |
+| F10-3 | `database/reference/db.sql` **no existe** (= C5 de [[datos-modelo-3fn]]); sin él no se comparan columnas no clave | ¿Lo aporta el trainer? |
+| F10-4 | El `.env.example` de la raíz lleva contraseñas de MySQL de laboratorio (valores no copiados aquí) | ¿Se acepta como laboratorio o se sustituyen por marcadores? |
+| F10-5 | Riesgo **R-1 de HU-032**: filas históricas rotuladas «Reprogramada» (rechazos previos a D39 con fila `APPROVED`) | No verificable sin consultar la BD de cada entorno |
+| F10-6 | Criterios que **solo se confirman en navegador**: las 7 HU `En validación` | Prueba manual pendiente |
+
+**Entorno (HECHO, 2026-10-04):** con el `.env` de esta máquina el proyecto Docker aparece como
+`fcv-citas-training` y MySQL en **3307**, no `fcv-citas-v1`/3308; ver [[riesgo-dos-copias-mismo-proyecto-docker]].
 
 ## S5–S6 (n8n): decisiones y preguntas abiertas al planificar (2026-09-30)
 

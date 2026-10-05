@@ -108,6 +108,27 @@ class SpecialtyAdminIntegrationTest {
                 .isZero();
     }
 
+    // CA-02 en PUT: la duracion invalida se rechaza y la fila no cambia
+    @ParameterizedTest
+    @ValueSource(ints = { 45, 0, -30 })
+    void updateRejectsDurationOtherThan30Or60AndLeavesTheRowUnchanged(int duration) throws Exception {
+        String code = code();
+        int id = createdId(code, "SPECIALIZED", 60);
+        Map<String, Object> before = jdbc.queryForMap(
+                "SELECT name, appointment_type_id, duration_minutes FROM specialties WHERE id = ?", id);
+
+        mvc.perform(put("/api/admin/specialties/" + id).header(HttpHeaders.AUTHORIZATION, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("name", "Nombre nuevo " + code,
+                        "appointmentType", "GENERAL", "durationMinutes", duration))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.durationMinutes").value("Solo se admiten 30 o 60 minutos"));
+
+        assertThat(jdbc.queryForMap(
+                "SELECT name, appointment_type_id, duration_minutes FROM specialties WHERE id = ?", id))
+                .isEqualTo(before);
+    }
+
     @Test
     void rejectsDuplicateCodeWith409() throws Exception {
         String code = code();

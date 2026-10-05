@@ -275,3 +275,13 @@ Prefijo `jhonNuñez-`, inactivos y en modo prueba. Data Table `iqNu0V8hyF7mXAau`
 
 ## [2026-09-30] learn | Runbook de ejecución S5–S6 y datos de conexión del MCP de n8n
 Creado `PLAN_EJECUCION_S5_S6.md` (raíz). HECHO verificado en el código: los casos de uso que aprueban, rechazan y cancelan ya releen el detalle tras `tx.inTransaction`, ese es el punto para publicar el evento de WF-002, sin tocar esquema ni `citas-web`. HECHO de entorno: el MCP de n8n se conecta con `claude mcp add --transport http n8n https://impulso-n8n.aiacademy.com.co/mcp-server/http` y se autentica desde `/mcp`. DECISIÓN: las HU de EP-010 **no** se aprueban por inferencia; hace falta la frase explícita del usuario (se revirtió un registro de aprobación escrito por error). Los JSON de los flujos aún no están versionados: se exportan en la Fase 4.
+
+## [2026-10-04] learn | F10 de S4: verificación independiente, 8+8 pruebas y decisiones de HU
+- HECHO verificado en frontmatter y `src`: 25 `Completada`, 7 `En validación` (HU-005, 007, 009, 011, 012, 022, 028), HU-033 `En desarrollo`, HU-034..036 `Borrador`. Backend 521/521 y frontend 256/256 (cifras del cierre de F10; las 8+8 pruebas nuevas existen, sin cambios de producción).
+- DECISIÓN directa del usuario: HU-009 CA-03 = 200 idempotente (D26); confirmadas las reescrituras de HU-012 CA-03, HU-008 DoD ownership y HU-006 DoD migración; HU-012 CA-02 = 404; HU-032 CA-07 solo por API.
+- PREGUNTAS ABIERTAS F10-1..F10-6 en [[sintesis-preguntas-abiertas]] (búsqueda HU-022, carrera cerrar/decidir, `db.sql`, `.env.example`, R-1 de HU-032, criterios solo en navegador). Entorno: `fcv-citas-training`/3307; `citas_fcv_migrations_v10_check` es esquema desechable. Páginas: [[dec-006-decisiones-s4-ciclo-de-vida]], [[sintesis-preguntas-abiertas]], [[datos-modelo-3fn]], [[riesgo-dos-copias-mismo-proyecto-docker]], `index.md`.
+
+## [2026-10-04] lint | Cifras e índice al día tras F10; enlace roto de EP-008; defectos de S3 anotados
+- Corregido: `[[EP-008]]` roto en dec-006 (el archivo es `EP-008-operacion-administrativa-de-solicitudes`); cobertura del índice 14 → 15 páginas; cifras e HU por estado del índice (las viejas quedan como "historia"); "Estado real de S4" marcado superado; S1/S3 de S3 anotados como cerrada/mitigada.
+- Sin huérfanas ni secretos. Los enlaces a `RES-001`/`MODELO-DATOS-3FN` apuntan a `raw/` (válidos). Dudoso, sin tocar: `[[EP-008]]` sigue escrito así en la entrada de log del 2026-09-30 (append-only); la ambigüedad de raíz de la bóveda de Obsidian sigue abierta.
+

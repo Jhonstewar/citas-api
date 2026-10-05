@@ -317,6 +317,35 @@ class BookingIntegrationTest {
                 .andExpect(jsonPath("$.code").value("SPECIALTY_NOT_ASSIGNED"));
     }
 
+    /**
+     * HU-011 CA-09: la duracion sale siempre de la especialidad. Un cliente que mande
+     * {@code durationMinutes} (u otro alias) en el cuerpo de la reserva no la altera.
+     */
+    @Test
+    void durationInTheBookingBodyIsIgnoredAndComesFromTheSpecialty() throws Exception {
+        Map<String, Object> general30 = body(gp, general, day, "08:00");
+        general30.put("durationMinutes", 60);
+        general30.put("duration", 60);
+        general30.put("endTime", "10:00");
+        book("general", patientToken, general30)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.durationMinutes").value(30))
+                .andExpect(jsonPath("$.endTime").value("08:30"));
+
+        Map<String, Object> specialized60 = body(cardiologist, cardiology, day, "08:00");
+        specialized60.put("durationMinutes", 30);
+        specialized60.put("duration", 30);
+        specialized60.put("endTime", "08:30");
+        String response = book("specialized", patientToken, specialized60)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.durationMinutes").value(60))
+                .andExpect(jsonPath("$.endTime").value("09:00"))
+                .andReturn().getResponse().getContentAsString();
+        long id = json.readTree(response).get("id").asLong();
+        assertThat(jdbc.queryForList("SELECT slot_order FROM slot_reservations WHERE appointment_id = ?"
+                + " ORDER BY slot_order", Integer.class, id)).containsExactly(1, 2);
+    }
+
     /** CA-09: solo USER agenda; el titular es el del token aunque el cuerpo diga otro. */
     @Test
     void onlyUsersBookAndAlwaysForThemselves() throws Exception {

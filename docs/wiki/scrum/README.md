@@ -171,16 +171,13 @@ Validación de las 18 HU en desarrollo, criterio por criterio, con la evidencia 
 | [[HU-030-aprobar-o-rechazar-cita-especializada]] | Aprobar o rechazar una cita especializada |
 | [[HU-032-auditar-cambios-de-estado-de-cita]] | Auditar cambios de estado de cita |
 
-**6 siguen abiertas**, con lo que falta a cada una:
+**6 quedaron abiertas al cierre de S3.** Los bloqueos de cinco de ellas ya los resolvió el código en S4 y se retiran de esta tabla (el estado vigente de cada una está en «Verificación independiente de F10», más abajo); solo sigue como bloqueo de S3 la última:
 
 | HU | Estado | Qué falta |
 |---|---|---|
-| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | `En validación` | CA-06 / RF-16 (el profesional ve datos de sus pacientes) depende de [[HU-020-consultar-agenda-de-citas-aprobadas]]; la mitad de escritura de CA-05 necesita operaciones del paciente sobre citas existentes; falta el componente reutilizable de ownership que pide la DoD |
-| [[HU-011-gestionar-especialidades-y-su-duracion]] | `En validación` | Falta la restricción de base de datos de **nombre único**: la unicidad solo vive en la aplicación. Requiere una migración posterior a V7 |
-| [[HU-016-activar-o-desactivar-profesional]] | `En validación` | Activar y desactivar no son operaciones del dominio, sino una actualización genérica del campo `active`; y no hay prueba de conservación de citas al desactivar |
-| [[HU-022-buscar-disponibilidad-con-filtros]] | `En validación` | CA-03 exige excluir una franja retenida por una reprogramación `PENDING`, que no tiene productor; y la regla de consecutividad de 60 minutos está duplicada en el dominio y en SQL |
-| [[HU-029-consultar-bandeja-administrativa]] | `En validación` | La mitad de reprogramaciones de CA-01 y CA-04 no existe en S3; queda pendiente decidir a qué franja se refieren los filtros de una reprogramación |
 | [[HU-033-publicar-contrato-rest-documentado]] | `En desarrollo` | **Abierta por diseño:** artefacto vivo que crece con cada endpoint. Al corte de S3 cubre identidad y todo S3; le faltan recuperación de contraseña, perfil, EPS y planes, agenda de citas aprobadas, cierre de atención, cancelación y reprogramación. Además, INC-038 e INC-040 los decidió el agente y conviene que el usuario los confirme |
+
+**Bloqueos de S3 retirados el 2026-10-04** (ya resueltos por el código de S4; no implican que la HU esté cerrada): [[HU-005-autorizar-peticiones-por-rol-y-ownership]] (componente `Ownership`, CA-06 con la agenda, escritura de CA-05), [[HU-011-gestionar-especialidades-y-su-duracion]] (nombre único con `V8`; la HU no se reevalúa aquí), [[HU-016-activar-o-desactivar-profesional]] (operaciones de dominio y prueba de conservación de citas; ahora `Completada`), [[HU-022-buscar-disponibilidad-con-filtros]] (productor de retenciones de reprogramación y equivalencia de la regla de 60 minutos) y [[HU-029-consultar-bandeja-administrativa]] (mitad de reprogramaciones; ahora `Completada`).
 
 [[HU-009-registrar-afiliacion-a-eps-y-plan]] no entró en esta validación: su primer corte (afiliación opcional al registrarse) se implementó el 2026-09-23, pero su alcance incluye consulta y edición desde el perfil, que todavía no existe.
 
@@ -251,6 +248,36 @@ La iteración 2 del LOOP_02 terminó con el comportamiento del backend en **PASS
 **Deriva respecto del PRD, corregida con aprobación directa del usuario (2026-09-30).** Cinco textos decían que **cada decisión** de ADMIN sobre una reprogramación se registra en el historial: «Contexto y descripción», la viñeta de «Alcance» y la tarea T-03 de [[HU-031-aprobar-o-rechazar-reprogramacion]], y en [[EP-008-operacion-administrativa-de-solicitudes]] la regla de RF-19 y la casilla del criterio de completitud. **RF-19 no dice eso:** dice «Todo cambio de estado de cita guarda: cita; estado nuevo; actor cuando existe; fuente `SYSTEM`, `USER` o `ADMIN`; fecha/hora; motivo opcional» (`PRD.md` §RF-19). Rechazar una reprogramación no cambia el estado de la cita —sigue `APPROVED`—, de modo que RF-19 nunca pidió una fila para el rechazo: la exigencia la había introducido la épica al reformular el requisito, y fue la que justificó D22. Los cinco textos se alinearon citando RF-19 y registrando D39 como la decisión que lo respeta. **No se relajó ningún requisito: se volvió al PRD.** [[HU-030-aprobar-o-rechazar-cita-especializada]] no cambia, porque allí la decisión sí cambia el estado de la cita.
 
 Estado global tras esta iteración: 16 `Completada`, 8 `Aprobada`, 8 `En validación` y 1 `En desarrollo`.
+
+## Verificación independiente de F10 (2026-10-04)
+
+Backend verificado leyendo código y pruebas (suite **513/513**) y frontend con vitest **248/248**, typecheck, lint y build limpios. Regla aplicada: una HU pasa a `Completada` solo con la matriz completa y **toda** la DoD en `Cumple`; con un ítem `No verificable` o en FAIL se queda `En validación` con la causa escrita en su ficha.
+
+**Decisiones directas del usuario (2026-10-04):** HU-009 CA-03 se confirma como 200 idempotente (reescritura por D26), y con ella las reescrituras de HU-012 CA-03, HU-008 (DoD de ownership) y HU-006 (DoD de migración); HU-012 CA-02 se reformula (EPS inexistente = `404 NOT_FOUND`, porque la EPS viaja en la ruta) y pasa a PASS; HU-032 CA-07 se cumple solo por API y la pantalla de administrador para el historial queda **fuera de alcance**.
+
+**Pasan a `Completada` (7):** [[HU-008-consultar-y-actualizar-perfil]], [[HU-016-activar-o-desactivar-profesional]], [[HU-020-consultar-agenda-de-citas-aprobadas]], [[HU-021-registrar-cierre-de-atencion]], [[HU-026-cancelar-una-cita-futura]], [[HU-029-consultar-bandeja-administrativa]] y [[HU-031-aprobar-o-rechazar-reprogramacion]].
+
+**Siguen `En validación`, con su causa:**
+
+| HU | Causa |
+|---|---|
+| [[HU-005-autorizar-peticiones-por-rol-y-ownership]] | Backend completo (CA-05, CA-06 y DoD de ownership y RF-16 en PASS). CA-08 solo falta en navegador real: escribir a mano la URL de una ruta de otro rol |
+| [[HU-007-restablecer-contrasena-con-token]] | Todo PASS salvo la prueba e2e en navegador de la pantalla (el backend la cubre por API en `PasswordRecoveryExposedTokenIntegrationTest`) |
+| [[HU-009-registrar-afiliacion-a-eps-y-plan]] | CA-05 y el ítem de DoD de la lista de planes: no se puede confirmar sin navegador que un plan inactivo no aparece. Paso manual: desactivar un plan y abrir `/paciente/perfil` y `/registro` |
+| [[HU-012-gestionar-eps-y-planes]] | CA-04, mitad de interfaz, por la misma causa que HU-009 |
+| [[HU-022-buscar-disponibilidad-con-filtros]] | PASS con matiz: la búsqueda tiene su propia codificación SQL de la regla de 60 minutos, atada al dominio por `SearchBookingEquivalenceIntegrationTest:90` (64 escenarios), no una única implementación. **Decisión pendiente del usuario** |
+| [[HU-028-decidir-sobre-cita-tras-rechazo-de-reprogramacion]] | CA-02 sin operación de «conservar» (solo se prueba que consultar no escribe) y diferencia visual de franjas solo comprobable en navegador |
+| [[HU-011-gestionar-especialidades-y-su-duracion]] | Segunda pasada: backend PASS (CA-02, CA-09 y la migración `V8` de nombre único). CA-06 y CA-07 en frontend no se pueden confirmar sin navegador (`BookingPage.tsx:63` usa `getActiveSpecialties` sin prueba del filtrado). Paso manual: desactivar una especialidad y abrir `/paciente/agendar` |
+
+**Segunda pasada (2026-10-04, suites vigentes: backend 521/521, frontend 256/256):** [[HU-006-solicitar-recuperacion-de-contrasena]] y [[HU-027-solicitar-reprogramacion-de-cita-aprobada]] pasan a `Completada`. HU-006 registra la confirmación directa del usuario de la reescritura de su DoD de migración; HU-027 anota el matiz de que `FlywayV10BackfillTest` valida el backfill de V10 (D31), no la V3 que cita la DoD.
+
+**[[HU-032-auditar-cambios-de-estado-de-cita]]** sigue `Completada` (PASS con D39): se corrigieron la fila de la «única puerta» (`rescheduleTo` es una segunda puerta deliberada) y la nota de «dos transiciones». El riesgo R-1 (filas históricas rotuladas «Reprogramada») sigue no verificable sin consultar la base de datos.
+
+**HU-001 a HU-004** siguen `Completada`: el código estaba bien y el texto mentía. Se corrigieron HU-003 y HU-004 (el refresh token ya no va en el cuerpo ni en `@RequestBody`: va en la cookie `HttpOnly` `fcv_refresh`, D36), se añadió D36 a HU-002, HU-003 y HU-004, y en HU-001 se corrigió la afirmación de que no se aplica política de contraseña (falso desde D29) y su matriz (`@PasswordPolicyCompliant` en lugar de `@BcryptPasswordLength`; suite vigente en lugar de «104 pruebas»). En HU-006 y HU-007 se corrigieron las líneas de `PasswordRecoveryIntegrationTest` (+8 de desfase).
+
+**Observaciones sin cambio de estado:** la carrera «cerrar atención» contra «decidir reprogramación» no tiene prueba concurrente ([[HU-021-registrar-cierre-de-atencion]], [[HU-031-aprobar-o-rechazar-reprogramacion]]; `dec-006` la declara abierta), y el `.env.example` de la raíz trae contraseñas de MySQL de laboratorio concretas ([[HU-001-registrar-cuenta-de-usuario]] ya lo anota como riesgo no bloqueante).
+
+**Estado global tras la segunda pasada:** 25 `Completada`, 7 `En validación` (HU-005, 007, 009, 011, 012, 022 y 028), 1 `En desarrollo` ([[HU-033-publicar-contrato-rest-documentado]], abierta por diseño) y 3 `Borrador` (HU-034 a HU-036); total 36.
 
 ## EP-010 — Automatizaciones n8n (especificada el 2026-09-30, sin aprobar)
 

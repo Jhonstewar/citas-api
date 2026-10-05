@@ -36,7 +36,7 @@ Pertenece al alcance de la sesión S2.
 
 ## Alcance
 
-- Endpoint de cierre de sesión en `citas-api` que recibe el refresh token y revoca su familia (la sesión de ese dispositivo), incluido el registro presentado.
+- Endpoint de cierre de sesión en `citas-api` que lee el refresh token de la cookie `HttpOnly` `fcv_refresh` (D36), revoca su familia (la sesión de ese dispositivo), incluido el registro presentado, y borra la cookie.
 - Comportamiento idempotente del logout ante un refresh token ya revocado o inexistente.
 - Verificación cruzada de que un refresh token revocado ya no permite renovar, apoyada en el endpoint de [[HU-003-renovar-sesion-con-refresh-token]].
 - Acción de cerrar sesión en `citas-web` que invoca el endpoint, elimina el estado de sesión del cliente y redirige al login.
@@ -82,7 +82,7 @@ Pertenece al alcance de la sesión S2.
 
 - [ ] **T-03 — Exponer el adaptador REST de logout**
   Dificultad: Bajo
-  Descripción: Controlador que recibe el refresh token en el cuerpo de la petición, nunca en la ruta ni en la cadena de consulta, y devuelve una respuesta uniforme sin contenido sensible en todos los casos.
+  Descripción: Controlador sin cuerpo que lee el refresh token de la cookie `HttpOnly` `fcv_refresh` (D36), nunca del cuerpo, de la ruta ni de la cadena de consulta —un token enviado en el cuerpo se ignora y no revoca nada—, borra la cookie y devuelve una respuesta uniforme sin contenido sensible en todos los casos.
 
 - [ ] **T-04 — Implementar el cierre de sesión en citas-web**
   Dificultad: Bajo
@@ -153,7 +153,7 @@ Condición del verificador frontend cumplida: la evidencia de `citas-web` está 
 | CA-03 | Cumple | `AuthFlowIntegrationTest#logoutRevokesRefreshTokenAndIsIdempotent` | El segundo logout responde otra vez 204 y `revoked_at` no cambia. Solo backend |
 | CA-04 | Cumple | `AuthFlowIntegrationTest#logoutWithUnknownTokenAnswersLikeARealLogoutAndTouchesNoRow` | Misma respuesta que un logout real y ninguna fila tocada. Solo backend |
 | CA-05 | Cumple | `citas-web/src/sessionFlow.test.tsx > flujo de sesión en la aplicación > HU-004 CA-05: cerrar sesión revoca el refresh token y vuelve al login`; `citas-web/src/auth/sessionManager.test.ts > sessionManager — expire > cierra la sesión si el token rechazado es el vigente`; `citas-web/src/sessionFlow.test.tsx > flujo de sesión en la aplicación > un logout mientras hay una renovación en vuelo no se deshace cuando esta responde` | Tras cerrar sesión se muestra el login y volver a `/` exige autenticarse de nuevo, sin otra llamada a `/api/me`. Solo frontend |
-| CA-06 | Cumple | Backend: `CapturedOutput` en `AuthFlowIntegrationTest#logoutRevokesRefreshTokenAndIsIdempotent` y `#logoutWithUnknownTokenAnswersLikeARealLogoutAndTouchesNoRow`. Frontend: la prueba `HU-004 CA-05` de `citas-web/src/sessionFlow.test.tsx` exige el cuerpo `{ refreshToken: 'refresh-1' }` y ninguna cabecera `Authorization` | Logout correcto y con token inexistente; el token nunca va en la ruta |
+| CA-06 | Cumple | Backend: `CapturedOutput` en `AuthFlowIntegrationTest#logoutRevokesRefreshTokenAndIsIdempotent` y `#logoutWithUnknownTokenAnswersLikeARealLogoutAndTouchesNoRow`. **Desde D36 el token va en la cookie `HttpOnly` `fcv_refresh`, no en el cuerpo:** `AuthFlowIntegrationTest:1015` `logoutRevokesTheWholeFamilyOfTheCookieAfterRotation` y `:1031` `logoutIgnoresATokenSentInTheBody`. Frontend: la prueba `HU-004 CA-05` de `citas-web/src/sessionFlow.test.tsx:308` (con la aserción de `:324-326`: logout **sin cuerpo** y `credentials: 'include'`, de modo que el servidor revoca la familia de la cookie) | Logout correcto y con token inexistente; el token nunca va en la ruta ni en el cuerpo |
 | DoD — CA-01 a CA-06 validados con evidencia concreta | Cumple | Filas CA-01 a CA-06 de esta tabla | — |
 | DoD — Revocación sobre la columna de V1, sin migración nueva | Cumple | Migraciones V1–V4 intactas; `refresh_tokens` de `V1__identity_and_fixed_catalogs.sql` | — |
 | DoD — Prueba encadenada login, logout e intento de renovación | Cumple | `AuthFlowIntegrationTest#logoutRevokesRefreshTokenAndIsIdempotent` | Es la misma prueba de CA-02 |
@@ -165,6 +165,7 @@ Condición del verificador frontend cumplida: la evidencia de `citas-web` está 
 
 ## Historial de validación
 
+- 2026-10-04 — **Corrección documental tras la verificación independiente de F10 (sin cambio de estado: sigue `Completada`).** El código estaba bien y el texto mentía: la tarea T-03, el alcance y la fila de evidencia de CA-06 decían que el refresh token llega en el cuerpo (`@RequestBody`). Desde **D36** (2026-09-25) viaja solo en la cookie `HttpOnly` `fcv_refresh`, el logout no tiene cuerpo y un token enviado en el cuerpo se ignora y no revoca. Se reescriben esas líneas con la evidencia vigente (`AuthFlowIntegrationTest:1015`, `:1031`; `sessionFlow.test.tsx:308`, `:324-326`). Ningún criterio de aceptación cambia. Queda anotado, sin reescribir, que la fila «Contrato de cierre de sesión documentado» menciona `@Size(max = 256)` en `RefreshTokenRequest`, dato de la verificación del 2026-09-17 anterior a D36.
 - 2026-09-17 — Estado `Completada`: matriz de evidencia completa y toda la DoD en `Cumple`, según la verificación independiente de backend y frontend (con prueba de mutación). Cierre dentro de la aprobación delegada de S2 (`AGENTS.md` §6).
 - 2026-09-17 — Estado `En validación` (paso previo al cierre): backend-verifier relee [[contrato-rest-identidad]] contra el código y sus sondas HTTP tras la corrección de D2 y no encuentra divergencias; la fila "DoD — Contrato de cierre de sesión documentado" pasa de `Pendiente` a `Cumple`. Se comprueba con `git log` que la evidencia de `citas-web` está commiteada en `develop` (commit `f3e7989`). Matriz: 14 de 14 filas en `Cumple`. Se marcan los ítems de la DoD, cada uno respaldado por su fila de la matriz.
 - 2026-09-17 — Tabla de evidencia reescrita a partir de la verificación independiente (backend-verifier y frontend-verifier, con prueba de mutación). Estado sin cambios (`Aprobada`). 14 filas (6 CA y 8 ítems de DoD): 13 `Cumple` y 1 `Pendiente` (contrato, a la espera de que el verificador confirme la corrección de D2). CA-02 se apoya ahora en la prueba de integración encadenada, no solo en la del caso de uso. La DoD de la acción para los tres roles pasa de `Parcial` a `Cumple` por construcción (la ruta `/` no filtra por rol), aunque solo se ha probado con `USER`.
@@ -174,6 +175,7 @@ Condición del verificador frontend cumplida: la evidencia de `citas-web` está 
 
 ## Notas y decisiones
 
+- **D36 (2026-09-25, provisional bajo delegación):** el refresh token deja de viajar en el cuerpo y pasa a la cookie `HttpOnly` `fcv_refresh`; el logout pasa a ser una petición sin cuerpo con `credentials: 'include'` ([[dec-006-decisiones-s4-ciclo-de-vida]], [[dec-002-rotacion-refresh-tokens]]). Afecta al transporte, no a la revocación por familia ni a la idempotencia.
 - El PRD no exige invalidar el access token ya emitido al cerrar sesión. Esta HU asume que el access token caduca por sí solo gracias a su corta duración (RF-02); si se decidiera invalidarlo de inmediato haría falta una lista de tokens revocados, que no está contemplada.
 - Alcance de la revocación (**implementado**, [[dec-002-rotacion-refresh-tokens]]): el PRD no indica si el logout debe revocar todos los refresh tokens del usuario o solo el presentado. El logout revoca la familia completa del refresh token presentado —la cadena de refresh tokens nacida de un login, es decir, la sesión de ese dispositivo—, no solo ese registro y no las sesiones de otros dispositivos. Es coherente con cerrar sesión en un dispositivo concreto y, con la rotación de [[HU-003-renovar-sesion-con-refresh-token]], asegura que ningún refresh token anterior o posterior de esa sesión siga sirviendo aunque el cliente presente uno ya rotado. La decisión sigue `Provisional` hasta que el usuario la confirme.
 - Incógnita abierta **INC-003** (ver [[EP-001-identidad-y-acceso-seguro]]): al no estar decidido si `ADMIN` y `PROFESSIONAL` usan la misma entrada de sesión, la acción de cerrar sesión se describe común para los tres roles y deberá revisarse si se separan las entradas.

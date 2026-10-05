@@ -2,7 +2,7 @@
 titulo: "Índice de la LLM Wiki"
 tipo: sintesis
 estado: Vigente
-actualizado: 2026-09-30
+actualizado: 2026-10-04
 tags: [indice]
 ---
 
@@ -16,6 +16,11 @@ Historia cronológica: [[log]].
 
 ## Estado del proyecto
 
+- **F10 de S4 cerrada en lo verificable (2026-10-04):** verificación independiente hecha, 8 pruebas nuevas de
+  backend y 8 de frontend sin cambios de producción, y decisiones directas del usuario sobre HU-009, HU-012,
+  HU-008, HU-006 y HU-032 en [[dec-006-decisiones-s4-ciclo-de-vida]] § "Cierre de F10". Quedan **7 HU en
+  `En validación`** que solo se confirman en navegador (HU-005, 007, 009, 011, 012, 022, 028). Las menciones
+  de más abajo a "F10 no ha corrido" y a "ninguna a `Completada`" son historia del 2026-09-30
 - **Sesión en curso:** S4 — **pausada el 2026-09-25, retomada el 2026-09-30** (el trabajo se hizo
   en otra máquina; hoy se bajaron los 16 + 28 + 14 commits que estaban en `origin/develop` y los
   tres repos quedaron limpios y al día). Plan en `PLAN_RETOMA_S4.md` (raíz), decisiones D15–D39 en
@@ -32,7 +37,7 @@ Historia cronológica: [[log]].
 - **Ramas:** `origin/main` y `origin/develop` están **idénticos** en los tres repos desde el merge
   del 2026-09-25, así que `main` contiene S4 a medio verificar. Contradecía `AGENTS.md:102`; el
   usuario decidió el 2026-09-30 **dejarlo así** y hacer el próximo merge a `main` solo al cerrar F10
-- **Entorno de esta máquina (2026-09-30):** Docker Desktop **arrancado**, MySQL 8.4 en
+- **Entorno de esta máquina (2026-09-30; reconfirmado el 2026-10-04: el proyecto Docker sigue como `fcv-citas-training` con MySQL en 3307):** Docker Desktop **arrancado**, MySQL 8.4 en
   `fcv-citas-v1-mysql` (healthy) y la base de pruebas `citas_fcv_training_test` creada con
   `.\scripts\init-test-db.ps1`. **Pero el `.env` de la raíz quedó atrás de `dafb0fa`:** no viaja en
   git, así que `COMPOSE_PROJECT_NAME` sigue valiendo `fcv-citas-training` y MySQL se publica en
@@ -54,15 +59,18 @@ Cualquier número distinto en una página de la wiki es historia fechada, no el 
 
 | Qué | Valor | Dónde se comprobó |
 |---|---|---|
-| Suite del backend (**2026-09-30**) | **484** pruebas, `BUILD SUCCESS` · `HexagonalArchitectureTest` 4/4 · clases concurrentes 89/89 en dos pasadas | `docker compose run --rm citas-api-dev mvn -B test`, ejecutado por el `backend-verifier` y de nuevo tras el cierre del LOOP_02 |
-| Suite del frontend (**2026-09-30**) | **218** pruebas, 20 archivos · typecheck 0 · `oxlint` 0 · build OK | los cuatro comandos ejecutados por el `frontend-verifier` en `citas-web` |
+| Suite del backend (**2026-10-04**) | **521/521** tras F10 (513 + 8 en `SpecialtyAdminIntegrationTest`, `BookingIntegrationTest` y `FlywayV10BackfillTest`) | cifra del cierre de F10; las 8 pruebas existen en `citas-api/src/test` (sin commitear al escribir esto) |
+| (historia) backend 2026-09-30 | **484** pruebas, `BUILD SUCCESS` · `HexagonalArchitectureTest` 4/4 · clases concurrentes 89/89 en dos pasadas | `docker compose run --rm citas-api-dev mvn -B test`, ejecutado por el `backend-verifier` y de nuevo tras el cierre del LOOP_02 |
+| Suite del frontend (**2026-10-04**) | **256/256** (248 + 8 de `citas-web/src/recoveryAndReschedule.test.tsx`, 8 casos, archivo nuevo sin commitear al escribir esto) | cifra del cierre de F10 |
+| (historia) frontend 2026-09-30 | **218** pruebas, 20 archivos · typecheck 0 · `oxlint` 0 · build OK | los cuatro comandos ejecutados por el `frontend-verifier` en `citas-web` |
 | Migraciones Flyway (**2026-09-30**) | **V1..V10**, 24 tablas de negocio (V8, V9, V10 son de S4 y no crean tablas) | `FlywayMigratesEmptySchemaTest.java:37,116,121` |
 | Proyecto Docker | `fcv-citas-v1`, contenedores `fcv-citas-v1-*` | `docker-compose.yml:5,11,41,85` |
 | Puertos del **host** | MySQL **3308** · API **8081** · Vite **5174** (web en contenedor 5175, Angular 4201) | `.env.example` de la raíz; `docker-compose.yml:22,76` |
 | Puertos **dentro** del contenedor | MySQL 3306 · API 8080 | `docker-compose.yml:22,76` |
-| HU por estado (**2026-09-30**, tras cerrar F5) | **16** `Completada` · **8** `En validación` (las 5 de S3 + HU-027, HU-028, HU-031) · **8** `Aprobada` sin verificar · 1 `En desarrollo` (HU-033) | frontmatter de los 33 `HU-*.md` de `citas-api/docs/wiki/scrum/` |
+| HU por estado (**2026-10-04**, tras F10) | **25** `Completada` · **7** `En validación` (HU-005, 007, 009, 011, 012, 022, 028) · 1 `En desarrollo` (HU-033) · 3 `Borrador` (HU-034..036) | frontmatter de los 36 `HU-*.md` de `citas-api/docs/wiki/scrum/historias-de-usuario/`, contado el 2026-10-04 |
+| (historia) HU por estado 2026-09-30 | 16 `Completada` · 8 `En validación` · 8 `Aprobada` · 1 `En desarrollo` | tras cerrar F5 |
 
-**Las dos cifras son de ejecuciones reales del 2026-09-30, no de un registro heredado.** Cada una la
+**Las cifras del 2026-09-30 son de ejecuciones reales de ese día, no de un registro heredado.** Cada una la
 corrió el Verifier independiente correspondiente, además del Builder. Progresión de la sesión:
 backend 471 → 480 (D38 y D39) → **484** (las dos pruebas que protegen el invariante de D39);
 frontend 212 → **218**.
@@ -110,7 +118,7 @@ disponibilidad**, **estados de la cita y sus transiciones**, **afiliación**.
 
 ## Síntesis
 
-- [[sintesis-preguntas-abiertas]] — huecos del PRD detectados al especificar las 33 HU, los dos defectos de esquema ya corregidos por `V5`, la afiliación opcional resuelta (`AF1–AF3`) y las decisiones del agente bajo aprobación delegada pendientes de confirmar (D1–D4); **R1–R4** son las que salieron al retomar S4 el 2026-09-30, incluida la de qué hacer con `main`
+- [[sintesis-preguntas-abiertas]] — huecos del PRD detectados al especificar las 33 HU, los dos defectos de esquema ya corregidos por `V5`, la afiliación opcional resuelta (`AF1–AF3`) y las decisiones del agente bajo aprobación delegada pendientes de confirmar (D1–D4); **R1–R4** salieron al retomar S4 el 2026-09-30, **R5–R12** al cerrar LOOP_02, y la sección "Tras F10 (2026-10-04)" lista lo que sigue abierto
 
 ## Fuentes en `raw/`
 
@@ -122,8 +130,8 @@ disponibilidad**, **estados de la cita y sus transiciones**, **afiliación**.
 - `index.md` — este catálogo. Toda página de `wiki/` aparece arriba, agrupada por tipo.
 - [[log]] — registro cronológico append-only de `ingest` / `query` / `learn` / `lint`.
 
-**Cobertura del catálogo, comprobada en el LINT del 2026-09-23:** 14 páginas en `wiki/` y 14
-entradas aquí. Ninguna página queda fuera y ninguna entrada apunta a un archivo inexistente.
+**Cobertura del catálogo, comprobada en el LINT del 2026-10-04:** 15 páginas en `wiki/` y 15
+entradas aquí (eran 14 el 2026-09-23, antes de dec-005 y dec-006). Ninguna página queda fuera y ninguna entrada apunta a un archivo inexistente.
 
 **Enlaces que salen de `llm-wiki/`:** [[contrato-rest-identidad]] usa cuatro wikilinks a HU
 (`[[HU-001-registrar-cuenta-de-usuario]]`, `HU-004`, `HU-005`, `HU-033`). No son enlaces rotos:

@@ -156,3 +156,5 @@ descrito arriba. El *fallback* de `application.yml:69`
   `docker-compose.yml`, la distinción puerto de host / puerto interno, la fecha de la cifra de
   pruebas del hook y la divergencia entre los dos `.env.example`.
 - 2026-09-23 — creada al descubrir que los contenedores en marcha eran de otra copia.
+
+- 2026-10-04 — reconfirmado en esta máquina: el `.env` sigue dando proyecto `fcv-citas-training` y MySQL en 3307 (no `fcv-citas-v1`/3308). Pendiente del usuario alinearlo con `.env.example`.
