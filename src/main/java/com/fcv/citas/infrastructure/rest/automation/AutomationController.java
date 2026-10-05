@@ -1,5 +1,7 @@
 package com.fcv.citas.infrastructure.rest.automation;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +33,26 @@ class AutomationController {
     @GetMapping("/appointments/upcoming")
     List<UpcomingAppointmentResponse> upcoming(@RequestParam(required = false) String hours) {
         return automation.upcoming(parseHours(hours)).stream().map(UpcomingAppointmentResponse::from).toList();
+    }
+
+    /**
+     * HU-034 CA-11 (WF-003): resumen operativo del dia, sin PII. {@code date} ausente = hoy en Bogota; presente
+     * pero vacio o no ISO ({@code yyyy-MM-dd}) = 400 VALIDATION con {@code fieldErrors.date}.
+     */
+    @GetMapping("/appointments/daily")
+    DailySummaryResponse daily(@RequestParam(required = false) String date) {
+        return DailySummaryResponse.from(automation.daily(parseDate(date)));
+    }
+
+    private static LocalDate parseDate(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(raw.trim());
+        } catch (DateTimeParseException e) {
+            throw InvalidRequestException.field("date", "La fecha debe tener el formato yyyy-MM-dd");
+        }
     }
 
     /** Ausente: 24. Presente pero vacio o no numerico: mismo 400 que un valor fuera de rango. */

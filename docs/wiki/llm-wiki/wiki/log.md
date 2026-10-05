@@ -295,3 +295,6 @@ Creado `PLAN_EJECUCION_S5_S6.md` (raíz). HECHO verificado en el código: los ca
 ## [2026-10-04] learn | S6 F5: contrato del evento a n8n, dec-007 y estado real de n8n
 - Nueva sección en `contrato-rest-citas` (evento saliente a WF-002: cuerpo exacto, 5 tipos, no-emisión, post-commit, reintentos 3x 1 s/2 s, NoOp/secreto vacío/CHANGE_ME, logs) contrastada con `N8nWebhookPublisher` y 4 clases de prueba. Creada `dec-007-entrega-best-effort-eventos-n8n` (D-F aprobada por el usuario; alternativas descartadas; riesgo residual 3).
 - HECHO de entorno n8n (flujos inactivos con sus ids, instancia compartida, credenciales propias faltantes, Data Table con 5 filas de prueba, MCP sin borrado) en `sintesis-preguntas-abiertas`. Índice y dec-006 enlazan dec-007. Abierto: WF-002 no probado extremo a extremo contra el publicador.
+
+## [2026-10-04] learn | S6 F8: contrato del endpoint daily para WF-003
+- `contrato-rest-citas` § S5: añadido `GET /api/automation/appointments/daily` (HU-034 CA-11, D-G): `date` opcional con 400 `fieldErrors.date`, respuesta `{date, rows, pending}` sin PII, todos los estados, orden determinista. Advertencia: `pending` es global y se calcula con hoy de Bogotá. Suite vigente 608/608.

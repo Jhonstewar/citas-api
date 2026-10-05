@@ -82,6 +82,19 @@ public interface AppointmentQueries {
     }
 
     /**
+     * HU-034 CA-11: fila minima del resumen operativo diario. SIN datos del paciente: solo sede
+     * ({@code siteCode}), estado ({@code status}, codigo), nombre de especialidad y hora de inicio.
+     */
+    record DailyRowView(String siteCode, String status, String specialty, LocalTime startTime) {
+    }
+
+    /**
+     * HU-034 CA-11: citas de {@code date} en cualquier estado, orden determinista: hora de inicio, codigo de
+     * sede, codigo de estado, nombre de especialidad y id de cita.
+     */
+    List<DailyRowView> findDailyRows(LocalDate date);
+
+    /**
      * HU-034: citas {@code APPROVED} cuyo inicio (fecha + hora) esta en el intervalo ({@code from}, {@code to}],
      * es decir, {@code from} excluido y {@code to} incluido, por fecha y hora ascendentes.
      */

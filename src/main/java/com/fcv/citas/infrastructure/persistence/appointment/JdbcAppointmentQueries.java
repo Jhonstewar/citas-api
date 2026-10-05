@@ -171,6 +171,20 @@ class JdbcAppointmentQueries implements AppointmentQueries {
     }
 
     @Override
+    public List<DailyRowView> findDailyRows(LocalDate date) {
+        // Reutiliza FROM; solo columnas sin PII. Orden total y determinista (id como desempate final).
+        String sql = """
+                SELECT si.code AS site_code, st.code AS status, sp.name AS specialty_name, a.start_time
+                """ + FROM + """
+                 WHERE a.scheduled_date = :date
+                 ORDER BY a.start_time, si.code, st.code, sp.name, a.id
+                """;
+        return jdbc.query(sql, new MapSqlParameterSource("date", date),
+                (rs, i) -> new DailyRowView(rs.getString("site_code"), rs.getString("status"),
+                        rs.getString("specialty_name"), rs.getObject("start_time", LocalTime.class)));
+    }
+
+    @Override
     public List<AppointmentView> findPendingRequests(InboxFilter filter) {
         MapSqlParameterSource params = new MapSqlParameterSource();
         List<String> where = new ArrayList<>(List.of("st.code = 'REQUESTED'"));

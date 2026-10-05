@@ -3,7 +3,7 @@ titulo: "Contrato REST — Catálogos, profesionales, agenda y citas (S3)"
 tipo: contrato
 estado: Vigente
 actualizado: 2026-10-04
-fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032, HU-034 (S5, contrastado el 2026-10-04)", "[[dec-004-decisiones-s3-reserva]]", "[[dec-006-decisiones-s4-ciclo-de-vida]] D18, D22, D37, D38, D39", "código de citas contrastado el 2026-09-30 (LOOP_02 iter. 3)"]
+fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032, HU-034 (S5, contrastado el 2026-10-04; CA-11 `daily` añadido en S6 F8)", "[[dec-004-decisiones-s3-reserva]]", "[[dec-006-decisiones-s4-ciclo-de-vida]] D18, D22, D37, D38, D39", "código de citas contrastado el 2026-09-30 (LOOP_02 iter. 3)"]
 tags: [contrato, rest, s3, citas]
 ---
 
@@ -690,7 +690,73 @@ manda el 401, porque la autenticación va antes que el controlador.
 - `AutomationKeyStartupIntegrationTest`: arranque real que **falla** con clave débil (menos de 32 bytes,
   `AutomationProperties.MIN_KEY_BYTES`) o con `CHANGE_ME` aunque supere los 32 bytes, sin imprimir el valor;
   clave vacía arranca (cadena cerrada).
-- Suite completa **565/565 el 2026-10-04**.
+- Suite completa **608/608 el 2026-10-04** (565/565 antes de añadir `daily` y las pruebas de n8n de S6).
+
+### `GET /api/automation/appointments/daily` — resumen operativo del día para WF-003 (HU-034 CA-11, D-G aprobada)
+
+Segundo endpoint de la cadena de automatización. Mismo mecanismo que `upcoming`: cabecera `X-Automation-Key`,
+cadena propia, solo `GET`. Reglas de § Autenticación **sin cambios**: clave ausente o inválida → 401 con cualquier
+método; clave válida con POST/PUT/PATCH/DELETE → 405 con `Allow: GET` (`AutomationDailyIntegrationTest`:
+`withoutKeyReturns401`, `wrongKeyReturns401AndPersonJwtDoesNotReplaceTheKey`, `writeMethodsWithValidKeyReturn405`).
+
+| Método | Ruta | Query | Respuesta |
+|---|---|---|---|
+| GET | `/api/automation/appointments/daily` | `date` opcional, ISO `yyyy-MM-dd` | 200 `DailySummary` · 400 `VALIDATION` (`fieldErrors.date`) · 401 · 405 |
+
+Fuentes: `infrastructure/rest/automation/AutomationController.java:38-45` (ruta y `parseDate`),
+`DailySummaryResponse.java:12-25` (forma), `application/automation/AutomationQueriesUseCase.java:41-53` (`daily`),
+`AppointmentQueries.java:88,95` (`DailyRowView`, `findDailyRows`) y `infrastructure/persistence/appointment/JdbcAppointmentQueries.java:173-185`.
+
+**`date`**
+- Ausente → **hoy en `America/Bogota`** (`SystemZone.today(clock)`), no el de UTC: con el reloj en 23:30 de Bogotá
+  (ya 16 en UTC) devuelve el 15 (`dateDefaultsToTodayInBogotaNotUtc`; `AutomationQueriesUseCaseTest.dailyUsaHoyDeBogotaSiNoHayFechaYSacaPendientesDeSummary`).
+- Se recortan los espacios. **Vacío, no ISO o fecha imposible** (`abc`, ``, `2032-13-45`, `15/06/2032`, `2032-02-30`)
+  → **400** `code: VALIDATION` con `fieldErrors.date` = "La fecha debe tener el formato yyyy-MM-dd"
+  (`invalidDateReturns400ValidationOnDate`). Como en `upcoming`, el 400 solo se ve con clave válida.
+
+**Respuesta 200** — claves exactas, sin ninguna más (`responseHasNoPiiKeysAndNoSeededDocumentOrPhone`):
+
+```ts
+DailySummary { date: 'yyyy-MM-dd',
+               rows: { siteCode: string, status: string, specialty: string, startTime: 'HH:mm' }[],
+               pending: { pendingRequests: number, pendingReschedules: number } }
+```
+
+- `status` es el **código de BD** del estado: `REQUESTED`, `APPROVED`, `REJECTED`, `CANCELLED`, `COMPLETED`, `NO_SHOW`
+  (no el nombre en español). `rows` incluye **todos** los estados, no solo `APPROVED` como `upcoming`
+  (`mixedStatusesAndSitesAreListedSortedByStartTimeWithExactKeys`).
+- `specialty` es el nombre de la especialidad; `startTime`, `HH:mm`.
+- **Orden determinista:** hora de inicio, código de sede, código de estado, nombre de especialidad y, como desempate
+  final, el `id` de la cita, que **no se expone** (`JdbcAppointmentQueries.java:180`). Reutiliza el `FROM` de las
+  demás lecturas, pero selecciona solo columnas sin PII.
+- **Sin PII ni identificadores:** ni nombres, correo, documento, teléfono, ni ids de paciente, profesional o cita
+  (`appointmentId` tampoco viaja). Es lo que lo distingue de `upcoming`, que sí lleva `patientEmail`.
+- Día sin citas → `rows: []` (con `pending` real) (`dayWithoutAppointmentsReturnsEmptyRowsAndRealPendingCounts`).
+
+> **ADVERTENCIA — `pending` es GLOBAL, no del día consultado.** `pendingRequests` cuenta **todas** las citas
+> `REQUESTED` de cualquier fecha y `pendingReschedules` **todas** las reprogramaciones sin decidir
+> (`decided_at IS NULL`), y se calculan siempre con `summary(hoy de Bogotá)` aunque `date` sea otro día
+> (`AutomationQueriesUseCase.java:49-52`; `JdbcAppointmentQueries.java:255-266`). Con `?date=2032-07-20` sin citas ese
+> día, `pending` sigue mostrando los pendientes globales. No leerlos como "pendientes de la fecha pedida". Lo fija
+> la prueba unitaria (el `summary` se invoca con hoy aunque haya `date`) y la de integración, que siembra una
+> `REQUESTED` de **otro** día y la ve contada.
+
+Ejemplo (datos ficticios; `GET /api/automation/appointments/daily?date=2026-10-05`):
+
+```json
+{
+  "date": "2026-10-05",
+  "rows": [
+    { "siteCode": "HIC", "status": "APPROVED",  "specialty": "Medicina General", "startTime": "08:00" },
+    { "siteCode": "ICV", "status": "APPROVED",  "specialty": "Medicina General", "startTime": "09:30" },
+    { "siteCode": "HIC", "status": "REQUESTED", "specialty": "Cardiologia",      "startTime": "11:00" },
+    { "siteCode": "ICV", "status": "CANCELLED", "specialty": "Medicina General", "startTime": "14:00" }
+  ],
+  "pending": { "pendingRequests": 4, "pendingReschedules": 2 }
+}
+```
+
+Pruebas: `AutomationDailyIntegrationTest` (reloj fijo 2032-06-15 23:30 Bogotá) y `AutomationQueriesUseCaseTest`.
 
 ## S5–S6 — evento de cambio de estado (HU-035, verificado el 2026-10-04)
 
@@ -806,6 +872,7 @@ porque n8n depende de su forma exacta. La decisión de entrega está en [[dec-00
 
 ## Historial
 
+- 2026-10-04 — S6 F8: documentado `GET /api/automation/appointments/daily` (HU-034 CA-11, D-G aprobada) en § S5: `date` opcional (hoy de Bogotá, 400 `fieldErrors.date`), `rows` con todos los estados y orden determinista, sin PII ni ids, y la advertencia de que `pending` es global y se calcula con «hoy». Contrastado con controlador, caso de uso, consulta JDBC y dos clases de prueba; suite vigente 608/608.
 - 2026-10-04 — S6 F5: añadida § «S5–S6 — evento de cambio de estado» (publicación saliente hacia n8n, no un endpoint): cuerpo JSON exacto, cinco tipos, cuándo no se emite, post-commit, reintentos, configuración y logs; contrastada con `N8nWebhookPublisher` y sus cuatro clases de prueba. Decisión en [[dec-007-entrega-best-effort-eventos-n8n]].
 - 2026-10-04 — S5 F3: CA-07 corregido (clave inválida/ausente → 401 con cualquier método; clave válida con POST/PUT/PATCH/DELETE → 405 con `Allow: GET`; supersede al "no GET = 401"). Documentadas las pruebas de clave fuera de logs y de arranque con clave débil/`CHANGE_ME`; suite 565/565.
 - 2026-10-04 — S5 F2: añadida § «S5 — automatización» con `GET /api/automation/appointments/upcoming` (clave `X-Automation-Key`, ventana, respuesta exacta, 401 sin `WWW-Authenticate`, 400 `hours`, decisión SHA-256 + `isEqual`), contrastada con controlador, filtro, config y pruebas.

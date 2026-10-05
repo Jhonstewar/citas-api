@@ -1,10 +1,13 @@
 package com.fcv.citas.application.automation;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fcv.citas.application.appointment.AppointmentQueries;
+import com.fcv.citas.application.appointment.AppointmentQueries.DailyRowView;
+import com.fcv.citas.application.appointment.AppointmentQueries.Summary;
 import com.fcv.citas.application.appointment.AppointmentQueries.UpcomingAppointmentView;
 import com.fcv.citas.domain.shared.InvalidRequestException;
 import com.fcv.citas.domain.shared.SystemZone;
@@ -33,5 +36,19 @@ public class AutomationQueriesUseCase {
         }
         LocalDateTime from = SystemZone.now(clock);
         return queries.findApprovedStartingBetween(from, from.plusHours(hours));
+    }
+
+    /** HU-034 CA-11: resumen del dia para WF-003. Sin PII. {@code pendingRequests/Reschedules} son globales. */
+    public record DailySummary(LocalDate date, List<DailyRowView> rows, long pendingRequests,
+            long pendingReschedules) {
+    }
+
+    /** {@code date} nulo = hoy en America/Bogota. */
+    public DailySummary daily(LocalDate date) {
+        LocalDate today = SystemZone.today(clock);
+        LocalDate day = date == null ? today : date;
+        List<DailyRowView> rows = queries.findDailyRows(day);
+        Summary summary = queries.summary(today);
+        return new DailySummary(day, rows, summary.pendingRequests(), summary.pendingReschedules());
     }
 }

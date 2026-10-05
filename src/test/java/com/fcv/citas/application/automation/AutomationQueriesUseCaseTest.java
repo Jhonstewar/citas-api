@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,6 +69,64 @@ class AutomationQueriesUseCaseTest {
 
         assertEquals(SystemZone.now(CLOCK), calls.get(0)[0]);
         assertEquals(LocalDateTime.of(2026, 3, 11, 10, 0), calls.get(0)[1]);
+    }
+
+    @Test
+    void dailyUsaHoyDeBogotaSiNoHayFechaYSacaPendientesDeSummary() {
+        // 2026-03-11T03:00Z = 2026-03-10 22:00 en Bogota: hoy es el 10, no el 11 de UTC.
+        Clock late = Clock.fixed(Instant.parse("2026-03-11T03:00:00Z"), SystemZone.ZONE);
+        List<LocalDate> rowCalls = new ArrayList<>();
+        List<LocalDate> summaryCalls = new ArrayList<>();
+        AppointmentQueries fake = (AppointmentQueries) Proxy.newProxyInstance(
+                AppointmentQueries.class.getClassLoader(), new Class<?>[] { AppointmentQueries.class },
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "findDailyRows" -> {
+                        rowCalls.add((LocalDate) args[0]);
+                        yield List.of(new AppointmentQueries.DailyRowView("HIC", "APPROVED", "General",
+                                LocalTime.of(8, 0)));
+                    }
+                    case "summary" -> {
+                        summaryCalls.add((LocalDate) args[0]);
+                        yield new AppointmentQueries.Summary(4, 9, 9, 9, 2);
+                    }
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+
+        AutomationQueriesUseCase.DailySummary out = new AutomationQueriesUseCase(fake, late).daily(null);
+
+        assertEquals(LocalDate.of(2026, 3, 10), out.date());
+        assertEquals(List.of(LocalDate.of(2026, 3, 10)), rowCalls);
+        assertEquals(List.of(LocalDate.of(2026, 3, 10)), summaryCalls);
+        assertEquals(1, out.rows().size());
+        assertEquals(4, out.pendingRequests());
+        assertEquals(2, out.pendingReschedules());
+    }
+
+    @Test
+    void dailyConFechaExplicitaPideFilasDeEsaFechaYSummaryConHoyDeBogota() {
+        List<LocalDate> rowCalls = new ArrayList<>();
+        List<LocalDate> summaryCalls = new ArrayList<>();
+        AppointmentQueries fake = (AppointmentQueries) Proxy.newProxyInstance(
+                AppointmentQueries.class.getClassLoader(), new Class<?>[] { AppointmentQueries.class },
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "findDailyRows" -> {
+                        rowCalls.add((LocalDate) args[0]);
+                        yield List.<AppointmentQueries.DailyRowView>of();
+                    }
+                    case "summary" -> {
+                        summaryCalls.add((LocalDate) args[0]);
+                        yield new AppointmentQueries.Summary(1, 0, 0, 0, 5);
+                    }
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+        LocalDate explicit = LocalDate.of(2026, 4, 1);
+
+        AutomationQueriesUseCase.DailySummary out = new AutomationQueriesUseCase(fake, CLOCK).daily(explicit);
+
+        assertEquals(explicit, out.date());
+        assertEquals(List.of(explicit), rowCalls);
+        assertEquals(List.of(LocalDate.of(2026, 3, 10)), summaryCalls);
+        assertEquals(5, out.pendingReschedules());
     }
 
     @ParameterizedTest

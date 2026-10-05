@@ -287,7 +287,7 @@ Se especificaron [[EP-010-automatizaciones-n8n]] y sus tres historias. El 2026-1
 
 | HU | Título | Esfuerzo | Estado |
 |---|---|---|---|
-| [[HU-034-consultar-citas-para-automatizacion]] | Consultar citas para automatización (clave dedicada, `/api/automation/**`) | Alto | `En validación` (CA-01 a CA-10 en PASS, suite 565/565; CA-11 y T-05 opcionales, entran con la Fase 8 por D-G; espera la F9) |
+| [[HU-034-consultar-citas-para-automatizacion]] | Consultar citas para automatización (clave dedicada, `/api/automation/**`) | Alto | `En validación` (CA-01 a CA-10 en PASS, suite 565/565; CA-11 y T-05 (`daily`, D-G) entregados y verificados, suite 610/610; espera la F9) |
 | [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] | Publicar eventos de cambio de estado a n8n | Alto | `En validación` (CA-01 a CA-12 en PASS, tres con reserva; suite 599/599; falta la prueba E2E contra WF-002 real, Fase 7, y la F9) |
 | [[HU-036-versionar-y-documentar-los-flujos-n8n]] | Versionar y documentar los flujos n8n | Medio | `Aprobada` |
 
