@@ -1,0 +1,47 @@
+package com.fcv.citas.infrastructure.rest.automation;
+
+import java.util.List;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.fcv.citas.application.automation.AutomationQueriesUseCase;
+import com.fcv.citas.domain.shared.InvalidRequestException;
+
+/**
+ * HU-034: lecturas para n8n. Se protege con la cadena de clave de API de {@code AutomationSecurityConfig},
+ * solo GET. El controlador traduce HTTP a caso de uso: la validacion de rango de {@code hours} y la
+ * seleccion de citas viven en {@link AutomationQueriesUseCase}.
+ */
+@RestController
+@RequestMapping("/api/automation")
+class AutomationController {
+
+    static final int DEFAULT_HOURS = 24;
+
+    private final AutomationQueriesUseCase automation;
+
+    AutomationController(AutomationQueriesUseCase automation) {
+        this.automation = automation;
+    }
+
+    /** 200 · 400 VALIDATION ({@code fieldErrors.hours}) si {@code hours} no es entero o esta fuera de 1..72. */
+    @GetMapping("/appointments/upcoming")
+    List<UpcomingAppointmentResponse> upcoming(@RequestParam(required = false) String hours) {
+        return automation.upcoming(parseHours(hours)).stream().map(UpcomingAppointmentResponse::from).toList();
+    }
+
+    /** Ausente: 24. Presente pero vacio o no numerico: mismo 400 que un valor fuera de rango. */
+    private static int parseHours(String raw) {
+        if (raw == null) {
+            return DEFAULT_HOURS;
+        }
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            throw InvalidRequestException.field("hours", "Las horas deben ser un entero entre 1 y 72");
+        }
+    }
+}

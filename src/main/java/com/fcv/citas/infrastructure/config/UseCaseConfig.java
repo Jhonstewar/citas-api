@@ -14,6 +14,7 @@ import com.fcv.citas.application.auth.LogoutUseCase;
 import com.fcv.citas.application.auth.RefreshSessionUseCase;
 import com.fcv.citas.application.auth.RegisterUserUseCase;
 import com.fcv.citas.application.auth.SessionIssuer;
+import com.fcv.citas.application.automation.AutomationQueriesUseCase;
 import com.fcv.citas.application.appointment.AdminAppointmentsUseCase;
 import com.fcv.citas.application.appointment.AppointmentQueries;
 import com.fcv.citas.application.appointment.AvailabilityQueries;
@@ -140,6 +141,11 @@ public class UseCaseConfig {
     @Bean
     SearchAvailabilityUseCase searchAvailabilityUseCase(AvailabilityQueries queries, Clock clock) {
         return new SearchAvailabilityUseCase(queries, clock);
+    }
+
+    @Bean
+    AutomationQueriesUseCase automationQueriesUseCase(AppointmentQueries queries, Clock clock) {
+        return new AutomationQueriesUseCase(queries, clock);
     }
 
     @Bean

@@ -40,7 +40,7 @@ Repositorios independientes con ramas `main` (estable) y `develop` (trabajo).
 | [[EP-007-ciclo-de-vida-de-las-citas-del-paciente]] | Ciclo de vida de las citas del paciente | RF-13, RF-14, RF-15 | 4 |
 | [[EP-008-operacion-administrativa-de-solicitudes]] | Operación administrativa de solicitudes | RF-12, RF-15, RF-18 | 3 |
 | [[EP-009-trazabilidad-y-contrato-rest]] | Trazabilidad y contrato REST | RF-19, RF-20 | 2 |
-| [[EP-010-automatizaciones-n8n]] | Automatizaciones n8n (`Borrador`) | PRD §10, RF-19, RF-20 | 3 |
+| [[EP-010-automatizaciones-n8n]] | Automatizaciones n8n (`Aprobada`) | PRD §10, RF-19, RF-20 | 3 |
 
 **Total: 10 épicas, 36 historias de usuario.**
 
@@ -279,20 +279,24 @@ Backend verificado leyendo código y pruebas (suite **513/513**) y frontend con 
 
 **Estado global tras la segunda pasada:** 25 `Completada`, 7 `En validación` (HU-005, 007, 009, 011, 012, 022 y 028), 1 `En desarrollo` ([[HU-033-publicar-contrato-rest-documentado]], abierta por diseño) y 3 `Borrador` (HU-034 a HU-036); total 36.
 
-## EP-010 — Automatizaciones n8n (especificada el 2026-09-30, sin aprobar)
+## EP-010 — Automatizaciones n8n (especificada el 2026-09-30; alcance S5 aprobado el 2026-10-04)
 
-Se especificaron [[EP-010-automatizaciones-n8n]] y sus tres historias, todas en `Borrador`. **Ninguna está `Aprobada`**: solo el usuario las aprueba. Fuente: `PLAN_S5_S6_N8N.md` (raíz), PRD §8–§10 y RF-19, `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`.
+Se especificaron [[EP-010-automatizaciones-n8n]] y sus tres historias. El 2026-10-04 el usuario aprobó con su mensaje «aprobdo lo del s5» (alcance interpretado por el agente principal): EP-010 y [[HU-034-consultar-citas-para-automatizacion]] pasan a `Aprobada`, junto con D-C, D-D y D-I. HU-035 y HU-036 siguen en `Borrador` hasta que el usuario las confirme explícitamente antes de la Fase 5.
+
+**Estado global tras la verificación de HU-034 (2026-10-04):** 25 `Completada`, 8 `En validación` (las 7 anteriores más HU-034), 1 `En desarrollo` (HU-033) y 2 `Borrador` (HU-035 y HU-036); total 36. Fuente: `PLAN_S5_S6_N8N.md` (raíz), PRD §8–§10 y RF-19, `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`.
 
 | HU | Título | Esfuerzo | Estado |
 |---|---|---|---|
-| [[HU-034-consultar-citas-para-automatizacion]] | Consultar citas para automatización (clave dedicada, `/api/automation/**`) | Alto | `Borrador` |
+| [[HU-034-consultar-citas-para-automatizacion]] | Consultar citas para automatización (clave dedicada, `/api/automation/**`) | Alto | `En validación` (CA-01 a CA-10 en PASS, suite 565/565; CA-11 y T-05 fuera de entrega de S5; espera la F9) |
 | [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] | Publicar eventos de cambio de estado a n8n | Alto | `Borrador` |
 | [[HU-036-versionar-y-documentar-los-flujos-n8n]] | Versionar y documentar los flujos n8n | Medio | `Borrador` |
 
 **Decididas por el usuario (2026-09-30):** D-A (clave de API dedicada de solo lectura, cabecera `X-Automation-Key`, cadena de seguridad propia), D-B (túnel temporal), D-H (workflows nuevos con prefijo `jhonNuñez-`, paths de webhook sin ñ).
 
-**Propuesta vigente, pendiente de confirmar** (también preguntas abiertas): D-C (ventana de 24 h revisada cada hora), D-D (anti-duplicado en Data Table de n8n), D-E (eventos: aprobación/rechazo de especializada, aprobación/rechazo de reprogramación, cancelación), D-F (entrega *best-effort* sin *outbox*), D-G (WF-003 bonus), D-I (webhook a demanda además del Schedule en WF-001 y WF-003).
+**Aprobadas el 2026-10-04 con «aprobdo lo del s5» (alcance S5):** D-C (ventana de 24 h revisada cada hora), D-D (anti-duplicado en Data Table de n8n), D-I (webhook a demanda además del Schedule en WF-001).
 
-**Precondición:** la épica depende de que S4 esté cerrada o de que el usuario autorice expresamente abrir S5. Varias HU de las que depende siguen en `En validación` o `En desarrollo` (HU-026, HU-027, HU-028, HU-031, HU-033).
+**Propuesta vigente, pendiente de confirmar explícitamente antes de la Fase 5 (S6):** D-E (eventos: aprobación/rechazo de especializada, aprobación/rechazo de reprogramación, cancelación), D-F (entrega *best-effort* sin *outbox*), D-G (WF-003 bonus).
+
+**Precondición (resuelta para S5 por la autorización del 2026-10-04):** la épica dependía de que S4 esté cerrada o de que el usuario autorice expresamente abrir S5. Varias HU de las que depende siguen en `En validación` o `En desarrollo` (HU-026, HU-027, HU-028, HU-031, HU-033).
 
 Las incógnitas INC-041 a INC-046 están en la épica.

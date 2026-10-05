@@ -2,8 +2,8 @@
 titulo: "Contrato REST — Catálogos, profesionales, agenda y citas (S3)"
 tipo: contrato
 estado: Vigente
-actualizado: 2026-09-30
-fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032", "[[dec-004-decisiones-s3-reserva]]", "[[dec-006-decisiones-s4-ciclo-de-vida]] D18, D22, D37, D38, D39", "código de citas contrastado el 2026-09-30 (LOOP_02 iter. 3)"]
+actualizado: 2026-10-04
+fuentes: ["PRD.md §4", "HU-005, HU-010, HU-011, HU-013..HU-019, HU-022..HU-025, HU-029, HU-030, HU-032, HU-034 (S5, contrastado el 2026-10-04)", "[[dec-004-decisiones-s3-reserva]]", "[[dec-006-decisiones-s4-ciclo-de-vida]] D18, D22, D37, D38, D39", "código de citas contrastado el 2026-09-30 (LOOP_02 iter. 3)"]
 tags: [contrato, rest, s3, citas]
 ---
 
@@ -561,8 +561,140 @@ español (ver [[contrato-rest-identidad]]). Prueba: `FrameworkErrorsSpanishInteg
 4. **Abierta, menor:** el 400 por cuerpo ausente o ilegible no lleva `code` (asimetría del cuerpo de
    § F5).
 
+## S5 — automatización: citas próximas para n8n (HU-034, verificado el 2026-10-04)
+
+Contrato de lectura para las automatizaciones de recordatorio (n8n). No es una ruta de persona: vive
+en una **cadena de seguridad propia** y no usa JWT. Verificado contra el código, no contra el plan.
+
+| Método | Ruta | Query | Respuesta |
+|---|---|---|---|
+| GET | `/api/automation/appointments/upcoming` | `hours` opcional, entero **1–72**, defecto **24** | 200 `UpcomingAppointment[]` · 400 `VALIDATION` · 401 · 405 (otro método con clave válida) |
+
+Fuentes: `infrastructure/rest/automation/AutomationController.java:31-34` (ruta, `DEFAULT_HOURS = 24`),
+`application/automation/AutomationQueriesUseCase.java:18-36` (rango y ventana).
+
+### Autenticación y cadena de seguridad
+
+- **Cabecera `X-Automation-Key`** (`AutomationApiKeyFilter.java:36`). Es la única credencial aceptada.
+- **Solo `GET`, y el orden importa** (`AutomationApiKeyFilter.java:52-62`; corregido tras la iteración 1 de
+  HU-034, CA-07):
+  1. Clave ausente o inválida → **401 con cualquier método** (también POST/PUT/PATCH/DELETE), sin 405.
+  2. Clave válida con POST/PUT/PATCH/DELETE → **405** con cabecera `Allow: GET` y `ProblemDetail` en español
+     ("Método no permitido" / "El método HTTP no está permitido para este recurso",
+     `ProblemJsonSecurityHandlers.methodNotAllowed`, líneas 58-62). No llega al controlador: no ejecuta nada.
+  - Pruebas: `AutomationUpcomingIntegrationTest.writeMethodsWithValidKeyReturn405AndNeverExecute` (exige 405,
+    `Allow: GET`, `status` 405 y `detail`; la cita sigue `APPROVED` y no cambia el número de citas) y
+    `wrongOrMissingKeyWithAnyMethodReturns401NotMethodNotAllowed` (clave errónea o ausente, 401 con los cuatro métodos).
+  - **Supersede** al texto previo de esta sección, que decía que los métodos no GET recibían 401 antes de mirar
+    la clave; ese comportamiento era el de la versión inicial del filtro, ya no vigente.
+- **Cadena aparte** (`AutomationSecurityConfig.java:25-47`): `@Order(1)`, `securityMatcher("/api/automation/**")`,
+  stateless, sin CORS (cliente servidor a servidor), sin `oauth2ResourceServer`. La cadena principal
+  ([[arq-hexagonal-seguridad]], `SecurityConfig`) conserva su `denyAll` para todo lo demás.
+- **Un JWT de persona no sustituye la clave:** con `Authorization: Bearer` de ADMIN, PROFESSIONAL o
+  USER y sin clave → 401; con JWT y clave errónea → 401 (`personJwtWithoutKeyReturns401ForEveryRole`,
+  `personJwtWithWrongKeyReturns401`). A la inversa, la clave válida **no abre** rutas de persona
+  (`/api/admin/...`, `/api/professional/...`, `/api/patient/...`, `/api/me` → 401/403,
+  `validKeyDoesNotOpenPersonRoutes`). La única autoridad aceptada es `ROLE_AUTOMATION`, que concede solo el filtro.
+- **Clave de configuración vacía = cadena cerrada: todo 401**, también con cabecera vacía, con
+  cualquier valor y con un JWT de persona (`AutomationApiKeyFilter.java:28,67-69`;
+  `AutomationClosedChainIntegrationTest`, contexto con `app.automation.api-key=`). La API arranca igual.
+  La clave se lee de la propiedad `app.automation.api-key` (`application.yml:91-92`, variable de entorno
+  con valor por defecto vacío). **El valor no se documenta ni se versiona.**
+
+### DECISIÓN: comparación de la clave
+
+Se compara el **SHA-256 de ambos valores** con `MessageDigest.isEqual` (tiempo constante)
+(`AutomationApiKeyFilter.java:71,74-79`). El digest esperado se calcula una vez al construir el filtro.
+- **Motivo:** `isEqual` sobre los bytes crudos devolvería antes si las longitudes difieren y filtraría
+  la longitud de la clave; con digests de 32 bytes fijos, ni el contenido ni la longitud se filtran por tiempo.
+- **Descartado:** `String.equals` (corta en el primer byte distinto) y `isEqual` directo sobre la clave.
+- Cabecera ausente o vacía → rechazo inmediato sin comparar. El filtro **nunca registra** la clave ni la cabecera.
+
+### Ventana y selección
+
+- Ventana **(ahora, ahora + `hours`]**: inicio **exclusivo**, fin **inclusivo**, con "ahora" en hora de
+  `America/Bogota` (`SystemZone.now(clock)`). Se compara el instante de **inicio** de la cita:
+  `TIMESTAMP(scheduled_date, start_time) > :from AND <= :to`
+  (`infrastructure/persistence/appointment/JdbcAppointmentQueries.java:155-156`).
+  Una cita que empieza exactamente ahora queda fuera; una que empieza en ahora+`hours`, dentro
+  (`exactlyNowPlusHoursIsIncludedAndExactlyNowIsExcluded`, con reloj fijo).
+- **Solo `APPROVED`** (`st.code = 'APPROVED'`, línea 154). `REQUESTED`, `REJECTED`, `CANCELLED`,
+  `COMPLETED` y `NO_SHOW` no salen (`onlyApprovedStatusIsReturned`).
+- **Orden:** fecha, hora de inicio e id ascendentes (línea 157; `resultsAreOrderedByDateAndStartTimeAscending`).
+- `hours` ausente → 24. Presente pero vacío o no numérico → mismo 400 que fuera de rango
+  (`AutomationController.java:37-46`); el espacio alrededor se recorta.
+
+### Respuesta 200
+
+`UpcomingAppointment[]` (`UpcomingAppointmentResponse.java:10-14`). Claves **exactas**, sin ninguna más
+(`responseHasExactlyTheContractKeysAndNoDocumentPhoneOrHistory`):
+
+```ts
+UpcomingAppointment { appointmentId: number, patientFirstName, patientEmail, date, startTime, endTime,
+                      site: { code, name, address }, professional: string, specialty: string }
+```
+
+`date` es `YYYY-MM-DD`; `startTime`/`endTime` son `HH:mm`. `professional` es nombres y apellidos
+concatenados; `specialty`, el nombre de la especialidad. Minimización de datos: el correo viaja porque sin
+él no hay recordatorio; **no hay documento, teléfono ni historial**, ni identificadores de paciente o
+profesional. Sin citas en la ventana → `[]`.
+
+```json
+[
+  {
+    "appointmentId": 57,
+    "patientFirstName": "Ana",
+    "patientEmail": "ana@ejemplo.test",
+    "date": "2026-10-05",
+    "startTime": "09:00",
+    "endTime": "09:30",
+    "site": { "code": "HIC", "name": "…", "address": "…" },
+    "professional": "Nombre Apellido",
+    "specialty": "Medicina General"
+  }
+]
+```
+
+(Datos sintéticos: las claves son las del código, los valores son ilustrativos.)
+
+### Errores
+
+Los dos errores de datos son `application/problem+json` en español, con `type: "about:blank"`; el 405 (clave
+válida, método no GET) usa el mismo formato y se describe en § Autenticación.
+
+**401 — `commenceApiKey`** (`ProblemJsonSecurityHandlers.java:52-55`). Cuerpo fijo, idéntico para cabecera
+ausente, clave errónea (con cualquier método), de otra longitud, vacía o cadena cerrada (la prueba
+`wrongKeyAndDifferentLengthKeyAndEmptyKeyReturnTheSame401BodyAsNoKey` exige igualdad con el caso sin clave
+y que no repita lo enviado). Solo lleva `type`, `title`, `status`, `detail`, `instance` (`write`, líneas
+77-89). **No lleva `WWW-Authenticate`**: no hay token que presentar, a diferencia del 401 de personas
+([[contrato-rest-identidad]]).
+
+```json
+{ "type": "about:blank", "title": "No autenticado", "status": 401,
+  "detail": "Se requiere una credencial de automatización válida",
+  "instance": "/api/automation/appointments/upcoming" }
+```
+
+**400 — `hours` inválido** (`0`, `73`, `-1`, `abc`, vacío): `InvalidRequestException.field("hours", …)` →
+`code: VALIDATION` y `fieldErrors.hours` = "Las horas deben ser un entero entre 1 y 72"
+(`AutomationController.java:44`, `AutomationQueriesUseCase.java:31-32`; `hoursOutOfRangeOrNotNumericReturns400Validation`).
+Los límites 1 y 72 dan 200 (`hoursAtTheLimitsReturns200`). El 400 solo se ve **con clave válida**: sin clave
+manda el 401, porque la autenticación va antes que el controlador.
+
+### Pruebas
+
+- `AutomationUpcomingIntegrationTest` (CA-01 a CA-07; reloj fijo 2032-06-15 10:00 Bogotá para probar los bordes).
+- `AutomationClosedChainIntegrationTest` (clave vacía = todo 401).
+- `AutomationKeyNotLoggedIntegrationTest.neitherConfiguredNorSentKeyAppearsInLogs`: ni la clave configurada ni la
+  enviada aparecen en los logs.
+- `AutomationKeyStartupIntegrationTest`: arranque real que **falla** con clave débil (menos de 32 bytes,
+  `AutomationProperties.MIN_KEY_BYTES`) o con `CHANGE_ME` aunque supere los 32 bytes, sin imprimir el valor;
+  clave vacía arranca (cadena cerrada).
+- Suite completa **565/565 el 2026-10-04**.
+
 ## Relacionado
 
+- [[arq-hexagonal-seguridad]] — la cadena principal frente a la de automatización
 - [[contrato-rest-identidad]]
 - [[dec-003-libro-unico-slot-reservations]]
 - [[dec-004-decisiones-s3-reserva]]
@@ -571,6 +703,8 @@ español (ver [[contrato-rest-identidad]]). Prueba: `FrameworkErrorsSpanishInteg
 
 ## Historial
 
+- 2026-10-04 — S5 F3: CA-07 corregido (clave inválida/ausente → 401 con cualquier método; clave válida con POST/PUT/PATCH/DELETE → 405 con `Allow: GET`; supersede al "no GET = 401"). Documentadas las pruebas de clave fuera de logs y de arranque con clave débil/`CHANGE_ME`; suite 565/565.
+- 2026-10-04 — S5 F2: añadida § «S5 — automatización» con `GET /api/automation/appointments/upcoming` (clave `X-Automation-Key`, ventana, respuesta exacta, 401 sin `WWW-Authenticate`, 400 `hours`, decisión SHA-256 + `isEqual`), contrastada con controlador, filtro, config y pruebas.
 - 2026-09-30 — F9 (S4): verificado el corte S4 contra los controladores reales (índice, ejemplos, códigos), documentados los errores de framework ya en español y las divergencias halladas; corregidos `AdminAppointment`, la bandeja y las referencias a `SecurityConfig`.
 - 2026-09-30 — LOOP_02 iteración 3: **alineado con el código lo que el `backend-verifier` marcó como
   gravedad ALTA** (el contrato afirmaba lo contrario del código y el frontend consumía un campo sin

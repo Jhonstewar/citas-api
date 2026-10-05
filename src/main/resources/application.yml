@@ -86,6 +86,16 @@ app:
   admin-bootstrap:
     email: ${ADMIN_BOOTSTRAP_EMAIL:}
     password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+  # HU-034: clave de la cadena de automatizacion. Vacia = cadena cerrada (todo 401) y la API
+  # arranca; no vacia con < 32 bytes o con CHANGE_ME = el arranque falla.
+  automation:
+    api-key: ${AUTOMATION_API_KEY:}
+  # HU-035: webhooks de n8n. URL vacia = publicacion desactivada; si no, debe ser https://.
+  n8n:
+    secret: ${N8N_WEBHOOK_SECRET:}
+    wf001-url: ${N8N_WEBHOOK_WF001_URL:}
+    wf002-url: ${N8N_WEBHOOK_WF002_URL:}
+    wf003-url: ${N8N_WEBHOOK_WF003_URL:}
 
 logging:
   level:

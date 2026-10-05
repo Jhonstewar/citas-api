@@ -285,3 +285,9 @@ Creado `PLAN_EJECUCION_S5_S6.md` (raíz). HECHO verificado en el código: los ca
 - Corregido: `[[EP-008]]` roto en dec-006 (el archivo es `EP-008-operacion-administrativa-de-solicitudes`); cobertura del índice 14 → 15 páginas; cifras e HU por estado del índice (las viejas quedan como "historia"); "Estado real de S4" marcado superado; S1/S3 de S3 anotados como cerrada/mitigada.
 - Sin huérfanas ni secretos. Los enlaces a `RES-001`/`MODELO-DATOS-3FN` apuntan a `raw/` (válidos). Dudoso, sin tocar: `[[EP-008]]` sigue escrito así en la entrada de log del 2026-09-30 (append-only); la ambigüedad de raíz de la bóveda de Obsidian sigue abierta.
 
+
+## [2026-10-04] learn | S5 F2: contrato de automatización upcoming
+- `contrato-rest-citas` gana § «S5 — automatización»: ruta, clave `X-Automation-Key` (solo GET, cadena aparte, clave vacía = todo 401), ventana (ahora, ahora+hours] en Bogotá, solo `APPROVED`, campos exactos, 401 sin `WWW-Authenticate`, 400 `fieldErrors.hours` y la decisión SHA-256 + `MessageDigest.isEqual`. Verificado contra código y pruebas; sin cambios en `index.md` (sin páginas nuevas).
+
+## [2026-10-04] learn | S5 F3: CA-07 corregido a 405 y pruebas de logs y arranque
+- `contrato-rest-citas` § S5: clave ausente/inválida → 401 con cualquier método; clave válida + POST/PUT/PATCH/DELETE → 405 `Allow: GET` sin ejecutar nada (supersede al "no GET = 401"). Añadida cobertura de clave fuera de logs y arranque que falla con clave débil o `CHANGE_ME`; suite 565/565.

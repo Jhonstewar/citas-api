@@ -31,3 +31,11 @@ app:
   admin-bootstrap:
     email: ""
     password: ""
+  # Clave FICTICIA solo para pruebas (>= 32 bytes). Las URLs de n8n van vacias: sin publicacion.
+  automation:
+    api-key: test-only-automation-key-0123456789abcdef
+  n8n:
+    secret: ""
+    wf001-url: ""
+    wf002-url: ""
+    wf003-url: ""

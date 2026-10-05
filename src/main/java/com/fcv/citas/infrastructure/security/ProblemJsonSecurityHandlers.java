@@ -44,6 +44,23 @@ class ProblemJsonSecurityHandlers implements AuthenticationEntryPoint, AccessDen
                 "Se requiere un access token válido", request);
     }
 
+    /**
+     * 401 de la cadena de automatizacion (HU-034). Cuerpo fijo y sin pistas de que fallo (cabecera
+     * ausente, clave errona, metodo no admitido o cadena cerrada), y sin {@code WWW-Authenticate:
+     * Bearer}: aqui no hay token que presentar. No incluye la clave ni la cabecera recibida.
+     */
+    void commenceApiKey(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        write(response, HttpStatus.UNAUTHORIZED, "No autenticado",
+                "Se requiere una credencial de automatización válida", request);
+    }
+
+    /** 405 de la cadena de automatizacion: solo se llega con clave valida (HU-034 CA-07). */
+    void methodNotAllowed(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.setHeader(HttpHeaders.ALLOW, "GET");
+        write(response, HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido",
+                "El método HTTP no está permitido para este recurso", request);
+    }
+
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
             AccessDeniedException accessDeniedException) throws IOException {

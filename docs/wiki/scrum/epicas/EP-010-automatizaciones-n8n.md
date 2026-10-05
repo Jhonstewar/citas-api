@@ -2,7 +2,7 @@
 id: EP-010
 tipo: epica
 titulo: "Automatizaciones n8n"
-estado: Borrador
+estado: Aprobada
 requisitos: ["PRD §10", RF-19, RF-20]
 historias:
   - "[[HU-034-consultar-citas-para-automatizacion]]"
@@ -74,6 +74,8 @@ El paciente recibe aviso de lo que le ocurre a sus citas (recordatorio y cambios
 
 ### Propuestas vigentes, pendientes de confirmar por el usuario
 
+> Actualización 2026-10-04: **D-C, D-D y D-I quedaron aprobadas** con «aprobdo lo del s5» (alcance S5, interpretado por el agente principal). D-E, D-F y D-G siguen pendientes hasta confirmación explícita antes de la Fase 5.
+
 Se tratan como reglas de trabajo mientras no se confirmen; cualquiera puede cambiar y obligaría a revisar la HU afectada (registradas también como preguntas abiertas).
 
 - **D-C** — Ventana de recordatorio: citas `APPROVED` que empiezan en las próximas **24 h**, revisadas **cada hora**. El PRD no la define.
@@ -124,3 +126,4 @@ Se tratan como reglas de trabajo mientras no se confirmen; cualquiera puede camb
 ## Historial
 
 - 2026-09-30 — Épica creada en estado `Borrador` por el especificador Scrum a partir de `PLAN_S5_S6_N8N.md`, `PRD.md` §8–§10 y RF-19, `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`. Incorpora como reglas D-A, D-B y D-H (decididas por el usuario) y como propuestas pendientes D-C, D-D, D-E, D-F, D-G y D-I. No está aprobada.
+- 2026-10-04 — Aprobada por el usuario el 2026-10-04 con su mensaje «aprobdo lo del s5»; alcance S5 (EP-010 y HU-034, D-C, D-D, D-I); HU-035/036 pendientes de confirmación. Alcance interpretado por el agente principal a partir de esa frase (respuesta a la pregunta de seguir con S5 con la frase de aprobación de `PLAN_EJECUCION_S5_S6.md` §0). D-C, D-D y D-I pasan a vigentes por esa aprobación (afectan a WF-001); D-E, D-F y D-G (S6) siguen como propuestas pendientes de confirmación explícita antes de la Fase 5. HU-035 y HU-036 siguen en `Borrador`. Se autoriza abrir S5, lo que resuelve la precondición de apertura para el alcance de S5.

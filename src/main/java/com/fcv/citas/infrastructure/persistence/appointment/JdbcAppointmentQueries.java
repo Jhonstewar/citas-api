@@ -142,6 +142,35 @@ class JdbcAppointmentQueries implements AppointmentQueries {
     }
 
     @Override
+    public List<UpcomingAppointmentView> findApprovedStartingBetween(LocalDateTime from, LocalDateTime to) {
+        // Reutiliza FROM; las columnas son solo las del contrato (sin documento ni telefono).
+        String sql = """
+                SELECT a.id, u.first_names AS patient_first_name, u.email AS patient_email,
+                       a.scheduled_date, a.start_time, a.end_time,
+                       si.code AS site_code, si.name AS site_name, si.address AS site_address,
+                       CONCAT(pu.first_names, ' ', pu.last_names) AS professional_name,
+                       sp.name AS specialty_name
+                """ + FROM + """
+                 WHERE st.code = 'APPROVED'
+                   AND TIMESTAMP(a.scheduled_date, a.start_time) > :from
+                   AND TIMESTAMP(a.scheduled_date, a.start_time) <= :to
+                 ORDER BY a.scheduled_date, a.start_time, a.id
+                """;
+        return jdbc.query(sql, new MapSqlParameterSource("from", from).addValue("to", to),
+                (rs, i) -> new UpcomingAppointmentView(
+                        rs.getLong("id"),
+                        rs.getString("patient_first_name"),
+                        rs.getString("patient_email"),
+                        rs.getObject("scheduled_date", LocalDate.class),
+                        rs.getObject("start_time", LocalTime.class),
+                        rs.getObject("end_time", LocalTime.class),
+                        new UpcomingAppointmentView.SiteInfo(rs.getString("site_code"), rs.getString("site_name"),
+                                rs.getString("site_address")),
+                        rs.getString("professional_name"),
+                        rs.getString("specialty_name")));
+    }
+
+    @Override
     public List<AppointmentView> findPendingRequests(InboxFilter filter) {
         MapSqlParameterSource params = new MapSqlParameterSource();
         List<String> where = new ArrayList<>(List.of("st.code = 'REQUESTED'"));

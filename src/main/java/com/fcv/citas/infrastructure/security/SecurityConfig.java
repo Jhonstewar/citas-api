@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -26,7 +27,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties({ JwtProperties.class, RefreshCookieProperties.class,
-        PasswordResetProperties.class })
+        PasswordResetProperties.class, AutomationProperties.class, N8nProperties.class })
 public class SecurityConfig {
 
     /**
@@ -48,7 +49,12 @@ public class SecurityConfig {
             .map(path -> (RequestMatcher) PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, path))
             .toList());
 
+    /**
+     * Cadena principal: sin {@code securityMatcher}, captura todo lo que no tomo antes la cadena de
+     * automatizacion ({@code @Order(1)}, solo {@code /api/automation/**}).
+     */
     @Bean
+    @Order(2)
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             // Se cualifica por nombre: MVC registra tambien mvcHandlerMappingIntrospector

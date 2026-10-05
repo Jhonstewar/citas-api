@@ -62,6 +62,31 @@ public interface AppointmentQueries {
     record PendingRescheduleView(AppointmentView appointment, RescheduleView reschedule) {
     }
 
+    /**
+     * HU-034: vista minima para recordatorios. Nombre de pila y correo del paciente, SIN documento ni
+     * telefono ni historial. {@code professional} y {@code specialty} son los nombres.
+     */
+    record UpcomingAppointmentView(
+            long appointmentId,
+            String patientFirstName,
+            String patientEmail,
+            LocalDate date,
+            LocalTime startTime,
+            LocalTime endTime,
+            SiteInfo site,
+            String professional,
+            String specialty) {
+
+        public record SiteInfo(String code, String name, String address) {
+        }
+    }
+
+    /**
+     * HU-034: citas {@code APPROVED} cuyo inicio (fecha + hora) esta en el intervalo ({@code from}, {@code to}],
+     * es decir, {@code from} excluido y {@code to} incluido, por fecha y hora ascendentes.
+     */
+    List<UpcomingAppointmentView> findApprovedStartingBetween(LocalDateTime from, LocalDateTime to);
+
     /** Citas del paciente, proximas primero. {@code status} y {@code date} opcionales. */
     List<AppointmentView> findByPatient(long patientUserId, String status, LocalDate date);
 
