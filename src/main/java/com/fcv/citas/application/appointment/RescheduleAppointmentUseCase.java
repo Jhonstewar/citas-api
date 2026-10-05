@@ -61,10 +61,12 @@ public class RescheduleAppointmentUseCase {
     private final AdminAppointmentsUseCase admin;
     private final TransactionRunner tx;
     private final Clock clock;
+    private final AppointmentEventEmitter events;
 
     public RescheduleAppointmentUseCase(SpecialtyRepository specialties, ProfessionalRepository professionals,
             BlockRepository blocks, AppointmentRepository appointments, RescheduleRequestRepository reschedules,
-            AppointmentQueries queries, AdminAppointmentsUseCase admin, TransactionRunner tx, Clock clock) {
+            AppointmentQueries queries, AdminAppointmentsUseCase admin, TransactionRunner tx, Clock clock,
+            AppointmentEventPublisher publisher) {
         this.allocator = new SlotAllocator(specialties, professionals, blocks, clock);
         this.appointments = appointments;
         this.reschedules = reschedules;
@@ -72,6 +74,7 @@ public class RescheduleAppointmentUseCase {
         this.admin = admin;
         this.tx = tx;
         this.clock = clock;
+        this.events = new AppointmentEventEmitter(publisher, clock);
     }
 
     // ------------------------------------------------------------------ HU-027
@@ -128,7 +131,10 @@ public class RescheduleAppointmentUseCase {
             reschedules.saveDecision(approval.request());
             return id;
         });
-        return admin.detail(appointmentId);
+        // HU-035: fuera de la transaccion (ya confirmada); nunca propaga un fallo del publicador.
+        Detail detail = admin.detail(appointmentId);
+        events.emit(AppointmentEventType.RESCHEDULE_APPROVED, detail.appointment(), null);
+        return detail;
     }
 
     /**
@@ -145,7 +151,9 @@ public class RescheduleAppointmentUseCase {
             reschedules.saveDecision(rejected);
             return locked.appointment().id();
         });
-        return admin.detail(appointmentId);
+        Detail detail = admin.detail(appointmentId);
+        events.emit(AppointmentEventType.RESCHEDULE_REJECTED, detail.appointment(), reason);
+        return detail;
     }
 
     private record Locked(RescheduleRequest request, Appointment appointment, IntFunction<String> siteLabel) {

@@ -20,6 +20,10 @@ public record N8nProperties(String secret, String wf001Url, String wf002Url, Str
 
     public N8nProperties {
         secret = secret == null ? "" : secret;
+        if (secret.toUpperCase(java.util.Locale.ROOT).contains("CHANGE_ME")) {
+            // No se incluye el valor: es un secreto.
+            throw new IllegalStateException("N8N_WEBHOOK_SECRET contiene el marcador CHANGE_ME: defina un secreto real");
+        }
         wf001Url = requireHttpsOrEmpty("N8N_WEBHOOK_WF001_URL", wf001Url);
         wf002Url = requireHttpsOrEmpty("N8N_WEBHOOK_WF002_URL", wf002Url);
         wf003Url = requireHttpsOrEmpty("N8N_WEBHOOK_WF003_URL", wf003Url);

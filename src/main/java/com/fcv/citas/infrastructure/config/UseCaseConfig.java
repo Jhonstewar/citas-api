@@ -16,6 +16,7 @@ import com.fcv.citas.application.auth.RegisterUserUseCase;
 import com.fcv.citas.application.auth.SessionIssuer;
 import com.fcv.citas.application.automation.AutomationQueriesUseCase;
 import com.fcv.citas.application.appointment.AdminAppointmentsUseCase;
+import com.fcv.citas.application.appointment.AppointmentEventPublisher;
 import com.fcv.citas.application.appointment.AppointmentQueries;
 import com.fcv.citas.application.appointment.AvailabilityQueries;
 import com.fcv.citas.application.appointment.BookAppointmentUseCase;
@@ -134,8 +135,8 @@ public class UseCaseConfig {
 
     @Bean
     AdminAppointmentsUseCase adminAppointmentsUseCase(AppointmentRepository appointments,
-            AppointmentQueries queries, TransactionRunner tx, Clock clock) {
-        return new AdminAppointmentsUseCase(appointments, queries, tx, clock);
+            AppointmentQueries queries, TransactionRunner tx, Clock clock, AppointmentEventPublisher publisher) {
+        return new AdminAppointmentsUseCase(appointments, queries, tx, clock, publisher);
     }
 
     @Bean
@@ -158,8 +159,8 @@ public class UseCaseConfig {
     @Bean
     CancelAppointmentUseCase cancelAppointmentUseCase(AppointmentRepository appointments,
             RescheduleRequestRepository reschedules, PatientAppointmentsUseCase patientAppointments,
-            TransactionRunner tx, Clock clock) {
-        return new CancelAppointmentUseCase(appointments, reschedules, patientAppointments, tx, clock);
+            TransactionRunner tx, Clock clock, AppointmentEventPublisher publisher) {
+        return new CancelAppointmentUseCase(appointments, reschedules, patientAppointments, tx, clock, publisher);
     }
 
     /** HU-027 y HU-031: pedir, aprobar y rechazar una reprogramacion. */
@@ -167,9 +168,9 @@ public class UseCaseConfig {
     RescheduleAppointmentUseCase rescheduleAppointmentUseCase(SpecialtyRepository specialties,
             ProfessionalRepository professionals, BlockRepository blocks, AppointmentRepository appointments,
             RescheduleRequestRepository reschedules, AppointmentQueries queries, AdminAppointmentsUseCase admin,
-            TransactionRunner tx, Clock clock) {
+            TransactionRunner tx, Clock clock, AppointmentEventPublisher publisher) {
         return new RescheduleAppointmentUseCase(specialties, professionals, blocks, appointments, reschedules,
-                queries, admin, tx, clock);
+                queries, admin, tx, clock, publisher);
     }
 
     /**

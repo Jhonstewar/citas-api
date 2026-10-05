@@ -2,7 +2,7 @@
 id: HU-036
 tipo: historia-de-usuario
 titulo: "Versionar y documentar los flujos n8n"
-estado: Borrador
+estado: Aprobada
 epica: "[[EP-010-automatizaciones-n8n]]"
 requisitos: ["PRD §10", RF-20]
 esfuerzo: "Medio"
@@ -39,7 +39,7 @@ Flujos:
 - **WF-002** `jhonNuñez-WF-002-status-notifications`: `Webhook` autenticado con Header Auth → validación de campos → idempotencia por `eventId` → `Switch` por `eventType` → Gmail en texto plano → registro → respuesta 200 válido, 400 inválido, 200 `duplicate:true`.
 - **WF-003** (opcional/bonus, D-G) `jhonNuñez-WF-003-daily-operational-summary`: `Schedule` 07:00 **y** webhook a demanda → `HTTP GET daily` → agrupar por sede y estado → Gmail → registro.
 
-Decisiones de esta HU: **D-H** (decidida) crea los workflows **de cero** con prefijo `jhonNuñez-` y paths de webhook **sin ñ**, sin tocar los tres borradores ajenos; **D-B** (decidida) el acceso de n8n a la API es por túnel temporal. **Propuestas vigentes, pendientes de confirmar:** **D-C** (24 h, cada hora), **D-D** (anti-duplicado en Data Table de n8n), **D-G** (WF-003 bonus) y **D-I** (webhook a demanda además del Schedule en WF-001 y WF-003).
+Decisiones de esta HU: **D-H** (decidida) crea los workflows **de cero** con prefijo `jhonNuñez-` y paths de webhook **sin ñ**, sin tocar los tres borradores ajenos; **D-B** (decidida) el acceso de n8n a la API es por túnel temporal. **Propuestas vigentes, pendientes de confirmar:** **D-C** (24 h, cada hora), **D-D** (anti-duplicado en Data Table de n8n) y **D-I** (webhook a demanda además del Schedule en WF-001 y WF-003). **D-G** (WF-003 bonus) quedó **aprobada por el usuario el 2026-10-04**.
 
 **Precondición:** esta HU depende de que S4 esté cerrada o de que el usuario autorice expresamente abrir S5/S6, y de que [[HU-034-consultar-citas-para-automatizacion]] (para WF-001) y [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] (para WF-002) estén implementadas.
 
@@ -250,12 +250,13 @@ Decisiones de esta HU: **D-H** (decidida) crea los workflows **de cero** con pre
 
 ## Historial de validación
 
+- 2026-10-04 — Estado `Borrador` → `Aprobada`. **Aprobación directa del usuario, no delegada**, respondida en esta sesión mediante el selector de opciones: «Apruebo todo tal como está en el plan (Recomendado)», a la pregunta «¿Apruebas HU-035, HU-036 y las propuestas D-E, D-F y D-G para adelantar la Fase 5 (publicador de eventos)?». La opción detallaba: D-E eventos de aprobación, rechazo, reprogramación y cancelación (la cita general no); D-F entrega *best-effort* con 3 reintentos, sin *outbox*; D-G WF-003 como bonus. D-G queda aprobada.
 - 2026-09-30 — HU creada en estado `Borrador` por el especificador Scrum a partir de `PLAN_S5_S6_N8N.md` (§2, §3–§5, §7), `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`. Recoge D-B y D-H, decididas por el usuario; D-C, D-D, D-G e D-I figuran como propuesta vigente pendiente de confirmar. No está aprobada.
 
 ## Notas y decisiones
 
 - **D-B y D-H (decididas):** túnel temporal y workflows nuevos con prefijo `jhonNuñez-`. Los paths de webhook no llevan ñ porque viajan en la URL.
-- **Propuestas pendientes:** D-C, D-D, D-G e D-I (véanse la épica y las preguntas abiertas).
+- **D-G aprobada el 2026-10-04** (WF-003 bonus). Siguen en la épica D-C, D-D e D-I (véanse la épica y las preguntas abiertas).
 - Las tres variables de URL de webhook son una por flujo: `N8N_WEBHOOK_WF001_URL` y `N8N_WEBHOOK_WF003_URL` sirven al disparo a demanda, `N8N_WEBHOOK_WF002_URL` es el destino del evento de Spring. La lectura de que las dos primeras son solo para disparo manual es una interpretación del plan y debe confirmarse (D-I).
 - Los criterios que dependen de la instancia remota (CA-03, CA-04, CA-07 a CA-09) requieren evidencia reproducible (ids de ejecución, capturas). Sin ella se clasifican `No verificable`, nunca `Cumple`.
 - Pregunta abierta: qué hacer en WF-003 con un día sin citas (INC-044).

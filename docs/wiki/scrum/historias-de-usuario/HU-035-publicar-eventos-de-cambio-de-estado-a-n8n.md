@@ -2,7 +2,7 @@
 id: HU-035
 tipo: historia-de-usuario
 titulo: "Publicar eventos de cambio de estado a n8n"
-estado: Borrador
+estado: En validación
 epica: "[[EP-010-automatizaciones-n8n]]"
 requisitos: ["PRD §10", RF-19, RF-20]
 esfuerzo: "Alto"
@@ -38,7 +38,7 @@ relacionadas:
 
 Forma del diseño: un **puerto** `AppointmentEventPublisher` en `application` (sin Spring ni HTTP), un **adaptador** en `infrastructure` que hace el `POST`, y un adaptador nulo cuando no hay URL. Los casos de uso llaman al puerto **después** de que `tx.inTransaction` retorne, nunca dentro, con la vista ya leída. Un fallo del publicador se captura y se registra, **nunca** se propaga.
 
-**Propuestas vigentes, pendientes de confirmar:** **D-E** (eventos: aprobación/rechazo de especializada, aprobación/rechazo de reprogramación y cancelación; la cita general auto-aprobada queda fuera) y **D-F** (entrega *best-effort* con reintentos tras el commit, sin *outbox*). Si el usuario cambia D-E o D-F, esta HU se reescribe antes de aprobarse.
+**Aprobadas por el usuario el 2026-10-04 (ver historial):** **D-E** (eventos: aprobación/rechazo de especializada, aprobación/rechazo de reprogramación y cancelación; la cita general auto-aprobada queda fuera) y **D-F** (entrega *best-effort* con reintentos tras el commit, sin *outbox*). D-F queda con 3 reintentos y sin *outbox*. Si el usuario cambia D-E o D-F, esta HU se reescribe.
 
 **Contrato propuesto del evento** (`POST {N8N_WEBHOOK_WF002_URL}`, cabecera `X-Webhook-Secret`, cuerpo JSON):
 
@@ -99,19 +99,19 @@ Forma del diseño: un **puerto** `AppointmentEventPublisher` en `application` (s
 
 ## Tareas de desarrollo
 
-- [ ] **T-01 — Definir el evento y el puerto de publicación**  
+- [x] **T-01 — Definir el evento y el puerto de publicación**  
   Dificultad: Medio  
   Descripción: Tipo de evento con `eventId`, `eventType`, `occurredAt`, cita, paciente y motivo, y la interfaz `AppointmentEventPublisher` en `application`. Sin Spring, sin HTTP, sin JSON.
 
-- [ ] **T-02 — Publicar desde los casos de uso, después del commit**  
+- [x] **T-02 — Publicar desde los casos de uso, después del commit**  
   Dificultad: Alto  
   Descripción: En aprobar/rechazar cita especializada, aprobar/rechazar reprogramación y cancelar, construir el evento con la vista ya leída y llamar al puerto fuera del bloque `tx.inTransaction`. Cualquier excepción del publicador se captura y se registra sin propagarse.
 
-- [ ] **T-03 — Adaptador HTTP hacia n8n**  
+- [x] **T-03 — Adaptador HTTP hacia n8n**  
   Dificultad: Alto  
   Descripción: `N8nWebhookPublisher` con cliente HTTP, timeouts de conexión y lectura, hasta tres reintentos con espera creciente, cabecera `X-Webhook-Secret`, ejecución asíncrona y log sin cuerpo ni correo.
 
-- [ ] **T-04 — Adaptador nulo y configuración**  
+- [x] **T-04 — Adaptador nulo y configuración**  
   Dificultad: Medio  
   Descripción: `NoOpAppointmentEventPublisher` activo si `N8N_WEBHOOK_WF002_URL` está vacía. Clase `@ConfigurationProperties("app.n8n")` con las tres URL y el secreto; validación al arrancar (URL `https`, rechazo de `CHANGE_ME`). Variables declaradas sin valores en `.env.example`, `docker-compose.yml` y `application.yml`.
 
@@ -119,11 +119,11 @@ Forma del diseño: un **puerto** `AppointmentEventPublisher` en `application` (s
   Dificultad: Alto  
   Descripción: Evento correcto por transición, ausencia de evento si la transacción falla, y publicador que lanza excepción sin cambiar el resultado ni revertir.
 
-- [ ] **T-06 — Pruebas del adaptador contra un servidor HTTP local**  
+- [x] **T-06 — Pruebas del adaptador contra un servidor HTTP local**  
   Dificultad: Medio  
   Descripción: Verifican cabecera, cuerpo, reintentos ante error y timeout, y contenido del log.
 
-- [ ] **T-07 — Contrato del evento y decisión de entrega**  
+- [x] **T-07 — Contrato del evento y decisión de entrega**  
   Dificultad: Bajo  
   Descripción: Documentar el evento en `contrato-rest-citas.md` y registrar D-F y sus límites en la wiki, según [[HU-033-publicar-contrato-rest-documentado]].
 
@@ -219,39 +219,46 @@ Forma del diseño: un **puerto** `AppointmentEventPublisher` en `application` (s
 
 | Elemento | Resultado | Evidencia | Observación |
 |---|---|---|---|
-| CA-01 | Pendiente | — | — |
-| CA-02 | Pendiente | — | — |
-| CA-03 | Pendiente | — | — |
-| CA-04 | Pendiente | — | — |
-| CA-05 | Pendiente | — | — |
-| CA-06 | Pendiente | — | — |
-| CA-07 | Pendiente | — | — |
-| CA-08 | Pendiente | — | — |
-| CA-09 | Pendiente | — | — |
-| CA-10 | Pendiente | — | — |
-| CA-11 | Pendiente | — | — |
-| CA-12 | Pendiente | — | — |
-| DoD — CA-01 a CA-12 validados | Pendiente | — | — |
-| DoD — Puerto en application y adaptador en infrastructure | Pendiente | — | — |
-| DoD — Ninguna llamada dentro de `tx.inTransaction` | Pendiente | — | — |
-| DoD — Sin migraciones | Pendiente | — | — |
-| DoD — Variables declaradas sin valores reales | Pendiente | — | — |
-| DoD — Pruebas y suite completa en Docker | Pendiente | — | — |
-| DoD — `HexagonalArchitectureTest` | Pendiente | — | — |
-| DoD — Contrato del evento y decisión D-F | Pendiente | — | — |
-| DoD — Prueba real de extremo a extremo | Pendiente | — | — |
-| DoD — Verificación independiente | Pendiente | — | — |
-| DoD — Trazabilidad actualizada | Pendiente | — | — |
+Verificación independiente de la Fase 6 (`backend-verifier`, agente distinto del implementador), 2026-10-04: suite **599/599**, `HexagonalArchitectureTest` 4/4, `HistoryWritersArchitectureTest` 3/3. Abreviaturas: **AEPIT** = `AppointmentEventPublishingIntegrationTest`, **N8WPT** = `N8nWebhookPublisherTest`, **AEE** = `AppointmentEventEmitter`.
+
+| Elemento | Resultado | Evidencia | Observación |
+|---|---|---|---|
+| CA-01 | Cumple | AEPIT: `approvingASpecializedRequest…`, `rejectingASpecializedRequest…`, `approvingAndRejectingAReschedulingEmitRescheduleEvents`, `cancellingEmitsOneCancelledEvent`, `everyEventHasADistinctEventId` | Un evento por operación, con su `eventType` y `eventId` distintos |
+| CA-02 | Cumple con reserva | AEPIT: `invalidTransitionEmitsNothing`, `rejectionWithoutReasonEmitsNothing` | La garantía es **estructural** (la emisión va después del `tx`). Sin prueba de decisión concurrente perdedora ni de cancelación ajena |
+| CA-03 | Cumple | AEPIT: `thePublisherObservesTheAlreadyCommittedState`; orden en `AdminAppointmentsUseCase:107-115` y `:121-129`, `RescheduleAppointmentUseCase:134-137` y `:154-156`, `CancelAppointmentUseCase:65-67` | La prueba no cubre `RESCHEDULE_*`; ahí se apoya en la lectura del orden en el código |
+| CA-04 | Cumple con reserva | AEPIT: `aFailingPublisherDoesNotChangeTheOutcome` (aprobar, rechazar, cancelar); `AEE:64-71` | Falta la prueba del fallo del publicador en reprogramación y la aserción del log del emisor |
+| CA-05 | Cumple | `AppointmentEventPublisherSelectionTest` | Sin URL, adaptador nulo |
+| CA-06 | Cumple | N8WPT: `sendsAPostWithTheSecretHeaderAndJsonContent`, `theBodyHasExactlyTheKeysOfTheContract`, `withoutSecretNothingIsSent` | — |
+| CA-07 | Cumple | N8WPT: `theLogNeverContainsEmailReasonSecretBodyOrUrl` | — |
+| CA-08 | Cumple con reserva | N8WPT: 502, 502, 200 → 3 intentos; timeout real; `publishingIsAsynchronousAndDoesNotWaitForTheRetryBackoff` | La espera creciente solo se prueba por constante y el *connect-timeout* no se ejerce |
+| CA-09 | Cumple | `HexagonalArchitectureTest` 4/4 | — |
+| CA-10 | Cumple | `N8nProperties:23-26` (`CHANGE_ME`) y `:36-38` (`https`); `n8nSecretWithChangeMeFailsStartupWithoutEchoingIt` | — |
+| CA-11 | Cumple | `contrato-rest-citas.md` § «S5–S6 — evento de cambio de estado»; [[dec-007-entrega-best-effort-eventos-n8n]] | Sin discrepancias con el código. `llm-wiki/` queda fuera del límite de escritura de esta skill: la evidencia se leyó |
+| CA-12 | Cumple | El diff de `src/test` solo añade; suite 599/599 | Ninguna expectativa previa modificada |
+| DoD — CA-01 a CA-12 validados | Cumple | Filas CA-01 a CA-12 (CA-02, CA-04 y CA-08 con reserva, anotada) | — |
+| DoD — Puerto en application y adaptador en infrastructure | Cumple | `HexagonalArchitectureTest` 4/4; puerto `AppointmentEventPublisher`, adaptador `N8nWebhookPublisher` | Ver observación O-4 en las notas |
+| DoD — Ninguna llamada dentro de `tx.inTransaction` | Cumple | Orden en los casos de uso (ver CA-03); AEPIT `thePublisherObservesTheAlreadyCommittedState` | — |
+| DoD — Sin migraciones | Cumple | Verificación de la Fase 6 | — |
+| DoD — Variables declaradas sin valores reales | Cumple | `N8nProperties`; `n8nSecretWithChangeMeFailsStartupWithoutEchoingIt` | `.env` no se versiona |
+| DoD — Pruebas y suite completa en Docker | Cumple | Suite 599/599 | — |
+| DoD — `HexagonalArchitectureTest` | Cumple | 4/4 (y `HistoryWritersArchitectureTest` 3/3) | — |
+| DoD — Contrato del evento y decisión D-F | Cumple | Fila CA-11 | — |
+| DoD — Prueba real de extremo a extremo | No verificable | — | Falta la prueba contra el WF-002 real: **Fase 7**. Antes hay que cerrar O-1 (`patient.fullName` frente a `patient.firstName` en el flujo) |
+| DoD — Verificación independiente | Cumple | Esta matriz (`backend-verifier`, Fase 6) | — |
+| DoD — Trazabilidad actualizada | Cumple | Esta matriz, el historial, `scrum/README.md` y [[sintesis-preguntas-abiertas]] | — |
 
 ## Historial de validación
 
+- 2026-10-04 — **Verificación independiente de la Fase 6; estado `Aprobada` → `En validación`. NO pasa a `Completada`:** faltan la prueba E2E contra el WF-002 real (Fase 7) y la F9. El `backend-verifier` da PASS a CA-01..CA-12 (CA-02, CA-04 y CA-08 con reserva, anotadas en la matriz) con suite 599/599, `HexagonalArchitectureTest` 4/4 y `HistoryWritersArchitectureTest` 3/3. T-01..T-04, T-06 y T-07 marcadas como completadas (backend); **T-05 sin marcar** (la matriz anota los huecos de prueba de reprogramación y de «no emite» en cancelación ajena y decisión perdedora) y la prueba real contra n8n queda en la DoD como `No verificable`. **Decisiones aceptadas:** executor propio `AutoCloseable`, no un bean `Executor`, para no desactivar `applicationTaskExecutor`; la espera de 4 s de `PRODUCTION_WAITS` no tiene uso real (con 3 intentos solo hay 2 esperas); selección del publicador por `@Bean` en lugar de `@ConditionalOnProperty`. Observaciones O-1, O-2 y O-4 en las notas y en [[sintesis-preguntas-abiertas]] («Actualización S6 F6»).
+- 2026-10-04 — Estado `Borrador` → `Aprobada`. **Aprobación directa del usuario, no delegada**, respondida en esta sesión mediante el selector de opciones: «Apruebo todo tal como está en el plan (Recomendado)», a la pregunta «¿Apruebas HU-035, HU-036 y las propuestas D-E, D-F y D-G para adelantar la Fase 5 (publicador de eventos)?». La opción detallaba: D-E eventos de aprobación, rechazo, reprogramación y cancelación (la cita general no); D-F entrega *best-effort* con 3 reintentos, sin *outbox*; D-G WF-003 como bonus. D-E y D-F quedan aprobadas.
 - 2026-09-30 — HU creada en estado `Borrador` por el especificador Scrum a partir de `PLAN_S5_S6_N8N.md` (§0.2, §2, §4). D-E, D-F e D-I figuran como propuesta vigente pendiente de confirmar. No está aprobada.
 
 ## Notas y decisiones
 
-- **Propuestas pendientes (D-E, D-F, D-I):** véanse la épica y la lista de preguntas abiertas.
+- **D-E y D-F, aprobadas el 2026-10-04** (D-F con 3 reintentos y sin *outbox*); D-I figura en la épica. Véanse la épica y la lista de preguntas abiertas.
 - Esta HU introduce un cambio de código en casos de uso de HU `Completada` o `En validación` (HU-026, HU-030, HU-031). El comportamiento observable no cambia (CA-12); se deja aquí la trazabilidad en lugar de tocar esas HU, por indicación de no modificarlas. Reabrir alguna sería decisión del usuario.
 - El paciente recibe el `reason` escrito por ADMIN o por el paciente: debe revisarse que no contenga datos de otras personas (riesgo residual documentado en [[HU-036-versionar-y-documentar-los-flujos-n8n]]).
 - Pregunta abierta: la cancelación puede incluir `reason`? El contrato REST de HU-026 no lo garantiza; el campo es opcional en el evento y debe verificarse contra el código al implementar.
 - Pregunta abierta: ¿se reenvía algo ante eventos perdidos? D-F responde que no.
+- **Observaciones de la verificación de la Fase 6 (2026-10-04), sin cambio de estado:** **O-1** el evento envía `patient.fullName` y `jhonNuñez-WF-002` lee `patient.firstName`: ajuste obligatorio de la Fase 7. **O-2** el borrador de la ficha incluía `status` y el evento real no lo envía; el contrato publicado coincide con el código, así que el texto de la ficha es el que hay que reconciliar. **O-4** `AppointmentEventEmitter` usa `org.slf4j` dentro de `application/`, primer uso en el núcleo: ArchUnit no lo prohíbe pero contradice el «Java puro» de `AGENTS.md` §2; decisión pendiente del usuario. No se demuestra que Spring invoque `close()` del adaptador (hilos daemon, impacto nulo). Huecos de prueba menores: excepción del publicador en reprogramación y «no emite» en cancelación ajena y decisión perdedora.
 - Precondición: S4 cerrada o autorización expresa del usuario para abrir S5/S6.

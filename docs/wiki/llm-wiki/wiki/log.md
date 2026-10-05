@@ -291,3 +291,7 @@ Creado `PLAN_EJECUCION_S5_S6.md` (raíz). HECHO verificado en el código: los ca
 
 ## [2026-10-04] learn | S5 F3: CA-07 corregido a 405 y pruebas de logs y arranque
 - `contrato-rest-citas` § S5: clave ausente/inválida → 401 con cualquier método; clave válida + POST/PUT/PATCH/DELETE → 405 `Allow: GET` sin ejecutar nada (supersede al "no GET = 401"). Añadida cobertura de clave fuera de logs y arranque que falla con clave débil o `CHANGE_ME`; suite 565/565.
+
+## [2026-10-04] learn | S6 F5: contrato del evento a n8n, dec-007 y estado real de n8n
+- Nueva sección en `contrato-rest-citas` (evento saliente a WF-002: cuerpo exacto, 5 tipos, no-emisión, post-commit, reintentos 3x 1 s/2 s, NoOp/secreto vacío/CHANGE_ME, logs) contrastada con `N8nWebhookPublisher` y 4 clases de prueba. Creada `dec-007-entrega-best-effort-eventos-n8n` (D-F aprobada por el usuario; alternativas descartadas; riesgo residual 3).
+- HECHO de entorno n8n (flujos inactivos con sus ids, instancia compartida, credenciales propias faltantes, Data Table con 5 filas de prueba, MCP sin borrado) en `sintesis-preguntas-abiertas`. Índice y dec-006 enlazan dec-007. Abierto: WF-002 no probado extremo a extremo contra el publicador.

@@ -77,6 +77,41 @@ class AutomationAndN8nPropertiesTest {
                 .doesNotContain("super-secreto-n8n");
     }
 
+    /* ---------------- CA-10: secreto de n8n con CHANGE_ME = falla el arranque ---------------- */
+
+    @Test
+    void n8nSecretWithChangeMeFailsStartupWithoutEchoingIt() {
+        for (String secret : new String[] { "CHANGE_ME", "change_me", "Change_Me-extra-secreto" }) {
+            assertThatThrownBy(() -> new N8nProperties(secret, "", "", ""))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("N8N_WEBHOOK_SECRET").hasMessageContaining("CHANGE_ME")
+                    .hasMessageNotContaining(secret.equals("CHANGE_ME") ? "zzz" : secret);
+            runner("app.n8n.secret=" + secret).run(ctx -> {
+                assertThat(ctx).hasFailed();
+                Throwable t = ctx.getStartupFailure();
+                while (t != null) {
+                    assertThat(String.valueOf(t.getMessage())).doesNotContain("extra-secreto");
+                    t = t.getCause();
+                }
+            });
+        }
+    }
+
+    @Test
+    void emptyOrOrdinaryN8nSecretStarts() {
+        assertThatCode(() -> new N8nProperties("", "", "", "")).doesNotThrowAnyException();
+        assertThatCode(() -> new N8nProperties("   ", "", "", "")).doesNotThrowAnyException();
+        assertThatCode(() -> new N8nProperties("un-secreto-normal", "", "", "")).doesNotThrowAnyException();
+        runner("app.n8n.secret=").run(ctx -> assertThat(ctx).hasNotFailed());
+        runner("app.n8n.secret=un-secreto-normal").run(ctx -> assertThat(ctx).hasNotFailed());
+    }
+
+    @Test
+    void toStringStillMasksTheSecret() {
+        assertThat(new N8nProperties("un-secreto-normal", "https://n8n.example.test/x", "", "").toString())
+                .doesNotContain("un-secreto-normal").contains("secret=***");
+    }
+
     /* ---------------- Regla 3: URL de n8n no vacia sin https:// = falla el arranque ---------------- */
 
     @Test

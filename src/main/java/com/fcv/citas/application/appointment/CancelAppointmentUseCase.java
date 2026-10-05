@@ -26,14 +26,17 @@ public class CancelAppointmentUseCase {
     private final PatientAppointmentsUseCase patientAppointments;
     private final TransactionRunner tx;
     private final Clock clock;
+    private final AppointmentEventEmitter events;
 
     public CancelAppointmentUseCase(AppointmentRepository appointments, RescheduleRequestRepository reschedules,
-            PatientAppointmentsUseCase patientAppointments, TransactionRunner tx, Clock clock) {
+            PatientAppointmentsUseCase patientAppointments, TransactionRunner tx, Clock clock,
+            AppointmentEventPublisher publisher) {
         this.appointments = appointments;
         this.reschedules = reschedules;
         this.patientAppointments = patientAppointments;
         this.tx = tx;
         this.clock = clock;
+        this.events = new AppointmentEventEmitter(publisher, clock);
     }
 
     /**
@@ -59,6 +62,9 @@ public class CancelAppointmentUseCase {
             }
             return null;
         });
-        return patientAppointments.detail(patientUserId, appointmentId);
+        // HU-035: fuera de la transaccion (ya confirmada); nunca propaga un fallo del publicador.
+        PatientDetail detail = patientAppointments.detail(patientUserId, appointmentId);
+        events.emit(AppointmentEventType.APPOINTMENT_CANCELLED, detail.appointment(), reason);
+        return detail;
     }
 }

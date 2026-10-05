@@ -281,21 +281,21 @@ Backend verificado leyendo código y pruebas (suite **513/513**) y frontend con 
 
 ## EP-010 — Automatizaciones n8n (especificada el 2026-09-30; alcance S5 aprobado el 2026-10-04)
 
-Se especificaron [[EP-010-automatizaciones-n8n]] y sus tres historias. El 2026-10-04 el usuario aprobó con su mensaje «aprobdo lo del s5» (alcance interpretado por el agente principal): EP-010 y [[HU-034-consultar-citas-para-automatizacion]] pasan a `Aprobada`, junto con D-C, D-D y D-I. HU-035 y HU-036 siguen en `Borrador` hasta que el usuario las confirme explícitamente antes de la Fase 5.
+Se especificaron [[EP-010-automatizaciones-n8n]] y sus tres historias. El 2026-10-04 el usuario aprobó con su mensaje «aprobdo lo del s5» (alcance interpretado por el agente principal): EP-010 y [[HU-034-consultar-citas-para-automatizacion]] pasan a `Aprobada`, junto con D-C, D-D y D-I. Después, el mismo 2026-10-04, el usuario respondió directamente en la sesión, por selector de opciones, «Apruebo todo tal como está en el plan (Recomendado)» a la pregunta «¿Apruebas HU-035, HU-036 y las propuestas D-E, D-F y D-G para adelantar la Fase 5 (publicador de eventos)?»: HU-035 y HU-036 pasan a `Aprobada`, y D-E, D-F y D-G quedan aprobadas.
 
-**Estado global tras la verificación de HU-034 (2026-10-04):** 25 `Completada`, 8 `En validación` (las 7 anteriores más HU-034), 1 `En desarrollo` (HU-033) y 2 `Borrador` (HU-035 y HU-036); total 36. Fuente: `PLAN_S5_S6_N8N.md` (raíz), PRD §8–§10 y RF-19, `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`.
+**Estado global tras la verificación de HU-035 (2026-10-04):** 25 `Completada`, 9 `En validación` (HU-005, 007, 009, 011, 012, 022, 028, 034 y 035), 1 `En desarrollo` (HU-033), 1 `Aprobada` (HU-036) y 0 `Borrador`; total 36. Fuente: `PLAN_S5_S6_N8N.md` (raíz), PRD §8–§10 y RF-19, `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`.
 
 | HU | Título | Esfuerzo | Estado |
 |---|---|---|---|
-| [[HU-034-consultar-citas-para-automatizacion]] | Consultar citas para automatización (clave dedicada, `/api/automation/**`) | Alto | `En validación` (CA-01 a CA-10 en PASS, suite 565/565; CA-11 y T-05 fuera de entrega de S5; espera la F9) |
-| [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] | Publicar eventos de cambio de estado a n8n | Alto | `Borrador` |
-| [[HU-036-versionar-y-documentar-los-flujos-n8n]] | Versionar y documentar los flujos n8n | Medio | `Borrador` |
+| [[HU-034-consultar-citas-para-automatizacion]] | Consultar citas para automatización (clave dedicada, `/api/automation/**`) | Alto | `En validación` (CA-01 a CA-10 en PASS, suite 565/565; CA-11 y T-05 opcionales, entran con la Fase 8 por D-G; espera la F9) |
+| [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] | Publicar eventos de cambio de estado a n8n | Alto | `En validación` (CA-01 a CA-12 en PASS, tres con reserva; suite 599/599; falta la prueba E2E contra WF-002 real, Fase 7, y la F9) |
+| [[HU-036-versionar-y-documentar-los-flujos-n8n]] | Versionar y documentar los flujos n8n | Medio | `Aprobada` |
 
 **Decididas por el usuario (2026-09-30):** D-A (clave de API dedicada de solo lectura, cabecera `X-Automation-Key`, cadena de seguridad propia), D-B (túnel temporal), D-H (workflows nuevos con prefijo `jhonNuñez-`, paths de webhook sin ñ).
 
 **Aprobadas el 2026-10-04 con «aprobdo lo del s5» (alcance S5):** D-C (ventana de 24 h revisada cada hora), D-D (anti-duplicado en Data Table de n8n), D-I (webhook a demanda además del Schedule en WF-001).
 
-**Propuesta vigente, pendiente de confirmar explícitamente antes de la Fase 5 (S6):** D-E (eventos: aprobación/rechazo de especializada, aprobación/rechazo de reprogramación, cancelación), D-F (entrega *best-effort* sin *outbox*), D-G (WF-003 bonus).
+**Aprobadas el 2026-10-04 por respuesta directa del usuario («Apruebo todo tal como está en el plan (Recomendado)»):** D-E (eventos de aprobación, rechazo, reprogramación y cancelación; la cita general no), D-F (entrega *best-effort* con 3 reintentos, sin *outbox*) y D-G (WF-003 como bonus, entra con la Fase 8). Con D-G aprobada, CA-11 y T-05 de HU-034 pasan de «fuera de entrega» a «opcional, entra con la Fase 8», sin cambiar el estado de HU-034.
 
 **Precondición (resuelta para S5 por la autorización del 2026-10-04):** la épica dependía de que S4 esté cerrada o de que el usuario autorice expresamente abrir S5. Varias HU de las que depende siguen en `En validación` o `En desarrollo` (HU-026, HU-027, HU-028, HU-031, HU-033).
 

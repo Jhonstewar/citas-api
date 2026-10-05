@@ -74,15 +74,13 @@ El paciente recibe aviso de lo que le ocurre a sus citas (recordatorio y cambios
 
 ### Propuestas vigentes, pendientes de confirmar por el usuario
 
-> Actualización 2026-10-04: **D-C, D-D y D-I quedaron aprobadas** con «aprobdo lo del s5» (alcance S5, interpretado por el agente principal). D-E, D-F y D-G siguen pendientes hasta confirmación explícita antes de la Fase 5.
-
-Se tratan como reglas de trabajo mientras no se confirmen; cualquiera puede cambiar y obligaría a revisar la HU afectada (registradas también como preguntas abiertas).
+> Actualización 2026-10-04: **D-C, D-D y D-I quedaron aprobadas** con «aprobdo lo del s5» (alcance S5, interpretado por el agente principal). **D-E, D-F y D-G quedaron aprobadas el 2026-10-04**, por respuesta directa del usuario en esta sesión (ver Historial). Cualquiera puede cambiar y obligaría a revisar la HU afectada (registradas también como preguntas abiertas).
 
 - **D-C** — Ventana de recordatorio: citas `APPROVED` que empiezan en las próximas **24 h**, revisadas **cada hora**. El PRD no la define.
 - **D-D** — Anti-duplicado del recordatorio en una **Data Table de n8n** (sin migración). Riesgo residual: si se pierde la tabla, se reenvían recordatorios.
-- **D-E** — Eventos de WF-002: aprobación y rechazo de cita especializada, aprobación y rechazo de reprogramación, y cancelación. La cita general auto-aprobada queda fuera.
-- **D-F** — Entrega **best-effort**: publicación tras el commit, con timeouts y reintentos, sin *outbox*.
-- **D-G** — WF-003 es **bonus**: entra al final y solo si WF-001 y WF-002 están cerrados.
+- **D-E (aprobada 2026-10-04)** — Eventos de WF-002: aprobación y rechazo de cita especializada, aprobación y rechazo de reprogramación, y cancelación. La cita general auto-aprobada queda fuera.
+- **D-F (aprobada 2026-10-04)** — Entrega **best-effort**: publicación tras el commit, con timeouts y **3 reintentos**, sin *outbox*.
+- **D-G (aprobada 2026-10-04)** — WF-003 es **bonus**: entra al final (Fase 8) y solo si WF-001 y WF-002 están cerrados.
 - **D-I** — WF-001 y WF-003 llevan, además del Schedule, un **webhook de disparo a demanda**, para la ejecución controlada que exige S6.
 
 ## Dependencias
@@ -126,4 +124,5 @@ Se tratan como reglas de trabajo mientras no se confirmen; cualquiera puede camb
 ## Historial
 
 - 2026-09-30 — Épica creada en estado `Borrador` por el especificador Scrum a partir de `PLAN_S5_S6_N8N.md`, `PRD.md` §8–§10 y RF-19, `GUIA_SESIONES_S2_S6.md` (S5, S6) y `RESTRICCIONES_TECNICAS.md`. Incorpora como reglas D-A, D-B y D-H (decididas por el usuario) y como propuestas pendientes D-C, D-D, D-E, D-F, D-G y D-I. No está aprobada.
+- 2026-10-04 — **D-E, D-F y D-G aprobadas; HU-035 y HU-036 pasan a `Aprobada`.** Aprobación directa del usuario, no delegada, respondida en esta sesión mediante el selector de opciones: «Apruebo todo tal como está en el plan (Recomendado)», a la pregunta «¿Apruebas HU-035, HU-036 y las propuestas D-E, D-F y D-G para adelantar la Fase 5 (publicador de eventos)?». La opción detallaba: D-E eventos de aprobación, rechazo, reprogramación y cancelación (la cita general no); D-F entrega *best-effort* con 3 reintentos, sin *outbox*; D-G WF-003 como bonus. Con D-G aprobada, CA-11 y T-05 de HU-034 pasan de «fuera de entrega de S5» a «opcional, entra con la Fase 8».
 - 2026-10-04 — Aprobada por el usuario el 2026-10-04 con su mensaje «aprobdo lo del s5»; alcance S5 (EP-010 y HU-034, D-C, D-D, D-I); HU-035/036 pendientes de confirmación. Alcance interpretado por el agente principal a partir de esa frase (respuesta a la pregunta de seguir con S5 con la frase de aprobación de `PLAN_EJECUCION_S5_S6.md` §0). D-C, D-D y D-I pasan a vigentes por esa aprobación (afectan a WF-001); D-E, D-F y D-G (S6) siguen como propuestas pendientes de confirmación explícita antes de la Fase 5. HU-035 y HU-036 siguen en `Borrador`. Se autoriza abrir S5, lo que resuelve la precondición de apertura para el alcance de S5.

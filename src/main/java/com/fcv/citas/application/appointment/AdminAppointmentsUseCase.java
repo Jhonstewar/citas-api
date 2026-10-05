@@ -59,13 +59,15 @@ public class AdminAppointmentsUseCase {
     private final AppointmentQueries queries;
     private final TransactionRunner tx;
     private final Clock clock;
+    private final AppointmentEventEmitter events;
 
     public AdminAppointmentsUseCase(AppointmentRepository appointments, AppointmentQueries queries,
-            TransactionRunner tx, Clock clock) {
+            TransactionRunner tx, Clock clock, AppointmentEventPublisher publisher) {
         this.appointments = appointments;
         this.queries = queries;
         this.tx = tx;
         this.clock = clock;
+        this.events = new AppointmentEventEmitter(publisher, clock);
     }
 
     /**
@@ -107,7 +109,10 @@ public class AdminAppointmentsUseCase {
             appointments.apply(appointment.approve(adminUserId, SystemZone.now(clock)));
             return null;
         });
-        return detail(appointmentId);
+        // HU-035: fuera de la transaccion (ya confirmada) y antes de responder; nunca propaga un fallo.
+        Detail detail = detail(appointmentId);
+        events.emit(AppointmentEventType.APPOINTMENT_APPROVED, detail.appointment(), null);
+        return detail;
     }
 
     /** HU-030 CA-02 y CA-03 (RN-04, RN-09): motivo obligatorio; libera los slots. */
@@ -120,7 +125,9 @@ public class AdminAppointmentsUseCase {
             }
             return null;
         });
-        return detail(appointmentId);
+        Detail detail = detail(appointmentId);
+        events.emit(AppointmentEventType.APPOINTMENT_REJECTED, detail.appointment(), reason);
+        return detail;
     }
 
     private Appointment locked(long appointmentId) {

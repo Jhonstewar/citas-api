@@ -94,7 +94,7 @@ disponibilidad**, **estados de la cita y sus transiciones**, **afiliación**.
 ## Contratos REST
 
 - [[contrato-rest-identidad]] — registro (con `insurancePlanId` opcional), login, refresh rotativo, logout, `/api/me` y el catálogo público de planes de EPS: rutas, cuerpos, `ProblemDetail` como formato de error uniforme, tabla de códigos y CORS al 5174
-- [[contrato-rest-citas]] — S3: catálogos, especialidades, profesionales, bloques, disponibilidad, reserva general/especializada, bandeja y decisión; tabla de códigos 400/409/422 con `code`
+- [[contrato-rest-citas]] — S3: catálogos, especialidades, profesionales, bloques, disponibilidad, reserva general/especializada, bandeja y decisión; tabla de códigos 400/409/422 con `code`; S5: `GET /api/automation/appointments/upcoming`; S6: contrato del evento saliente a n8n (WF-002), no un endpoint
 
 ## Decisiones
 
@@ -103,6 +103,7 @@ disponibilidad**, **estados de la cita y sus transiciones**, **afiliación**.
 - [[dec-003-libro-unico-slot-reservations]] — una sola tabla con PK `slot_id` hace imposible la doble reserva; el **código** `SLOT_TAKEN` del 409 depende además del `SELECT … FOR UPDATE`
 - [[dec-004-decisiones-s3-reserva]] — D5–D14, provisionales: primer ADMIN por variables de entorno, Medicina General precargada, V5 de auditoría, 60 min en un mismo bloque, lecturas por `JdbcTemplate`, hooks de git
 - [[dec-006-decisiones-s4-ciclo-de-vida]] — D15–D39 de S4: aprobación delegada, cancelar con reprogramación pendiente libera las dos franjas, cierre de atención desde la hora de inicio, una afiliación vigente, token de recuperación solo en laboratorio, y pantallas nuevas sin mockup de Stitch. Además, el **estado real de S4 al retomarla el 2026-09-30**: cero HU cerradas, LOOP_02 a medias, las casillas de F10 que no son de fiar y `main` con trabajo a medio verificar
+- [[dec-007-entrega-best-effort-eventos-n8n]] — D-F aprobada el 2026-10-04: los eventos de cita hacia n8n se entregan best-effort (sin outbox, 3 intentos, se pierden si n8n cae), el fallo nunca revierte la operación y `reason` es contenido no confiable; alternativas descartadas
 - [[dec-005-sistema-visual-stitch]] — el `DESIGN.md` de Stitch es la fuente de verdad visual; **manda el `colors:` del frontmatter, no la prosa**, y con esa paleta no hace falta ninguna desviación por contraste; fuentes autoalojadas sin CDN y lo que Stitch inventó se descarta
 
 ## Datos y modelo
@@ -130,7 +131,7 @@ disponibilidad**, **estados de la cita y sus transiciones**, **afiliación**.
 - `index.md` — este catálogo. Toda página de `wiki/` aparece arriba, agrupada por tipo.
 - [[log]] — registro cronológico append-only de `ingest` / `query` / `learn` / `lint`.
 
-**Cobertura del catálogo, comprobada en el LINT del 2026-10-04:** 15 páginas en `wiki/` y 15
+**Cobertura del catálogo, comprobada en el LINT del 2026-10-04 (y ampliada con dec-007 el mismo día):** 16 páginas en `wiki/` y 16
 entradas aquí (eran 14 el 2026-09-23, antes de dec-005 y dec-006). Ninguna página queda fuera y ninguna entrada apunta a un archivo inexistente.
 
 **Enlaces que salen de `llm-wiki/`:** [[contrato-rest-identidad]] usa cuatro wikilinks a HU

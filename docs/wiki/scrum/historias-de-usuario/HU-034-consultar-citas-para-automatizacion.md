@@ -97,7 +97,7 @@ El llamante es un cliente de servicio, no una persona ni un rol de negocio. `GET
   Dificultad: Medio  
   Descripción: `AutomationQueriesUseCase` en `application/automation` y `AutomationController` en `infrastructure/rest/automation`, con un DTO propio. `hours` se valida entre 1 y 72; fuera de rango o no numérico responde 400 `ProblemDetail` en español. Sin reglas de negocio en el controlador.
 
-- [ ] **T-05 — (Opcional/bonus) Consulta y endpoint `daily`** *(fuera de entrega de S5: WF-003 opcional, D-G sin confirmar)*  
+- [ ] **T-05 — (Opcional/bonus) Consulta y endpoint `daily`** *(opcional, entra con la Fase 8: D-G aprobada el 2026-10-04)*  
   Dificultad: Medio  
   Descripción: Consulta por fecha, `date` con valor por omisión «hoy» en `America/Bogota`, filas sin datos personales y contadores de pendientes reutilizando el cálculo existente del resumen administrativo. Un día sin citas devuelve `rows: []`.
 
@@ -210,7 +210,7 @@ Verificación independiente (agente distinto del implementador), iteración 1 y 
 | CA-08 | Cumple | `AKNLIT` | **Iteración 1: FAIL** (sin prueba de logs). Límite anotado: se probó con los loggers de seguridad y web en TRACE, no con todos los loggers |
 | CA-09 | Cumple | `AKSIT`; `AN8PT` | **Iteración 1: FAIL** (solo `ApplicationContextRunner`, no un arranque real). Corregido con arranque de contexto real en `AKSIT` |
 | CA-10 | Cumple | `citas-api/docs/wiki/llm-wiki/wiki/contrato-rest-citas.md` §«S5 — automatización» | Ruta, cabecera, parámetros, respuesta, 200/400/401/405 y ejemplo; `llm-wiki/` queda fuera del límite de escritura de esta skill: la evidencia se leyó |
-| CA-11 (opcional) | Fuera de entrega de S5 | — | WF-003 es opcional y D-G sigue sin confirmar; la HU puede completarse sin este criterio (texto de CA-11) |
+| CA-11 (opcional) | Opcional, entra con la Fase 8 | — | D-G aprobada el 2026-10-04 (antes «fuera de entrega de S5»); sin evidencia todavía. La HU puede completarse sin este criterio si WF-003 se declara fuera de entrega (texto de CA-11) |
 | DoD — CA-01 a CA-10 validados | Cumple | Filas CA-01 a CA-10; verificación independiente iteración 2 | CA-11 declarado fuera de entrega |
 | DoD — Cadena independiente con `denyAll` intacto | Cumple | `AutomationSecurityConfig`; `ACCIT`; `AUIT.validKeyDoesNotOpenPersonRoutes` | Verificado por la iteración 2 |
 | DoD — Comparación de tiempo constante | Cumple | `AutomationApiKeyFilter` compara SHA-256 de ambas claves con `MessageDigest.isEqual` | **Decisión:** SHA-256 + `isEqual` se acepta como equivalente o mejor que `isEqual` directo, porque no filtra la longitud de la clave |
@@ -227,6 +227,7 @@ Verificación independiente (agente distinto del implementador), iteración 1 y 
 ## Historial de validación
 
 - 2026-10-04 — **Verificación independiente, iteraciones 1 y 2; estado `Aprobada` → `En validación`. NO pasa a `Completada`: espera la F9.** **Iteración 1: FAIL** en CA-07 (con clave válida y método de escritura respondía 401 en lugar de 405), CA-08 (sin prueba de logs) y CA-09 (solo con `ApplicationContextRunner`, sin arranque real). Se corrigió. **Iteración 2: PASS** en CA-01 a CA-10 y en las DoD «CA-01 a CA-10 validados» y «pruebas y suite en Docker» (suite 565/565, `HexagonalArchitectureTest` 4/4). **CA-11 y T-05 se declaran fuera de entrega de S5:** WF-003 es opcional y D-G sigue sin confirmar. T-01 a T-04, T-06 y T-07 marcadas. **Decisiones aceptadas:** comparación SHA-256 + `MessageDigest.isEqual` (equivalente o mejor, no filtra la longitud); `commenceApiKey` responde 401 sin `WWW-Authenticate`; `hours` ausente = 24 (D-C aprobada).
+- 2026-10-04 — **D-G aprobada por el usuario** («Apruebo todo tal como está en el plan (Recomendado)»): CA-11 y T-05 dejan de estar «fuera de entrega de S5» y pasan a «opcional, entra con la Fase 8» (WF-003). Sin cambio de estado: HU-034 sigue `En validación`; la fila CA-11 de la matriz sigue sin evidencia.
 - 2026-10-04 — Observaciones sin cambio de estado: CA-08 se probó solo con los loggers de seguridad y web en TRACE; `N8nProperties.secret` no valida su longitud, pregunta abierta para [[HU-035-publicar-eventos-de-cambio-de-estado-a-n8n]] que no se resuelve aquí.
 - 2026-09-30 — HU creada en estado `Borrador` por el especificador Scrum a partir de `PLAN_S5_S6_N8N.md` (§2, §3, §5). Recoge D-A y D-B, decididas por el usuario; D-C y D-G figuran como propuesta vigente pendiente de confirmar. No está aprobada.
 - 2026-10-04 — Aprobada por el usuario el 2026-10-04 con su mensaje «aprobdo lo del s5»; alcance S5 (EP-010 y HU-034, D-C, D-D, D-I); HU-035/036 pendientes de confirmación. Alcance interpretado por el agente principal; D-C (ventana 24 h cada hora) queda vigente por esa aprobación. CA-11 y T-05 siguen opcionales (D-G, de S6, sin confirmar).
@@ -235,7 +236,7 @@ Verificación independiente (agente distinto del implementador), iteración 1 y 
 
 - **D-A (decidida):** clave dedicada de solo lectura, cabecera `X-Automation-Key`, cadena propia. **D-B (decidida):** el túnel temporal que permite a n8n llegar a la API no forma parte de esta HU (ver [[HU-036-versionar-y-documentar-los-flujos-n8n]]); HTTPS y clave son obligatorios mientras esté abierto.
 - **D-C (aprobada el 2026-10-04):** ventana 24 h revisada cada hora; `hours` ausente = 24, y el endpoint acota `hours` entre 1 y 72.
-- **D-G (propuesta, pendiente):** CA-11 y T-05 son opcionales y quedan **fuera de entrega de S5**; solo se abordarían si WF-001 y WF-002 están cerrados y el usuario confirma D-G.
+- **D-G (aprobada el 2026-10-04):** CA-11 y T-05 pasan de «fuera de entrega de S5» a **opcionales, entran con la Fase 8**, y solo si WF-001 y WF-002 están cerrados. El estado de la HU no cambia (`En validación`).
 - **Aceptadas en la verificación (2026-10-04):** comparación SHA-256 + `MessageDigest.isEqual` (no filtra longitud); 401 sin `WWW-Authenticate` (`commenceApiKey`).
 - El correo del paciente sí viaja en `upcoming`: es el mínimo para enviar el recordatorio. Se deja anotado como dato personal sintético (`@ejemplo.test`) y como riesgo residual en [[HU-036-versionar-y-documentar-los-flujos-n8n]].
 - Pregunta abierta: ¿se exige `GET /api/automation/ping` como comprobación de la clave? El plan lo menciona en su criterio de salida de la Fase 0 pero no lo incluye en el contrato; no se inventó un criterio.

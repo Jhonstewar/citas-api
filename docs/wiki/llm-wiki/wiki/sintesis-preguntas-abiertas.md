@@ -244,3 +244,30 @@ el backend no tiene puerto de eventos, cliente HTTP saliente ni endpoint legible
 **Abiertas:** ventana del recordatorio (D-C, propuesta 24 h) · anti-duplicado en Data Table o columna (D-D) · si la cita
 general auto-aprobada notifica (D-E) · entrega *best-effort* u *outbox* (D-F) · si WF-003 entra (D-G) · webhooks a demanda
 en WF-001/003 (D-I) · qué hacer con un día sin citas en WF-003 · S5 no debería abrirse con S4 en F10 sin autorización expresa.
+
+### Actualización S6 F5 (2026-10-04)
+
+- **D-F resuelta:** el usuario aprobó la entrega *best-effort* sin outbox; registro en
+  [[dec-007-entrega-best-effort-eventos-n8n]]. Contrato del evento en [[contrato-rest-citas]] § «S5–S6 — evento de cambio de estado».
+  (D-E, la lista de eventos, quedó implementada tal como está en ese contrato; la cita general auto-aprobada no emite.)
+
+### Actualización S6 F6 (2026-10-04)
+
+Verificación independiente del publicador de eventos (HU-035, backend-verifier; suite 599/599). Observaciones y preguntas que quedan abiertas:
+
+- **O-1 (ajuste obligatorio de la Fase 7):** el evento envía `patient.fullName` y el flujo `jhonNuñez-WF-002` lee `patient.firstName`. Hay que alinear el flujo con el contrato antes de la prueba E2E.
+- **O-2:** el borrador de la ficha de HU-035 incluía `status` en el evento y el evento real no lo envía. El contrato publicado coincide con el código; falta reconciliar el texto de la ficha.
+- **O-4 (decisión pendiente del usuario):** `AppointmentEventEmitter` usa `org.slf4j` dentro de `application/`. Es el primer uso en el núcleo: ArchUnit no lo prohíbe, pero contradice el «Java puro» de `AGENTS.md` §2.
+- **Huecos menores, sin acción inmediata:** no se demuestra que Spring invoque `close()` del adaptador (hilos daemon, impacto nulo); falta la prueba de excepción del publicador en reprogramación y la de «no emite» en cancelación ajena y en decisión concurrente perdedora.
+
+### Entorno n8n verificado el 2026-10-04 (vía MCP de n8n)
+
+- **HECHO:** los tres flujos `jhonNuñez-WF-001`, `jhonNuñez-WF-002` y `jhonNuñez-WF-003` existen y están **inactivos**; ids
+  `9vNgFpXjjAkwse7o`, `7XF4DTWA11YViP42` y `BRksx12kTEtI5r2l` respectivamente (coinciden con la entrada de log del 2026-09-30).
+- **HECHO:** la instancia es **compartida** y contiene credenciales de otras personas: **no usarlas**.
+- **HECHO:** el usuario tiene su propia credencial de Gmail, «Gmail Jhon». **Aún no** tiene creadas las credenciales de la clave de
+  automatización ni del secreto de webhook (hay que crearlas antes de activar los flujos). No se persiste ningún valor ni correo real.
+- **HECHO:** la Data Table `jhonNuñez-citas_notification_log` (id `iqNu0V8hyF7mXAau`) tiene **5 filas de prueba**, una de ellas
+  `95001|2026-10-01|09:00`, que el runbook (`PLAN_EJECUCION_S5_S6.md`) no listaba. El MCP **no puede borrar filas**: limpiarlas
+  es manual en la interfaz de n8n, y conviene hacerlo antes de la demo porque el anti-duplicado (D-D) las leería como recordatorios ya enviados.
+- Relacionado: riesgo residual 4 del runbook §10 (anti-duplicado en Data Table) y el 6 (instancia compartida).

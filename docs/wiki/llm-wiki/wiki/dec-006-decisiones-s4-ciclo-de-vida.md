@@ -287,6 +287,7 @@ de F10; esta página solo verificó que las pruebas existen y suman 8 + 8.
 - [[dec-004-decisiones-s3-reserva]] — D5–D14, las provisionales de S3
 - [[dec-003-libro-unico-slot-reservations]] — dónde conviven retención de reprogramación y ocupación
 - [[dec-005-sistema-visual-stitch]] — el sistema visual que D30 reutiliza
+- [[dec-007-entrega-best-effort-eventos-n8n]] — las transiciones de estado de S4 son las que, desde S6, publican eventos best-effort a n8n
 - [[sintesis-preguntas-abiertas]]
 - [[contrato-rest-citas]] — donde se publicarán los endpoints de S4
 

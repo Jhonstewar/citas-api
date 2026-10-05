@@ -692,8 +692,111 @@ manda el 401, porque la autenticación va antes que el controlador.
   clave vacía arranca (cadena cerrada).
 - Suite completa **565/565 el 2026-10-04**.
 
+## S5–S6 — evento de cambio de estado (HU-035, verificado el 2026-10-04)
+
+**No es un endpoint de la API.** Es una **publicación saliente**: Spring hace `POST` a la URL de
+`N8N_WEBHOOK_WF002_URL` (WF-002 de n8n) cuando una cita cambia de estado. Aquí se documenta como contrato
+porque n8n depende de su forma exacta. La decisión de entrega está en [[dec-007-entrega-best-effort-eventos-n8n]].
+
+### Petición saliente
+
+- Origen: `N8nWebhookPublisher` (`citas-api/src/main/java/com/fcv/citas/infrastructure/automation/N8nWebhookPublisher.java:154`).
+- Cabeceras: `Content-Type: application/json` y `X-Webhook-Secret: <N8N_WEBHOOK_SECRET>` (`:53`, `:154`). El valor del secreto nunca
+  se documenta ni se registra en log.
+- Destino: la URL de `app.n8n.wf002-url`; si no está vacía debe empezar por `https://` o el arranque falla
+  (`N8nProperties.java:27-40`).
+- Tiempos: conexión 2 s, lectura 5 s (`N8nWebhookPublisher.java:46-47`).
+
+### Cuerpo JSON exacto (`toPayload`, `N8nWebhookPublisher.java:171-198`)
+
+```json
+{
+  "eventId": "<UUID v4>",
+  "eventType": "APPOINTMENT_REJECTED",
+  "occurredAt": "2026-10-01T10:15:00-05:00",
+  "appointmentId": 57,
+  "patient": { "fullName": "Ana Perez", "email": "<correo del paciente>" },
+  "appointment": {
+    "date": "2026-10-05",
+    "startTime": "09:00",
+    "endTime": "09:30",
+    "site": { "code": "ICV", "name": "Clinica Ficticia Valle" },
+    "professional": "Dr. Carlos Ruiz",
+    "specialty": "Cardiologia"
+  },
+  "reason": "Sin cupo"
+}
+```
+
+(Ejemplo con datos ficticios del test.) Reglas, todas verificadas:
+
+- Claves de primer nivel: `eventId`, `eventType`, `occurredAt`, `appointmentId`, `patient`, `appointment`, `reason`; `patient` lleva solo
+  `fullName` y `email`; `appointment` lleva `date`, `startTime`, `endTime`, `site{code,name}`, `professional` (nombre completo, texto) y
+  `specialty` (nombre, texto). `N8nWebhookPublisherTest.theBodyHasExactlyTheKeysOfTheContract` (`:239`) comprueba el conjunto exacto de claves.
+- **Sin documento ni teléfono** del paciente: el test afirma que el cuerpo no contiene ninguno de los dos (`:266`).
+- Formatos: `date` ISO `yyyy-MM-dd` (`LocalDate.toString()`); `startTime`/`endTime` `HH:mm`; `occurredAt` ISO con desfase, truncado a
+  segundos (`ISO_OFFSET_DATE_TIME`, `:57`, `:200-202`), tomado del reloj inyectado (`AppointmentEvent.java:35`).
+- `eventId` es un UUID v4 nuevo por evento (`AppointmentEvent.java:35`), pensado como clave de idempotencia para el destino. No hay
+  garantía de entrega única: ver reintentos.
+- `reason`: **siempre presente**; `null` si no hay motivo (`aMissingReasonIsSentAsNull`, `:270`). Un motivo en blanco se normaliza a `null`
+  (`AppointmentEvent.java:34`). Se **recorta a 300 caracteres** (`MAX_REASON_LENGTH`, `:52`, `:204-213`) sin partir un par sustituto.
+  Es texto libre del usuario: **contenido no confiable** (ver [[dec-007-entrega-best-effort-eventos-n8n]]).
+
+### Tipos de evento (`AppointmentEventType`) y cuándo se emite
+
+| `eventType` | Emitido por | `reason` |
+|---|---|---|
+| `APPOINTMENT_APPROVED` | `AdminAppointmentsUseCase.approve` (`:114`) | `null` |
+| `APPOINTMENT_REJECTED` | `AdminAppointmentsUseCase.reject` (`:129`) | motivo del rechazo |
+| `APPOINTMENT_CANCELLED` | `CancelAppointmentUseCase` (`:67`) | motivo de cancelación, si lo hay |
+| `RESCHEDULE_APPROVED` | `RescheduleAppointmentUseCase` (`:136`) | `null` |
+| `RESCHEDULE_REJECTED` | `RescheduleAppointmentUseCase` (`:155`) | motivo del rechazo |
+
+**No se emite** (cubierto por `AppointmentEventPublishingIntegrationTest`): la reserva general auto-aprobada
+(`autoApprovedGeneralBookingEmitsNothing`), completar y no-show (`completingAndNoShowEmitNothing`), solicitar una reprogramación
+(`requestingAReschedulingEmitsNothing`), y cualquier operación que falle: transición inválida 409 o rechazo sin motivo 400
+(`invalidTransitionEmitsNothing`, `rejectionWithoutReasonEmitsNothing`).
+
+### Cuándo y cómo se publica
+
+- **Después del commit y fuera de la transacción:** el caso de uso cierra `tx.inTransaction(...)`, relee el detalle y solo entonces llama a
+  `events.emit(...)` (p. ej. `AdminAppointmentsUseCase.java:107-115`). El publicador observa el estado ya confirmado
+  (`thePublisherObservesTheAlreadyCommittedState`).
+- **Un fallo nunca cambia el resultado:** `AppointmentEventEmitter` captura cualquier `RuntimeException` y registra solo su clase
+  (`AppointmentEventEmitter.java:26-33`); `aFailingPublisherDoesNotChangeTheOutcome` comprueba que aprobar, rechazar y cancelar
+  siguen respondiendo igual.
+- **Asíncrono, executor propio y acotado:** 2 hilos daemon `n8n-webhook-N`, cola de 100 y `AbortPolicy` (`:55-56`, `:217-225`); si la
+  cola está llena el evento se descarta con un WARN y no se lanza nada (`:109-112`). No se declara como bean `Executor` para no
+  desactivar el `applicationTaskExecutor` de Spring Boot (`AppointmentEventPublisherConfig.java:17-19`).
+- **Reintentos:** hasta **3 intentos**, esperas de **1 s y 2 s** entre ellos (`MAX_ATTEMPTS`, `:51`; la espera de 4 s de
+  `PRODUCTION_WAITS` solo valdría para un cuarto intento que no existe). Se reintenta solo ante error de red/timeout o **5xx**;
+  **2xx y 4xx son definitivos** (`:117-151`).
+- **Configuración** (`AppointmentEventPublisherConfig.java:25-32`, `N8nProperties.java`):
+  - `N8N_WEBHOOK_WF002_URL` vacía: bean `NoOpAppointmentEventPublisher`, no se envía nada.
+  - `N8N_WEBHOOK_SECRET` vacío con URL activa: no se envía y se registra un WARN (`:95-98`).
+  - `N8N_WEBHOOK_SECRET` que contiene `CHANGE_ME` (sin distinguir mayúsculas): **falla el arranque** sin imprimir el valor
+    (`N8nProperties.java:23-26`).
+- **Logs:** solo tipo de evento, `eventId`, código HTTP o clase de la excepción. **Nunca** cuerpo, correo, `reason`, secreto ni URL
+  (puede llevar un token en la ruta) (`:39-40`; `theLogNeverContainsEmailReasonSecretBodyOrUrl`). `N8nProperties.toString()` enmascara
+  el secreto y las URL.
+
+### Pruebas que respaldan esta sección
+
+- `N8nWebhookPublisherTest` — cuerpo exacto, `reason` nulo, cabeceras, reintentos (502,502,200 = 3 intentos; 400 sin reintento; 2xx sin
+  reintento; 5xx, red y timeout abandonan tras 3), asincronía, cola saturada, valores de producción, sin secreto no envía, y el log
+  sin datos sensibles.
+- `AppointmentEventPublisherSelectionTest` — URL vacía o propiedad ausente = NoOp y no se envía nada; URL configurada = publicador HTTP.
+- `AppointmentEventPublishingIntegrationTest` — los cinco tipos, un `eventId` distinto por evento, los casos que no emiten, estado ya
+  confirmado y fallo del publicador sin efecto.
+- `AutomationAndN8nPropertiesTest` — secreto con `CHANGE_ME` falla el arranque sin imprimirse, vacío/ordinario arranca, `toString`
+  enmascarado y URL no vacía sin `https://` falla el arranque.
+
+**PREGUNTA ABIERTA:** no se ha ejecutado aún el flujo real WF-002 contra este publicador (los flujos de n8n están inactivos; ver
+[[sintesis-preguntas-abiertas]] § "S5–S6 (n8n)"). Lo anterior es contrato verificado en el lado de Spring, no extremo a extremo.
+
 ## Relacionado
 
+- [[dec-007-entrega-best-effort-eventos-n8n]] — por qué la entrega del evento es best-effort y qué se pierde
 - [[arq-hexagonal-seguridad]] — la cadena principal frente a la de automatización
 - [[contrato-rest-identidad]]
 - [[dec-003-libro-unico-slot-reservations]]
@@ -703,6 +806,7 @@ manda el 401, porque la autenticación va antes que el controlador.
 
 ## Historial
 
+- 2026-10-04 — S6 F5: añadida § «S5–S6 — evento de cambio de estado» (publicación saliente hacia n8n, no un endpoint): cuerpo JSON exacto, cinco tipos, cuándo no se emite, post-commit, reintentos, configuración y logs; contrastada con `N8nWebhookPublisher` y sus cuatro clases de prueba. Decisión en [[dec-007-entrega-best-effort-eventos-n8n]].
 - 2026-10-04 — S5 F3: CA-07 corregido (clave inválida/ausente → 401 con cualquier método; clave válida con POST/PUT/PATCH/DELETE → 405 con `Allow: GET`; supersede al "no GET = 401"). Documentadas las pruebas de clave fuera de logs y de arranque con clave débil/`CHANGE_ME`; suite 565/565.
 - 2026-10-04 — S5 F2: añadida § «S5 — automatización» con `GET /api/automation/appointments/upcoming` (clave `X-Automation-Key`, ventana, respuesta exacta, 401 sin `WWW-Authenticate`, 400 `hours`, decisión SHA-256 + `isEqual`), contrastada con controlador, filtro, config y pruebas.
 - 2026-09-30 — F9 (S4): verificado el corte S4 contra los controladores reales (índice, ejemplos, códigos), documentados los errores de framework ya en español y las divergencias halladas; corregidos `AdminAppointment`, la bandeja y las referencias a `SecurityConfig`.
