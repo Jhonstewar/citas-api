@@ -1,0 +1,255 @@
+{
+  "name": "jhonNuñez-WF-001-appointment-reminders",
+  "description": "Recordatorios por Gmail de citas APPROVED próximas (API con clave dedicada), con registro en Data Table. Laboratorio FCV, datos ficticios.",
+  "settings": { "executionOrder": "v1", "availableInMCP": true, "binaryMode": "separate" },
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [ { "field": "hours" } ] } },
+      "id": "5cfb8087-4afa-47f3-a55d-1cb63d5b34bc",
+      "name": "Cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "cfg-api", "name": "apiBaseUrl", "value": "", "type": "string" },
+            { "id": "cfg-hours", "name": "hoursAhead", "value": 24, "type": "number" },
+            { "id": "cfg-mode", "name": "testMode", "value": true, "type": "boolean" },
+            { "id": "cfg-rcpt", "name": "testRecipient", "value": "CONFIGURAR-CORREO-DE-PRUEBA@invalid.test", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f7efa664-4456-46b7-8001-a15dd279637b",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [224, 96]
+    },
+    {
+      "parameters": {
+        "url": "={{ $(\"Configuración\").first().json.apiBaseUrl }}/api/automation/appointments/upcoming",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [ { "name": "hours", "value": "={{ $(\"Configuración\").first().json.hoursAhead }}" } ] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "599e9c9c-e2ab-48ed-8b9f-1656499d393b",
+      "name": "Consultar citas próximas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [448, 96],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            { "leftValue": "={{ $json.status }}", "rightValue": "APPROVED", "operator": { "type": "string", "operation": "equals" } }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4b679782-4136-4a85-8a73-402532c8d516",
+      "name": "Solo APPROVED",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [672, -64]
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            { "keyName": "eventId", "keyValue": "={{ $json.appointmentId }}|{{ $json.date }}|{{ $json.startTime }}" },
+            { "keyName": "workflow", "keyValue": "WF-001" },
+            { "keyName": "result", "keyValue": "SENT" }
+          ]
+        }
+      },
+      "id": "386be091-d9a4-458a-96d0-829e475d6bc3",
+      "name": "Descartar ya enviados",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [672, 96]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "p-key", "name": "eventId", "value": "={{ $json.appointmentId }}|{{ $json.date }}|{{ $json.startTime }}", "type": "string" },
+            { "id": "p-rcpt", "name": "recipient", "value": "={{ $(\"Configuración\").first().json.testMode ? $(\"Configuración\").first().json.testRecipient : $json.patientEmail }}", "type": "string" },
+            { "id": "p-mask", "name": "recipientMasked", "value": "={{ String($(\"Configuración\").first().json.testMode ? $(\"Configuración\").first().json.testRecipient : $json.patientEmail).replace(/^(.).*(@.*)$/, \"$1***$2\") }}", "type": "string" },
+            { "id": "p-subj", "name": "subject", "value": "=Recordatorio de cita: {{ $json.specialty }} el {{ $json.date }} a las {{ $json.startTime }}", "type": "string" },
+            { "id": "p-body", "name": "body", "value": "=Hola {{ $json.patientFirstName }},\n\nTe recordamos tu próxima cita de {{ $json.specialty }}:\n- Fecha: {{ $json.date }}\n- Hora: {{ $json.startTime }} a {{ $json.endTime }}\n- Sede: {{ $json.site.name }} ({{ $json.site.address }})\n- Profesional: {{ $json.professional }}\n\nSi no puedes asistir, cancela o reprograma desde la aplicación.\n\nMensaje automático del laboratorio FCV (datos ficticios).", "type": "string" }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "076b0f69-3dde-4fef-906a-964af012c1aa",
+      "name": "Preparar recordatorio",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [896, 96]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipient }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": { "appendAttribution": false }
+      },
+      "id": "0cdb9ba0-1987-49b4-bdec-851fb735d67b",
+      "name": "Enviar recordatorio",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1120, 96],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "eventId": "={{ $(\"Preparar recordatorio\").item.json.eventId }}",
+            "workflow": "WF-001",
+            "appointmentId": "={{ $(\"Preparar recordatorio\").item.json.appointmentId }}",
+            "recipientMasked": "={{ $(\"Preparar recordatorio\").item.json.recipientMasked }}",
+            "result": "SENT",
+            "detail": "Recordatorio enviado",
+            "executionId": "={{ $execution.id }}",
+            "loggedAt": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "eventId", "displayName": "eventId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "workflow", "displayName": "workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "appointmentId", "displayName": "appointmentId", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true },
+            { "id": "recipientMasked", "displayName": "recipientMasked", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "result", "displayName": "result", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "detail", "displayName": "detail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "executionId", "displayName": "executionId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "loggedAt", "displayName": "loggedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "afd3190b-bc38-4173-8179-b91ca5cec1b8",
+      "name": "Registrar enviado",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [1344, 0]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "citas/jhon-nunez/reminders", "authentication": "headerAuth", "options": {} },
+      "id": "2a7dc3ea-ee08-4957-b294-0a33b34f59fc",
+      "name": "Disparo a demanda",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 192]
+    },
+    {
+      "parameters": {
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "eventId": "={{ $(\"Preparar recordatorio\").item.json.eventId }}",
+            "workflow": "WF-001",
+            "appointmentId": "={{ $(\"Preparar recordatorio\").item.json.appointmentId }}",
+            "recipientMasked": "={{ $(\"Preparar recordatorio\").item.json.recipientMasked }}",
+            "result": "FAILED",
+            "detail": "={{ String($json.error?.message ?? \"error desconocido\").slice(0, 200) }}",
+            "executionId": "={{ $execution.id }}",
+            "loggedAt": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "eventId", "displayName": "eventId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "workflow", "displayName": "workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "appointmentId", "displayName": "appointmentId", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true },
+            { "id": "recipientMasked", "displayName": "recipientMasked", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "result", "displayName": "result", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "detail", "displayName": "detail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "executionId", "displayName": "executionId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "loggedAt", "displayName": "loggedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "23679f7a-58c1-401e-b14a-9583a3bb462a",
+      "name": "Registrar fallo",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [1344, 192]
+    },
+    {
+      "parameters": {
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "eventId": "API_UNAVAILABLE",
+            "workflow": "WF-001",
+            "appointmentId": 0,
+            "recipientMasked": "n/a",
+            "result": "FAILED",
+            "detail": "={{ String($json.error?.message ?? $json.message ?? \"API no disponible\").slice(0,200) }}",
+            "executionId": "={{ $execution.id }}",
+            "loggedAt": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "eventId", "displayName": "eventId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "workflow", "displayName": "workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "appointmentId", "displayName": "appointmentId", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true },
+            { "id": "recipientMasked", "displayName": "recipientMasked", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "result", "displayName": "result", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "detail", "displayName": "detail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "executionId", "displayName": "executionId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "loggedAt", "displayName": "loggedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6c45216d-b215-4bb9-af6d-c3726d861c82",
+      "name": "Registrar error API",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [672, 288]
+    },
+    {
+      "parameters": {
+        "content": "## Antes de activar\n1. Conectar credenciales: jhonNuñez-Gmail (OAuth2, solo envío), jhonNuñez-Automation-Key (Templated Custom Auth con la cabecera X-Automation-Key) y jhonNuñez-Webhook-Secret (Header Auth: X-Webhook-Secret).\n2. En \"Configuración\": poner la URL del túnel y un correo de prueba. testMode=true envía SIEMPRE al correo de prueba.\n3. Probar con ejecución controlada. Poner testMode=false solo en la demo final.",
+        "height": 240,
+        "color": 4
+      },
+      "id": "01034278-1333-4533-ba70-df59fc03799b",
+      "name": "Sticky Note e621f6b5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1024, 400]
+    }
+  ],
+  "connections": {
+    "Cada hora": { "main": [ [ { "node": "Configuración", "type": "main", "index": 0 } ] ] },
+    "Configuración": { "main": [ [ { "node": "Consultar citas próximas", "type": "main", "index": 0 } ] ] },
+    "Descartar ya enviados": { "main": [ [ { "node": "Preparar recordatorio", "type": "main", "index": 0 } ] ] },
+    "Preparar recordatorio": { "main": [ [ { "node": "Enviar recordatorio", "type": "main", "index": 0 } ] ] },
+    "Enviar recordatorio": { "main": [ [ { "node": "Registrar enviado", "type": "main", "index": 0 } ], [ { "node": "Registrar fallo", "type": "main", "index": 0 } ] ] },
+    "Disparo a demanda": { "main": [ [ { "node": "Configuración", "type": "main", "index": 0 } ] ] },
+    "Consultar citas próximas": { "main": [ [ { "node": "Solo APPROVED", "type": "main", "index": 0 } ], [ { "node": "Registrar error API", "type": "main", "index": 0 } ] ] },
+    "Solo APPROVED": { "main": [ [ { "node": "Descartar ya enviados", "type": "main", "index": 0 } ] ] }
+  }
+}

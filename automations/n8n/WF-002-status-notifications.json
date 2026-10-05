@@ -1,0 +1,264 @@
+{
+  "name": "jhonNuñez-WF-002-status-notifications",
+  "description": "Webhook desde Spring: notifica por Gmail los cambios de estado de cita (aprobada, rechazada, cancelada, reprogramación), con validación, idempotencia y registro.",
+  "settings": { "executionOrder": "v1", "availableInMCP": true, "binaryMode": "separate" },
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "citas/jhon-nunez/status-change", "authentication": "headerAuth", "responseMode": "responseNode", "options": {} },
+      "id": "6fc7e7a8-f3c4-4ec1-95af-06fe9781f20d",
+      "name": "Evento de cambio de estado",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 192]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "n-id", "name": "eventId", "value": "={{ $json.body?.eventId ?? $json.eventId ?? \"\" }}", "type": "string" },
+            { "id": "n-type", "name": "eventType", "value": "={{ $json.body?.eventType ?? $json.eventType ?? \"\" }}", "type": "string" },
+            { "id": "n-appt", "name": "appointmentId", "value": "={{ Number($json.body?.appointmentId ?? $json.appointmentId) }}", "type": "number" },
+            { "id": "n-mail", "name": "patientEmail", "value": "={{ $json.body?.patient?.email ?? $json.patient?.email ?? \"\" }}", "type": "string" },
+            { "id": "n-name", "name": "patientName", "value": "={{ $json.body?.patient?.fullName ?? $json.body?.patient?.firstName ?? $json.patient?.fullName ?? $json.patient?.firstName ?? \"\" }}", "type": "string" },
+            { "id": "n-date", "name": "date", "value": "={{ $json.body?.appointment?.date ?? $json.appointment?.date ?? \"\" }}", "type": "string" },
+            { "id": "n-start", "name": "startTime", "value": "={{ $json.body?.appointment?.startTime ?? $json.appointment?.startTime ?? \"\" }}", "type": "string" },
+            { "id": "n-end", "name": "endTime", "value": "={{ $json.body?.appointment?.endTime ?? $json.appointment?.endTime ?? \"\" }}", "type": "string" },
+            { "id": "n-site", "name": "siteName", "value": "={{ $json.body?.appointment?.site?.name ?? $json.appointment?.site?.name ?? \"\" }}", "type": "string" },
+            { "id": "n-prof", "name": "professional", "value": "={{ $json.body?.appointment?.professional ?? $json.appointment?.professional ?? \"\" }}", "type": "string" },
+            { "id": "n-spec", "name": "specialty", "value": "={{ $json.body?.appointment?.specialty ?? $json.appointment?.specialty ?? \"\" }}", "type": "string" },
+            { "id": "n-reason", "name": "reason", "value": "={{ String($json.body?.reason ?? $json.reason ?? \"\").slice(0, 300) }}", "type": "string" },
+            { "id": "n-test", "name": "testMode", "value": true, "type": "boolean" },
+            { "id": "n-rcpt", "name": "testRecipient", "value": "CONFIGURAR-CORREO-DE-PRUEBA@invalid.test", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d6637919-6c8a-47c1-a317-5b6f5a78829e",
+      "name": "Normalizar evento",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [224, 192]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 1 },
+          "conditions": [
+            { "leftValue": "={{ $json.eventType }}", "operator": { "type": "string", "operation": "regex" }, "rightValue": "^(APPOINTMENT_APPROVED|APPOINTMENT_REJECTED|APPOINTMENT_CANCELLED|RESCHEDULE_APPROVED|RESCHEDULE_REJECTED)$" },
+            { "leftValue": "={{ $json.eventId }}", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }, "rightValue": "" },
+            { "leftValue": "={{ $json.patientEmail }}", "operator": { "type": "string", "operation": "regex" }, "rightValue": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" },
+            { "leftValue": "={{ $json.appointmentId }}", "operator": { "type": "number", "operation": "gt" }, "rightValue": 0 }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c93552d3-8a75-4dfa-86a8-4876043c1c2e",
+      "name": "¿Evento válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [448, 192]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "matchType": "allConditions",
+        "filters": { "conditions": [ { "keyName": "eventId", "keyValue": "={{ $json.eventId }}" }, { "keyName": "result", "keyValue": "SENT" } ] },
+        "limit": 1
+      },
+      "id": "83cd83e9-abf3-4745-b369-7096d3f97c12",
+      "name": "Buscar evento ya procesado",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [672, 96],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 1 },
+          "conditions": [ { "leftValue": "={{ $json.id }}", "operator": { "type": "number", "operation": "exists", "singleValue": true }, "rightValue": "" } ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6b8ef130-fad1-4566-a891-bec58eafed63",
+      "name": "¿Ya procesado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [896, 96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: true, duplicate: true, eventId: $(\"Normalizar evento\").item.json.eventId } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "73905ed5-bd43-4793-a859-ba8d74aee0e4",
+      "name": "Responder 200 duplicado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1120, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "c-rcpt", "name": "recipient", "value": "={{ $(\"Normalizar evento\").item.json.testMode ? $(\"Normalizar evento\").item.json.testRecipient : $(\"Normalizar evento\").item.json.patientEmail }}", "type": "string" },
+            { "id": "c-mask", "name": "recipientMasked", "value": "={{ String($(\"Normalizar evento\").item.json.testMode ? $(\"Normalizar evento\").item.json.testRecipient : $(\"Normalizar evento\").item.json.patientEmail).replace(/^(.).*(@.*)$/, \"$1***$2\") }}", "type": "string" },
+            { "id": "c-subj", "name": "subject", "value": "={{ ({ APPOINTMENT_APPROVED: \"Tu cita fue aprobada\", APPOINTMENT_REJECTED: \"Tu solicitud de cita fue rechazada\", APPOINTMENT_CANCELLED: \"Tu cita fue cancelada\", RESCHEDULE_APPROVED: \"Tu reprogramación fue aprobada\", RESCHEDULE_REJECTED: \"Tu reprogramación fue rechazada\" })[$(\"Normalizar evento\").item.json.eventType] }}", "type": "string" },
+            { "id": "c-body", "name": "body", "value": "=Hola {{ $(\"Normalizar evento\").item.json.patientName }},\n\n{{ ({ APPOINTMENT_APPROVED: \"Tu solicitud de cita fue aprobada.\", APPOINTMENT_REJECTED: \"Tu solicitud de cita fue rechazada.\", APPOINTMENT_CANCELLED: \"Tu cita fue cancelada.\", RESCHEDULE_APPROVED: \"Tu reprogramación fue aprobada; la cita quedó en la nueva franja.\", RESCHEDULE_REJECTED: \"Tu reprogramación fue rechazada; tu cita original se mantiene.\" })[$(\"Normalizar evento\").item.json.eventType] }}\n\nDetalle de la cita:\n- Especialidad: {{ $(\"Normalizar evento\").item.json.specialty }}\n- Fecha: {{ $(\"Normalizar evento\").item.json.date }}\n- Hora: {{ $(\"Normalizar evento\").item.json.startTime }} a {{ $(\"Normalizar evento\").item.json.endTime }}\n- Sede: {{ $(\"Normalizar evento\").item.json.siteName }}\n- Profesional: {{ $(\"Normalizar evento\").item.json.professional }}{{ $(\"Normalizar evento\").item.json.reason ? \"\\nMotivo: \" + $(\"Normalizar evento\").item.json.reason : \"\" }}\n\nMensaje automático del laboratorio FCV (datos ficticios).", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1f71156f-20ba-4ed3-a47b-5bf01a76dfa3",
+      "name": "Componer mensaje",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [1120, 192]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipient }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": { "appendAttribution": false }
+      },
+      "id": "f8fdc9b4-c7ce-466b-b696-8d94ccfc195f",
+      "name": "Enviar notificación",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1344, 192],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "eventId": "={{ $(\"Normalizar evento\").item.json.eventId }}",
+            "workflow": "WF-002",
+            "appointmentId": "={{ $(\"Normalizar evento\").item.json.appointmentId }}",
+            "recipientMasked": "={{ $(\"Componer mensaje\").item.json.recipientMasked }}",
+            "result": "SENT",
+            "detail": "={{ $(\"Normalizar evento\").item.json.eventType }}",
+            "executionId": "={{ $execution.id }}",
+            "loggedAt": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "eventId", "displayName": "eventId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "workflow", "displayName": "workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "appointmentId", "displayName": "appointmentId", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true },
+            { "id": "recipientMasked", "displayName": "recipientMasked", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "result", "displayName": "result", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "detail", "displayName": "detail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "executionId", "displayName": "executionId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "loggedAt", "displayName": "loggedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "63031c5d-fd8f-4cc2-b097-f26f935a5361",
+      "name": "Registrar enviado",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [1568, 96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: true, duplicate: false, eventId: $(\"Normalizar evento\").item.json.eventId } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "6a2437de-d62d-42a3-85e8-4e3e3222c5ab",
+      "name": "Responder 200 procesado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1792, 96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: false, error: \"Evento inválido\", eventId: $json.eventId } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "b5837c28-c9e4-4f16-b455-af462df330f7",
+      "name": "Responder 400 evento inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [672, 288]
+    },
+    {
+      "parameters": {
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "eventId": "={{ $(\"Normalizar evento\").item.json.eventId }}",
+            "workflow": "WF-002",
+            "appointmentId": "={{ $(\"Normalizar evento\").item.json.appointmentId }}",
+            "recipientMasked": "={{ $(\"Componer mensaje\").item.json.recipientMasked }}",
+            "result": "FAILED",
+            "detail": "={{ String($json.error?.message ?? \"error desconocido\").slice(0, 200) }}",
+            "executionId": "={{ $execution.id }}",
+            "loggedAt": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "eventId", "displayName": "eventId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "workflow", "displayName": "workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "appointmentId", "displayName": "appointmentId", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true },
+            { "id": "recipientMasked", "displayName": "recipientMasked", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "result", "displayName": "result", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "detail", "displayName": "detail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "executionId", "displayName": "executionId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "loggedAt", "displayName": "loggedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d712b4e5-016d-4e60-bf6d-2f3636cc7597",
+      "name": "Registrar fallo",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [1568, 288]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: false, error: \"Fallo de envío\", eventId: $(\"Normalizar evento\").item.json.eventId } }}",
+        "options": { "responseCode": 502 }
+      },
+      "id": "01d2d785-e7d3-48a3-a450-e9a7fcd2490e",
+      "name": "Responder 502 fallo de envío",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1792, 288]
+    },
+    {
+      "parameters": {
+        "content": "## Antes de activar\n1. Conectar jhonNuñez-Gmail (OAuth2, solo envío) y jhonNuñez-Webhook-Secret (Header Auth: X-Webhook-Secret).\n2. En \"Normalizar evento\": poner un correo de prueba en testRecipient. testMode=true envía SIEMPRE ahí.\n3. Respuestas: 200 procesado o duplicado, 400 evento inválido, 502 fallo de envío (Spring puede reintentar: el envío fallido no cuenta como procesado).\n4. La URL de producción va en N8N_WEBHOOK_WF002_URL del .env.",
+        "color": 4
+      },
+      "id": "94f040cb-744c-427d-92bd-313379f94c8d",
+      "name": "Sticky Note f3e8e467",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [864, 352]
+    }
+  ],
+  "connections": {
+    "Evento de cambio de estado": { "main": [ [ { "node": "Normalizar evento", "type": "main", "index": 0 } ] ] },
+    "Normalizar evento": { "main": [ [ { "node": "¿Evento válido?", "type": "main", "index": 0 } ] ] },
+    "¿Evento válido?": { "main": [ [ { "node": "Buscar evento ya procesado", "type": "main", "index": 0 } ], [ { "node": "Responder 400 evento inválido", "type": "main", "index": 0 } ] ] },
+    "Buscar evento ya procesado": { "main": [ [ { "node": "¿Ya procesado?", "type": "main", "index": 0 } ] ] },
+    "¿Ya procesado?": { "main": [ [ { "node": "Responder 200 duplicado", "type": "main", "index": 0 } ], [ { "node": "Componer mensaje", "type": "main", "index": 0 } ] ] },
+    "Componer mensaje": { "main": [ [ { "node": "Enviar notificación", "type": "main", "index": 0 } ] ] },
+    "Enviar notificación": { "main": [ [ { "node": "Registrar enviado", "type": "main", "index": 0 } ], [ { "node": "Registrar fallo", "type": "main", "index": 0 } ] ] },
+    "Registrar enviado": { "main": [ [ { "node": "Responder 200 procesado", "type": "main", "index": 0 } ] ] },
+    "Registrar fallo": { "main": [ [ { "node": "Responder 502 fallo de envío", "type": "main", "index": 0 } ] ] }
+  }
+}

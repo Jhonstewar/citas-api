@@ -1,0 +1,167 @@
+{
+  "name": "jhonNuñez-WF-003-daily-operational-summary",
+  "description": "Resumen operativo diario por sede y estado enviado por Gmail a operaciones (bonus). Laboratorio FCV, datos ficticios.",
+  "settings": { "executionOrder": "v1", "availableInMCP": true, "binaryMode": "separate" },
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [ { "triggerAtHour": 7 } ] } },
+      "id": "7fbbf0f2-fcb5-47f1-95c6-81cb9b12b182",
+      "name": "Cada día 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "cfg-api", "name": "apiBaseUrl", "value": "https://CONFIGURAR-URL-DEL-TUNEL.invalid", "type": "string" },
+            { "id": "cfg-rcpt", "name": "operationsRecipient", "value": "CONFIGURAR-CORREO-DE-OPERACIONES@invalid.test", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "86c60981-3c67-4358-b2bb-ed4beeda084b",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [224, 96]
+    },
+    {
+      "parameters": {
+        "url": "={{ $(\"Configuración\").first().json.apiBaseUrl }}/api/automation/appointments/daily",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "options": { "timeout": 15000 }
+      },
+      "id": "1ebeec3b-1933-488c-824f-83756e677516",
+      "name": "Consultar citas del día",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [448, 96],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst data = $input.first().json;\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nconst pending = data.pending || {};\nconst bySite = {};\nrows.forEach(function (r) {\n  const site = r.siteCode || 'SIN_SEDE';\n  const status = r.status || 'SIN_ESTADO';\n  bySite[site] = bySite[site] || {};\n  bySite[site][status] = (bySite[site][status] || 0) + 1;\n});\nconst lines = [];\nObject.keys(bySite).sort().forEach(function (site) {\n  lines.push(site + ':');\n  Object.keys(bySite[site]).sort().forEach(function (status) {\n    lines.push('  - ' + status + ': ' + bySite[site][status]);\n  });\n});\nconst body = lines.length ? lines.join(NL) : 'Sin citas registradas para hoy.';\nconst text = 'Resumen operativo del ' + data.date + NL + NL\n  + 'Citas del día: ' + rows.length + NL + NL\n  + body + NL + NL\n  + 'Pendientes de decisión:' + NL\n  + '  - Solicitudes especializadas: ' + (pending.pendingRequests ?? 0) + NL\n  + '  - Reprogramaciones: ' + (pending.pendingReschedules ?? 0) + NL + NL\n  + 'Mensaje automático del laboratorio FCV (datos ficticios).';\nreturn [{ json: { date: data.date, total: rows.length, subject: 'Resumen operativo diario ' + data.date, text: text } }];"
+      },
+      "id": "f7abfa83-1261-4c26-a641-29bce4e4768f",
+      "name": "Agrupar por sede y estado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, 96]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $(\"Configuración\").first().json.operationsRecipient }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.text }}",
+        "options": { "appendAttribution": false }
+      },
+      "id": "d1d46d13-f73a-4c7f-a5ae-efe5ed62c591",
+      "name": "Enviar resumen",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [896, 96],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "eventId": "=WF-003|{{ $(\"Agrupar por sede y estado\").item.json.date }}",
+            "workflow": "WF-003",
+            "appointmentId": 0,
+            "recipientMasked": "operaciones",
+            "result": "SENT",
+            "detail": "=Citas del día: {{ $(\"Agrupar por sede y estado\").item.json.total }}",
+            "executionId": "={{ $execution.id }}",
+            "loggedAt": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "eventId", "displayName": "eventId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "workflow", "displayName": "workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "appointmentId", "displayName": "appointmentId", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true },
+            { "id": "recipientMasked", "displayName": "recipientMasked", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "result", "displayName": "result", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "detail", "displayName": "detail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "executionId", "displayName": "executionId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "loggedAt", "displayName": "loggedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6c010121-ffa6-41ec-a653-ed562d59c913",
+      "name": "Registrar enviado",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [1120, 0]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "citas/jhon-nunez/daily-summary", "authentication": "headerAuth", "options": {} },
+      "id": "edbd13cc-768b-46e1-b330-12c6f7185044",
+      "name": "Disparo a demanda",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 192]
+    },
+    {
+      "parameters": {
+        "dataTableId": { "__rl": true, "mode": "id", "value": "iqNu0V8hyF7mXAau" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "eventId": "=WF-003|{{ $(\"Agrupar por sede y estado\").item.json.date }}",
+            "workflow": "WF-003",
+            "appointmentId": 0,
+            "recipientMasked": "operaciones",
+            "result": "FAILED",
+            "detail": "={{ String($json.error?.message ?? \"error desconocido\").slice(0, 200) }}",
+            "executionId": "={{ $execution.id }}",
+            "loggedAt": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "eventId", "displayName": "eventId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "workflow", "displayName": "workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "appointmentId", "displayName": "appointmentId", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true },
+            { "id": "recipientMasked", "displayName": "recipientMasked", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "result", "displayName": "result", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "detail", "displayName": "detail", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "executionId", "displayName": "executionId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "loggedAt", "displayName": "loggedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "15e2e4e7-4c54-4132-8d12-f402d1f02a21",
+      "name": "Registrar fallo",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [1120, 192]
+    },
+    {
+      "parameters": {
+        "content": "## Antes de activar\n1. Conectar jhonNuñez-Gmail (OAuth2, solo envío), jhonNuñez-Automation-Key (Templated Custom Auth con la cabecera X-Automation-Key) y jhonNuñez-Webhook-Secret.\n2. En \"Configuración\": URL del túnel y correo de operaciones (en pruebas, el tuyo).\n3. Las filas del día no llevan datos personales: solo sede, estado, especialidad y hora.\n4. Un día sin citas igualmente envía el resumen con ceros.",
+        "color": 4
+      },
+      "id": "1caa9b78-2f4d-4d08-8f89-6b955bff9e4d",
+      "name": "Sticky Note 58cc14ac",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [496, 288]
+    }
+  ],
+  "connections": {
+    "Cada día 07:00": { "main": [ [ { "node": "Configuración", "type": "main", "index": 0 } ] ] },
+    "Configuración": { "main": [ [ { "node": "Consultar citas del día", "type": "main", "index": 0 } ] ] },
+    "Consultar citas del día": { "main": [ [ { "node": "Agrupar por sede y estado", "type": "main", "index": 0 } ] ] },
+    "Agrupar por sede y estado": { "main": [ [ { "node": "Enviar resumen", "type": "main", "index": 0 } ] ] },
+    "Enviar resumen": { "main": [ [ { "node": "Registrar enviado", "type": "main", "index": 0 } ], [ { "node": "Registrar fallo", "type": "main", "index": 0 } ] ] },
+    "Disparo a demanda": { "main": [ [ { "node": "Configuración", "type": "main", "index": 0 } ] ] }
+  }
+}
